@@ -28,6 +28,7 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         var alerts = new List<ThresholdEvent>();
         var operation = Find(_configuration.Operations, scenario.OperationId, x => x.Id, "operation");
         var plan = Find(_configuration.Plans, scenario.PlanId, x => x.Id, "plan");
+        var costChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly;
         var richGuardrails = scenario.BillingContext is not null ||
             scenario.Attribution is not null ||
             scenario.EconomicGuardrails is not null;
@@ -59,24 +60,27 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         }
 
         var runtimeEvaluator = new RuntimeGuardrailEvaluator();
-        var runtimePreflight = runtimeEvaluator.EvaluateBeforeCalls(scenario);
-        appliedGuardrails.AddRange(runtimePreflight.AppliedGuardrails);
-        if (runtimePreflight.Decision != SimulationDecision.Allowed)
+        if (!costChecksOnly)
         {
-            return new SimulationResult
+            var runtimePreflight = runtimeEvaluator.EvaluateBeforeCalls(scenario);
+            appliedGuardrails.AddRange(runtimePreflight.AppliedGuardrails);
+            if (runtimePreflight.Decision != SimulationDecision.Allowed)
             {
-                Decision = runtimePreflight.Decision,
-                FirstFailingGate = runtimePreflight.FailingGuardrailId,
-                Attribution = attribution,
-                AppliedGuardrails = appliedGuardrails,
-                Remaining = CreateUnchangedRemaining(scenario),
-                Explanation = explanation
-            };
+                return new SimulationResult
+                {
+                    Decision = runtimePreflight.Decision,
+                    FirstFailingGate = runtimePreflight.FailingGuardrailId,
+                    Attribution = attribution,
+                    AppliedGuardrails = appliedGuardrails,
+                    Remaining = CreateUnchangedRemaining(scenario),
+                    Explanation = explanation
+                };
+            }
         }
 
         var requiresActions = operation.ActionsMetering != ActionsMeteringMode.None;
         var actionsEvaluator = new ActionsGuardrailEvaluator();
-        if (requiresActions && scenario.ActionsGuardrails is not null)
+        if (!costChecksOnly && requiresActions && scenario.ActionsGuardrails is not null)
         {
             var actionsAccess = actionsEvaluator.EvaluateAccess(scenario.ActionsGuardrails);
             appliedGuardrails.AddRange(actionsAccess.AppliedGuardrails);
@@ -95,7 +99,7 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
             }
         }
 
-        var gateFailure = EvaluateGates(operation, scenario, explanation);
+        var gateFailure = costChecksOnly ? null : EvaluateGates(operation, scenario, explanation);
         if (gateFailure is not null)
         {
             return Blocked(
@@ -140,21 +144,24 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         var totalCredits = calls.Sum(x => x.Credits);
 
         assumptions.Add("Fractional AI credits are retained because GitHub does not document billing rounding.");
-        var runtimeCredits = runtimeEvaluator.EvaluateCredits(scenario.RuntimeGuardrails, totalCredits);
-        appliedGuardrails.AddRange(runtimeCredits.AppliedGuardrails);
-        if (runtimeCredits.Decision == SimulationDecision.SoftStopped)
+        if (!costChecksOnly)
         {
-            return new SimulationResult
+            var runtimeCredits = runtimeEvaluator.EvaluateCredits(scenario.RuntimeGuardrails, totalCredits);
+            appliedGuardrails.AddRange(runtimeCredits.AppliedGuardrails);
+            if (runtimeCredits.Decision == SimulationDecision.SoftStopped)
             {
-                Decision = SimulationDecision.SoftStopped,
-                FirstFailingGate = runtimeCredits.FailingGuardrailId,
-                Calls = calls,
-                Attribution = attribution,
-                AppliedGuardrails = appliedGuardrails,
-                Remaining = CreateUnchangedRemaining(scenario),
-                Assumptions = assumptions,
-                Explanation = explanation
-            };
+                return new SimulationResult
+                {
+                    Decision = SimulationDecision.SoftStopped,
+                    FirstFailingGate = runtimeCredits.FailingGuardrailId,
+                    Calls = calls,
+                    Attribution = attribution,
+                    AppliedGuardrails = appliedGuardrails,
+                    Remaining = CreateUnchangedRemaining(scenario),
+                    Assumptions = assumptions,
+                    Explanation = explanation
+                };
+            }
         }
 
         var actionsUsage = CalculateActions(operation, scenario, explanation);

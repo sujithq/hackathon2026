@@ -110,6 +110,8 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .guardrail-editor { display: grid; gap: .7rem; }
 .budget-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
 .setting-card { border: 1px solid var(--border); border-radius: 11px; padding: .85rem; background: rgba(9,14,27,.55); }
+.scope-card { margin-bottom: 1rem; border-color: rgba(124,92,255,.5); background: rgba(124,92,255,.08); }
+.default-badge { display: inline-flex; margin-left: .35rem; color: #ddd6fe; background: rgba(124,92,255,.22); border-radius: 999px; padding: .1rem .38rem; font-size: .58rem; text-transform: uppercase; letter-spacing: .05em; vertical-align: middle; }
 .impacted-setting { scroll-margin-top: 100px; outline: 2px solid var(--danger); outline-offset: 3px; border-color: rgba(251,113,133,.75) !important; background-color: rgba(251,113,133,.08) !important; }
 .impacted-setting::before { content: "Stopped here"; display: inline-flex; margin-bottom: .55rem; color: #fecdd3; background: rgba(251,113,133,.18); border-radius: 999px; padding: .18rem .48rem; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .setting-toggle { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; }

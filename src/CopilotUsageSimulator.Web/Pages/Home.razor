@@ -49,6 +49,16 @@
             <span class="step">1</span>
         </div>
 
+        <section class="setting-card scope-card">
+            <label class="setting-toggle">
+                <input type="checkbox" @bind="_form.CostChecksOnly" />
+                <span>
+                    <strong>Cost-related checks only <span class="default-badge">Default</span></strong>
+                    <small>Show and evaluate billing attribution, ULBs, included credits, paid usage, and spending budgets. Turn off to include access, policy, runtime, and approval checks.</small>
+                </span>
+            </label>
+        </section>
+
         <div class="field full">
             <label for="task">Task for the agent <span class="json-sync-badge">Scenario JSON</span></label>
             <textarea id="task" rows="4" @bind="_form.Task"></textarea>
@@ -134,13 +144,48 @@
         </div>
 
         <h3 class="synced-heading">Optional guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
+        <p class="section-help">ULB precedence: Individual exception → Cost center → Universal default. Only the most specific applicable ULB is enforced.</p>
         <div class="guardrail-editor">
-            <section id="individual-ulb-settings" class="setting-card @ImpactClass("user-level-budget")">
+            <section id="universal-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Universal)">
+                <label class="setting-toggle">
+                    <input type="checkbox" @bind="_form.UseUniversalUlb" />
+                    <span>
+                        <strong>Universal ULB</strong>
+                        <small>Default per-user limit for every Copilot-licensed user.</small>
+                    </span>
+                </label>
+                @if (_form.UseUniversalUlb)
+                {
+                    <div class="form-grid">
+                        <DecimalField Label="Credit limit per user" @bind-Value="_form.UniversalUlbLimit" />
+                        <DecimalField Label="Current user credits used" @bind-Value="_form.UniversalUlbConsumed" />
+                    </div>
+                }
+            </section>
+
+            <section id="cost-center-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.CostCenter)">
+                <label class="setting-toggle">
+                    <input type="checkbox" @bind="_form.UseCostCenterUlb" />
+                    <span>
+                        <strong>Cost-center ULB</strong>
+                        <small>Per-user default for the selected cost center; overrides the universal ULB.</small>
+                    </span>
+                </label>
+                @if (_form.UseCostCenterUlb)
+                {
+                    <div class="form-grid">
+                        <DecimalField Label="Credit limit per member" @bind-Value="_form.CostCenterUlbLimit" />
+                        <DecimalField Label="Current user credits used" @bind-Value="_form.CostCenterUlbConsumed" />
+                    </div>
+                }
+            </section>
+
+            <section id="individual-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Individual)">
                 <label class="setting-toggle">
                     <input type="checkbox" @bind="_form.UseIndividualUlb" />
                     <span>
-                        <strong>Individual user-level budget</strong>
-                        <small>Turn off to simulate without an individual ULB.</small>
+                        <strong>Individual ULB exception</strong>
+                        <small>Specific limit for the attributed user; overrides cost-center and universal ULBs.</small>
                     </span>
                 </label>
                 @if (_form.UseIndividualUlb)
@@ -178,54 +223,57 @@
             </section>
         </div>
 
-        <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
-        <section id="runtime-settings" class="setting-card @ImpactClass("runtime")">
-            <label class="setting-toggle">
-                <input type="checkbox" @bind="_form.UseRuntimeGuardrails" />
-                <span>
-                    <strong>Agent runtime limits</strong>
-                    <small>Operational limits for cumulative calls, duration, depth, and CLI credits.</small>
-                </span>
-            </label>
-            @if (_form.UseRuntimeGuardrails)
-            {
-                <div class="form-grid">
-                    <div class="field">
-                        <label>Maximum model calls</label>
-                        <input type="number" min="0" @bind="_form.MaximumModelCalls" />
+        @if (!_form.CostChecksOnly)
+        {
+            <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
+            <section id="runtime-settings" class="setting-card @ImpactClass("runtime")">
+                <label class="setting-toggle">
+                    <input type="checkbox" @bind="_form.UseRuntimeGuardrails" />
+                    <span>
+                        <strong>Agent runtime limits</strong>
+                        <small>Operational limits for cumulative calls, duration, depth, and CLI credits.</small>
+                    </span>
+                </label>
+                @if (_form.UseRuntimeGuardrails)
+                {
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>Maximum model calls</label>
+                            <input type="number" min="0" @bind="_form.MaximumModelCalls" />
+                        </div>
+                        <div class="field">
+                            <label>Model calls already used</label>
+                            <input type="number" min="0" @bind="_form.ModelCallsConsumed" />
+                        </div>
+                        <div class="field">
+                            <label>Maximum duration (minutes)</label>
+                            <input type="number" min="0" step="0.1" @bind="_form.MaximumDurationMinutes" />
+                        </div>
+                        <div class="field">
+                            <label>Duration already used (minutes)</label>
+                            <input type="number" min="0" step="0.1" @bind="_form.ElapsedDurationMinutes" />
+                        </div>
+                        <div class="field">
+                            <label>Duration needed per run (minutes)</label>
+                            <input type="number" min="0" step="0.1" @bind="_form.RequestedDurationMinutes" />
+                        </div>
+                        <div class="field">
+                            <label>Maximum subagent depth</label>
+                            <input type="number" min="0" @bind="_form.MaximumSubagentDepth" />
+                        </div>
+                        <div class="field">
+                            <label>Requested subagent depth</label>
+                            <input type="number" min="0" @bind="_form.RequestedSubagentDepth" />
+                        </div>
+                        <div class="field">
+                            <label>CLI session credit limit</label>
+                            <input type="number" min="0" step="0.01" @bind="_form.CliSoftCreditLimit" />
+                        </div>
+                        <DecimalField Label="CLI credits already used" @bind-Value="_form.CliCreditsConsumed" />
                     </div>
-                    <div class="field">
-                        <label>Model calls already used</label>
-                        <input type="number" min="0" @bind="_form.ModelCallsConsumed" />
-                    </div>
-                    <div class="field">
-                        <label>Maximum duration (minutes)</label>
-                        <input type="number" min="0" step="0.1" @bind="_form.MaximumDurationMinutes" />
-                    </div>
-                    <div class="field">
-                        <label>Duration already used (minutes)</label>
-                        <input type="number" min="0" step="0.1" @bind="_form.ElapsedDurationMinutes" />
-                    </div>
-                    <div class="field">
-                        <label>Duration needed per run (minutes)</label>
-                        <input type="number" min="0" step="0.1" @bind="_form.RequestedDurationMinutes" />
-                    </div>
-                    <div class="field">
-                        <label>Maximum subagent depth</label>
-                        <input type="number" min="0" @bind="_form.MaximumSubagentDepth" />
-                    </div>
-                    <div class="field">
-                        <label>Requested subagent depth</label>
-                        <input type="number" min="0" @bind="_form.RequestedSubagentDepth" />
-                    </div>
-                    <div class="field">
-                        <label>CLI session credit limit</label>
-                        <input type="number" min="0" step="0.01" @bind="_form.CliSoftCreditLimit" />
-                    </div>
-                    <DecimalField Label="CLI credits already used" @bind-Value="_form.CliCreditsConsumed" />
-                </div>
-            }
-        </section>
+                }
+            </section>
+        }
 
         <h3 class="synced-heading">Spending budgets <span class="json-sync-badge">Scenario JSON</span></h3>
         <p class="section-help">Enable only the budget scopes you want to test. Disabled budgets are not evaluated.</p>
@@ -599,6 +647,9 @@
             {
                 OperationId = _form.OperationId,
                 PlanId = _form.PlanId,
+                CheckScope = _form.CostChecksOnly
+                    ? SimulationCheckScope.CostRelatedOnly
+                    : SimulationCheckScope.All,
                 RepositoryVisibility = _form.RepositoryVisibility,
                 Calls = [call],
                 Metadata = metadata,
@@ -641,13 +692,39 @@
             _form.EnterpriseBudgetEnforcement);
 
         var ulbs = economic.UserLevelBudgets
-            .Where(ulb => ulb.Kind != UserLevelBudgetKind.Individual)
+            .Where(ulb =>
+                ulb.Kind != UserLevelBudgetKind.Universal &&
+                !(ulb.Kind == UserLevelBudgetKind.CostCenter &&
+                  string.Equals(ulb.TargetId, _form.CostCenterId, StringComparison.OrdinalIgnoreCase)) &&
+                !(ulb.Kind == UserLevelBudgetKind.Individual &&
+                  string.Equals(ulb.TargetId, userId, StringComparison.OrdinalIgnoreCase)))
             .ToList();
+        if (_form.UseUniversalUlb)
+        {
+            ulbs.Add(new UserLevelBudget
+            {
+                Id = "ulb-universal",
+                Kind = UserLevelBudgetKind.Universal,
+                LimitCredits = _form.UniversalUlbLimit,
+                ConsumedCredits = _form.UniversalUlbConsumed
+            });
+        }
+        if (_form.UseCostCenterUlb && !string.IsNullOrWhiteSpace(_form.CostCenterId))
+        {
+            ulbs.Add(new UserLevelBudget
+            {
+                Id = "ulb-cost-center",
+                Kind = UserLevelBudgetKind.CostCenter,
+                TargetId = _form.CostCenterId,
+                LimitCredits = _form.CostCenterUlbLimit,
+                ConsumedCredits = _form.CostCenterUlbConsumed
+            });
+        }
         if (_form.UseIndividualUlb)
         {
             ulbs.Add(new UserLevelBudget
             {
-                Id = "ulb-user",
+                Id = "ulb-individual",
                 Kind = UserLevelBudgetKind.Individual,
                 TargetId = userId,
                 LimitCredits = _form.UlbLimit,
@@ -845,7 +922,7 @@
         }
 
         var runtime = scenario.RuntimeGuardrails;
-        if (runtime is not null)
+        if (runtime is not null && scenario.CheckScope == SimulationCheckScope.All)
         {
             runtime = runtime with
             {
@@ -896,8 +973,18 @@
     private void LoadForm(SimulationScenario scenario)
     {
         var call = scenario.Calls.FirstOrDefault();
+        var userId = scenario.Attribution?.UserId;
+        var costCenterId = scenario.Attribution?.DirectAssignments.FirstOrDefault()?.CostCenterId;
+        var universalUlb = scenario.EconomicGuardrails?.UserLevelBudgets
+            .FirstOrDefault(x => x.Kind == UserLevelBudgetKind.Universal);
+        var costCenterUlb = scenario.EconomicGuardrails?.UserLevelBudgets
+            .FirstOrDefault(x =>
+                x.Kind == UserLevelBudgetKind.CostCenter &&
+                string.Equals(x.TargetId, costCenterId, StringComparison.OrdinalIgnoreCase));
         var individualUlb = scenario.EconomicGuardrails?.UserLevelBudgets
-            .FirstOrDefault(x => x.Kind == UserLevelBudgetKind.Individual);
+            .FirstOrDefault(x =>
+                x.Kind == UserLevelBudgetKind.Individual &&
+                string.Equals(x.TargetId, userId, StringComparison.OrdinalIgnoreCase));
         var enterpriseBudget = scenario.EconomicGuardrails?.SpendingBudgets
             .FirstOrDefault(x => x.Scope == SpendingBudgetScope.Enterprise);
         var costCenterBudget = scenario.EconomicGuardrails?.SpendingBudgets
@@ -911,6 +998,7 @@
             Task = scenario.Metadata.GetValueOrDefault("task", ""),
             OperationId = scenario.OperationId,
             PlanId = scenario.PlanId,
+            CostChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly,
             RepositoryVisibility = scenario.RepositoryVisibility,
             ModelId = call?.ModelId ?? ActiveConfiguration.Models.First().Id,
             ContextTokens = call?.ContextTokens ?? 0,
@@ -918,10 +1006,15 @@
             CachedInputTokens = call?.CachedInputTokens ?? 0,
             CacheWriteTokens = call?.CacheWriteTokens ?? 0,
             OutputTokens = call?.OutputTokens ?? 0,
-            CostCenterId = scenario.Attribution?.DirectAssignments.FirstOrDefault()?.CostCenterId
-                ?? "",
+            CostCenterId = costCenterId ?? "",
             OrganizationId = scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault() ?? "",
             PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
+            UseUniversalUlb = universalUlb is not null,
+            UniversalUlbLimit = universalUlb?.LimitCredits ?? 0,
+            UniversalUlbConsumed = universalUlb?.ConsumedCredits ?? 0,
+            UseCostCenterUlb = costCenterUlb is not null,
+            CostCenterUlbLimit = costCenterUlb?.LimitCredits ?? 0,
+            CostCenterUlbConsumed = costCenterUlb?.ConsumedCredits ?? 0,
             UseIndividualUlb = individualUlb is not null,
             UlbLimit = individualUlb?.LimitCredits ?? 0,
             UlbConsumed = individualUlb?.ConsumedCredits ?? 0,
@@ -1159,6 +1252,10 @@
         string.Equals(BlockingGuardrail?.Category, category, StringComparison.OrdinalIgnoreCase);
     private bool IsBlockingGate(string gateId) =>
         string.Equals(_result?.FirstFailingGate, gateId, StringComparison.OrdinalIgnoreCase);
+    private string UlbImpactClass(UserLevelBudgetKind kind) =>
+        IsBlockingCategory("user-level-budget") && _result?.EffectiveUlb?.Kind == kind
+            ? "impacted-setting"
+            : "";
     private string ImpactClass(string category) =>
         _result?.FirstFailingGate is null
             ? ""
@@ -1171,8 +1268,13 @@
     private string BlockingSettingsAnchor(AppliedGuardrail? guardrail) => guardrail?.Category switch
     {
         "runtime" => "runtime-settings",
-        "user-level-budget" when _result?.EffectiveUlb?.Kind == UserLevelBudgetKind.Individual =>
-            "individual-ulb-settings",
+        "user-level-budget" => _result?.EffectiveUlb?.Kind switch
+        {
+            UserLevelBudgetKind.Individual => "individual-ulb-settings",
+            UserLevelBudgetKind.CostCenter => "cost-center-ulb-settings",
+            UserLevelBudgetKind.Universal => "universal-ulb-settings",
+            _ => "scenario-json"
+        },
         "included-usage-control" => "included-control-settings",
         "included-pool" => "pool-settings",
         "paid-usage-authorization" => "paid-usage-settings",
@@ -1204,6 +1306,7 @@
         public string Task { get; set; } = "";
         public string OperationId { get; set; } = "cloud-agent";
         public string PlanId { get; set; } = "business";
+        public bool CostChecksOnly { get; set; } = true;
         public RepositoryVisibility RepositoryVisibility { get; set; } = RepositoryVisibility.Private;
         public string ModelId { get; set; } = "gpt-5.6-luna";
         public long ContextTokens { get; set; }
@@ -1214,6 +1317,12 @@
         public string CostCenterId { get; set; } = "";
         public string OrganizationId { get; set; } = "";
         public decimal PoolConsumed { get; set; }
+        public bool UseUniversalUlb { get; set; }
+        public decimal UniversalUlbLimit { get; set; }
+        public decimal UniversalUlbConsumed { get; set; }
+        public bool UseCostCenterUlb { get; set; }
+        public decimal CostCenterUlbLimit { get; set; }
+        public decimal CostCenterUlbConsumed { get; set; }
         public bool UseIndividualUlb { get; set; }
         public decimal UlbLimit { get; set; }
         public decimal UlbConsumed { get; set; }

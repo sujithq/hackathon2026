@@ -9,6 +9,7 @@ public sealed record SimulationScenario
     public string ProductId { get; init; } = "github-copilot";
     public string SkuId { get; init; } = "copilot-ai-credits";
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public SimulationCheckScope CheckScope { get; init; } = SimulationCheckScope.All;
     public RepositoryVisibility RepositoryVisibility { get; init; } = RepositoryVisibility.Private;
     public IReadOnlyList<ModelCallInput> Calls { get; init; } = [];
     public IReadOnlyDictionary<string, AccessGateState> AccessGates { get; init; } =
@@ -22,6 +23,12 @@ public sealed record SimulationScenario
     public ActionsGuardrailSnapshot? ActionsGuardrails { get; init; }
     public IReadOnlyDictionary<string, string> Metadata { get; init; } =
         new Dictionary<string, string>();
+}
+
+public enum SimulationCheckScope
+{
+    All,
+    CostRelatedOnly
 }
 
 public enum RepositoryVisibility

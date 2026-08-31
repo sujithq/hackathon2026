@@ -498,6 +498,67 @@ public sealed class GuardrailEngineTests
         Assert.Equal(0m, result.Allocation.TotalCredits);
     }
 
+    [Fact]
+    public void CostRelatedScopeSkipsOperationalAndAccessChecks()
+    {
+        var scenario = RichScenario(operation: "cloud-agent") with
+        {
+            CheckScope = SimulationCheckScope.CostRelatedOnly,
+            AccessGates = new Dictionary<string, AccessGateState>
+            {
+                ["policy"] = new() { Passed = false }
+            },
+            RuntimeGuardrails = new RuntimeGuardrailSnapshot
+            {
+                MaximumModelCalls = 0,
+                MaximumDuration = TimeSpan.Zero,
+                RequestedDuration = TimeSpan.FromMinutes(1)
+            },
+            ActionsUsage = new ActionsUsageInput
+            {
+                RunnerId = "linux-2-core",
+                Minutes = 5m
+            },
+            ActionsGuardrails = new ActionsGuardrailSnapshot
+            {
+                ActionsEnabled = GuardrailValue.Disabled,
+                RunnerAvailable = GuardrailValue.Disabled,
+                WorkflowApproved = GuardrailValue.Disabled,
+                RepositoryRulesPermitRun = GuardrailValue.Disabled,
+                IncludedMinutes = 100m
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+        Assert.DoesNotContain(result.AppliedGuardrails, x => x.Category == "runtime");
+        Assert.DoesNotContain(result.AppliedGuardrails, x => x.Category == "actions-access");
+        Assert.Contains(result.AppliedGuardrails, x => x.Category == "included-pool");
+    }
+
+    [Fact]
+    public void CostRelatedScopeStillEnforcesSpendingBudgets()
+    {
+        var scenario = MeteredScenario(
+            new SpendingBudget
+            {
+                Id = "cost-limit",
+                Scope = SpendingBudgetScope.Enterprise,
+                LimitUsd = 0.01m,
+                Enforcement = GuardrailEnforcement.HardStop
+            }) with
+        {
+            CheckScope = SimulationCheckScope.CostRelatedOnly,
+            RuntimeGuardrails = new RuntimeGuardrailSnapshot { MaximumModelCalls = 0 }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("cost-limit", result.FirstFailingGate);
+    }
+
     private static SimulationScenario MeteredScenario(params SpendingBudget[] budgets) =>
         RichScenario() with
         {

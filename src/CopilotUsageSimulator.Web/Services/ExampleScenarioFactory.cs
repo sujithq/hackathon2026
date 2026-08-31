@@ -25,6 +25,7 @@ public static class ExampleScenarioFactory
             ProductId = "github-copilot",
             SkuId = "copilot-ai-credits",
             Timestamp = timestamp,
+            CheckScope = SimulationCheckScope.CostRelatedOnly,
             RepositoryVisibility = RepositoryVisibility.Private,
             Metadata = new Dictionary<string, string> { ["task"] = task, ["estimate"] = "expected" },
             Calls =
@@ -81,6 +82,14 @@ public static class ExampleScenarioFactory
                         Kind = UserLevelBudgetKind.Universal,
                         LimitCredits = 2_000m,
                         ConsumedCredits = 250m
+                    },
+                    new UserLevelBudget
+                    {
+                        Id = "ulb-cost-center",
+                        Kind = UserLevelBudgetKind.CostCenter,
+                        TargetId = "cc-engineering",
+                        LimitCredits = 1_200m,
+                        ConsumedCredits = 150m
                     },
                     new UserLevelBudget
                     {

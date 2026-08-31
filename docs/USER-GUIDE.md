@@ -18,9 +18,14 @@ Successful clicks on **Apply overrides and simulate** also advance the current w
 
 The task description records intent; it does not automatically predict tokens. For uncertainty, save separate low, expected, and high workload scenarios.
 
+**Cost-related checks only** is enabled by default. It evaluates and displays attribution,
+ULBs, included-credit controls and pools, paid usage, spending budgets, and Actions cost.
+It skips access gates, runtime limits, repository policies, and workflow approvals. Turn
+the switch off to include the complete operational and cost guardrail sequence.
+
 To simulate without a cost center, clear the **Cost center** field. The user is then attributed at organization/enterprise level. Cost-center ULBs, included controls, and budgets do not apply, while applicable organization and enterprise constraints remain active.
 
-Optional guardrails are configured with plain-language cards. Turn off the switch for an individual ULB, included-usage control, cost-center budget, organization budget, enterprise budget, or Actions budget to omit it from the simulation. Each enabled budget exposes its limit, current spending, and stop/alert behavior.
+Optional guardrails are configured with plain-language cards. Universal, cost-center, and individual ULBs can be configured independently. The most specific applicable ULB wins: **Individual → Cost center → Universal**. This lets an individual ULB act as a higher or lower exception to the broader defaults. Turn off a switch to omit that control from the simulation. Each enabled budget exposes its limit, current spending, and stop/alert behavior.
 
 ## Result decisions
 

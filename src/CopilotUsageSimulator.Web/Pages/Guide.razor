@@ -106,6 +106,16 @@
     </section>
 
     <section>
+        <h2>Choosing the check scope</h2>
+        <p>
+            <strong>Cost-related checks only</strong> is enabled by default. In this mode, the simulator evaluates
+            attribution, ULBs, included-credit controls and pools, paid usage, metered budgets, and Actions spending.
+            Access gates, runtime limits, repository policies, and workflow approvals are not evaluated or shown.
+            Turn the switch off to simulate the complete operational and cost guardrail sequence.
+        </p>
+    </section>
+
+    <section>
         <h2>Reading the result</h2>
         <p>
             <strong>First failing check</strong> is the stable identifier for the guardrail that stopped the simulation.
@@ -135,9 +145,14 @@
         <h2>Advanced configuration</h2>
         <h3>Optional guardrail cards</h3>
         <p>
-            ULBs, included-usage controls, and each cost-center, organization, enterprise,
+            Universal, cost-center, and individual ULBs, included-usage controls, and each cost-center, organization, enterprise,
             or Actions budget have an enable switch. Turn a switch off to omit that constraint
             from the simulation; no JSON editing is required.
+        </p>
+        <p>
+            When multiple ULB types apply, GitHub uses the most specific one:
+            <strong>Individual → Cost center → Universal</strong>. Use an individual ULB as an
+            exception for a power user or for a more restrictive personal limit.
         </p>
         <h3>Complete scenario JSON</h3>
         <p>
