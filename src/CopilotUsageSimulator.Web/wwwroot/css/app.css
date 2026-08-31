@@ -105,6 +105,11 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .field { display: grid; gap: .35rem; }
 .field.full { margin-bottom: .9rem; }
 .field label { font-size: .78rem; font-weight: 700; color: #cdd6e9; }
+.field-label, .setting-header { display: flex; align-items: center; justify-content: space-between; gap: .55rem; }
+.setting-header { align-items: flex-start; }
+.setting-header .setting-toggle { flex: 1; }
+.docs-link { flex: 0 0 auto; color: #a5b4fc; font-size: .68rem; font-weight: 700; letter-spacing: 0; text-decoration: none; text-transform: none; white-space: nowrap; }
+.docs-link:hover, .docs-link:focus-visible { color: #c7d2fe; text-decoration: underline; }
 .field small { line-height: 1.4; }
 .section-help { color: var(--muted); font-size: .8rem; margin: -.3rem 0 .8rem; }
 .guardrail-editor { display: grid; gap: .7rem; }

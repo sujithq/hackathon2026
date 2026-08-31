@@ -67,7 +67,10 @@
 
         <div class="form-grid">
             <div class="field">
-                <label for="operation">Operation</label>
+                <div class="field-label">
+                    <label for="operation">Operation</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBilling" Topic="billable Copilot features" />
+                </div>
                 <select id="operation" @bind="_form.OperationId">
                     @foreach (var operation in ActiveConfiguration.Operations)
                     {
@@ -76,7 +79,10 @@
                 </select>
             </div>
             <div class="field">
-                <label for="plan">Plan</label>
+                <div class="field-label">
+                    <label for="plan">Plan</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.UsageBasedBilling" Topic="Copilot plan billing" />
+                </div>
                 <select id="plan" @bind="_form.PlanId">
                     @foreach (var plan in ActiveConfiguration.Plans)
                     {
@@ -94,7 +100,10 @@
                 </select>
             </div>
             <div class="field">
-                <label for="model">Model</label>
+                <div class="field-label">
+                    <label for="model">Model</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="Copilot models and pricing" />
+                </div>
                 <select id="model" @bind="_form.ModelId">
                     @foreach (var model in ActiveConfiguration.Models)
                     {
@@ -104,30 +113,47 @@
             </div>
         </div>
 
-        <h3 class="synced-heading">Expected model call <span class="json-sync-badge">Scenario JSON</span></h3>
+        <h3 class="synced-heading">
+            Expected model call
+            <span class="json-sync-badge">Scenario JSON</span>
+            <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="token pricing" />
+        </h3>
         <div class="form-grid compact">
-            <NumberField Label="Context tokens" @bind-Value="_form.ContextTokens" />
-            <NumberField Label="Fresh input" @bind-Value="_form.FreshInputTokens" />
-            <NumberField Label="Cached input" @bind-Value="_form.CachedInputTokens" />
-            <NumberField Label="Cache write" @bind-Value="_form.CacheWriteTokens" />
-            <NumberField Label="Output tokens" @bind-Value="_form.OutputTokens" />
+            <NumberField Label="Context tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="context-tier pricing" @bind-Value="_form.ContextTokens" />
+            <NumberField Label="Fresh input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="input-token pricing" @bind-Value="_form.FreshInputTokens" />
+            <NumberField Label="Cached input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cached-input pricing" @bind-Value="_form.CachedInputTokens" />
+            <NumberField Label="Cache write" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cache-write pricing" @bind-Value="_form.CacheWriteTokens" />
+            <NumberField Label="Output tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="output-token pricing" @bind-Value="_form.OutputTokens" />
         </div>
 
-        <h3 class="synced-heading">Enterprise overrides <span class="json-sync-badge">Scenario JSON</span></h3>
+        <h3 class="synced-heading">
+            Enterprise overrides
+            <span class="json-sync-badge">Scenario JSON</span>
+            <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
+        </h3>
         <div class="form-grid compact">
             <div class="field">
-                <label>Cost center</label>
+                <div class="field-label">
+                    <label>Cost center</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
+                </div>
                 <input @bind="_form.CostCenterId" />
             </div>
             <div class="field">
-                <label>Licensing organization</label>
+                <div class="field-label">
+                    <label>Licensing organization</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CostCenterAllocation" Topic="Copilot cost attribution" />
+                </div>
                 <input @bind="_form.OrganizationId" />
             </div>
             <div id="pool-settings" class="@ImpactClass("included-pool")">
-                <DecimalField Label="Pool consumed" @bind-Value="_form.PoolConsumed" />
+                <DecimalField Label="Pool consumed" DocsUrl="@GitHubDocumentationLinks.UsageBasedBilling" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
             </div>
             <div id="paid-usage-settings" class="field @ImpactClass("paid-usage-authorization")">
-                <label>Paid usage</label>
+                <div class="field-label">
+                    <label>Paid usage</label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="paid Copilot usage" />
+                </div>
                 <select @bind="_form.PaidUsage">
                     @foreach (var value in Enum.GetValues<GuardrailValue>())
                     {
@@ -135,7 +161,7 @@
                     }
                 </select>
             </div>
-            <DecimalField Label="Actions minutes" @bind-Value="_form.ActionsMinutes" />
+            <DecimalField Label="Actions minutes" DocsUrl="@GitHubDocumentationLinks.ActionsSpending" DocsTopic="GitHub Actions spending" @bind-Value="_form.ActionsMinutes" />
             <div class="field">
                 <label>Repeat task</label>
                 <input type="number" min="1" max="1000" @bind="_form.RepeatCount" />
@@ -147,13 +173,16 @@
         <p class="section-help">ULB precedence: Individual exception → Cost center → Universal default. Only the most specific applicable ULB is enforced.</p>
         <div class="guardrail-editor">
             <section id="universal-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Universal)">
-                <label class="setting-toggle">
-                    <input type="checkbox" @bind="_form.UseUniversalUlb" />
-                    <span>
-                        <strong>Universal ULB</strong>
-                        <small>Default per-user limit for every Copilot-licensed user.</small>
-                    </span>
-                </label>
+                <div class="setting-header">
+                    <label class="setting-toggle">
+                        <input type="checkbox" @bind="_form.UseUniversalUlb" />
+                        <span>
+                            <strong>Universal ULB</strong>
+                            <small>Default per-user limit for every Copilot-licensed user.</small>
+                        </span>
+                    </label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="universal user-level budgets" />
+                </div>
                 @if (_form.UseUniversalUlb)
                 {
                     <div class="form-grid">
@@ -164,13 +193,16 @@
             </section>
 
             <section id="cost-center-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.CostCenter)">
-                <label class="setting-toggle">
-                    <input type="checkbox" @bind="_form.UseCostCenterUlb" />
-                    <span>
-                        <strong>Cost-center ULB</strong>
-                        <small>Per-user default for the selected cost center; overrides the universal ULB.</small>
-                    </span>
-                </label>
+                <div class="setting-header">
+                    <label class="setting-toggle">
+                        <input type="checkbox" @bind="_form.UseCostCenterUlb" />
+                        <span>
+                            <strong>Cost-center ULB</strong>
+                            <small>Per-user default for the selected cost center; overrides the universal ULB.</small>
+                        </span>
+                    </label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="cost-center user-level budgets" />
+                </div>
                 @if (_form.UseCostCenterUlb)
                 {
                     <div class="form-grid">
@@ -181,13 +213,16 @@
             </section>
 
             <section id="individual-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Individual)">
-                <label class="setting-toggle">
-                    <input type="checkbox" @bind="_form.UseIndividualUlb" />
-                    <span>
-                        <strong>Individual ULB exception</strong>
-                        <small>Specific limit for the attributed user; overrides cost-center and universal ULBs.</small>
-                    </span>
-                </label>
+                <div class="setting-header">
+                    <label class="setting-toggle">
+                        <input type="checkbox" @bind="_form.UseIndividualUlb" />
+                        <span>
+                            <strong>Individual ULB exception</strong>
+                            <small>Specific limit for the attributed user; overrides cost-center and universal ULBs.</small>
+                        </span>
+                    </label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="individual user-level budgets" />
+                </div>
                 @if (_form.UseIndividualUlb)
                 {
                     <div class="form-grid">
@@ -198,13 +233,16 @@
             </section>
 
             <section id="included-control-settings" class="setting-card @ImpactClass("included-usage-control")">
-                <label class="setting-toggle">
-                    <input type="checkbox" @bind="_form.UseIncludedControl" />
-                    <span>
-                        <strong>Cost-center included-usage control</strong>
-                        <small>Limit how the attributed cost center uses included credits.</small>
-                    </span>
-                </label>
+                <div class="setting-header">
+                    <label class="setting-toggle">
+                        <input type="checkbox" @bind="_form.UseIncludedControl" />
+                        <span>
+                            <strong>Cost-center included-usage control</strong>
+                            <small>Limit how the attributed cost center uses included credits.</small>
+                        </span>
+                    </label>
+                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="included usage controls" />
+                </div>
                 @if (_form.UseIncludedControl)
                 {
                     <div class="form-grid">
@@ -281,6 +319,7 @@
             <BudgetCard Title="Cost-center budget"
                         Id="cost-center-budget-settings"
                         Highlighted="@IsBlockingGate("budget-cost-center")"
+                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
                         Help="Applies to metered usage attributed to this cost center."
                         @bind-Enabled="_form.UseCostCenterBudget"
                         @bind-Limit="_form.CostCenterBudgetLimit"
@@ -289,6 +328,7 @@
             <BudgetCard Title="Organization budget"
                         Id="organization-budget-settings"
                         Highlighted="@IsBlockingGate("budget-organization")"
+                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
                         Help="Used when organization-level metered spending is constrained."
                         @bind-Enabled="_form.UseOrganizationBudget"
                         @bind-Limit="_form.OrganizationBudgetLimit"
@@ -297,6 +337,7 @@
             <BudgetCard Title="Enterprise budget"
                         Id="enterprise-budget-settings"
                         Highlighted="@IsBlockingGate("budget-enterprise")"
+                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
                         Help="Applies across the enterprise unless the cost center is excluded."
                         @bind-Enabled="_form.UseEnterpriseBudget"
                         @bind-Limit="_form.EnterpriseBudgetLimit"
@@ -305,6 +346,7 @@
             <BudgetCard Title="Actions budget"
                         Id="actions-budget-settings"
                         Highlighted="@IsBlockingCategory("actions-budget")"
+                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
                         Help="Controls additional GitHub Actions runner charges."
                         @bind-Enabled="_form.UseActionsBudget"
                         @bind-Limit="_form.ActionsBudgetLimit"

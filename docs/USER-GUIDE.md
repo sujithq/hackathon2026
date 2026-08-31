@@ -51,6 +51,10 @@ scenario document. After a run stops, the responsible control is outlined in red
 **Stopped here**. Use **Review highlighted setting** to jump to it. If that setting has no
 guided control, the complete scenario JSON opens and is highlighted instead.
 
+A **Docs ↗** link beside a setting opens the matching official GitHub documentation in a new
+tab. Simulator-only controls, such as repeat count and custom runtime limits, intentionally
+have no GitHub Docs link because they do not represent GitHub billing settings.
+
 ## Cost and attribution
 
 - **AI credits** is the calculated request total.

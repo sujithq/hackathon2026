@@ -1,4 +1,5 @@
 .dotnet/
+.playwright-mcp/
 **/bin/
 **/obj/
 TestResults/
