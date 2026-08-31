@@ -33,13 +33,26 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         var poolEntitlement = CalculatePoolEntitlement(billing, scenario.Timestamp);
         if (poolEntitlement is null)
         {
+            var inventoryControl = ResolveIncludedControl(
+                snapshot,
+                attribution.CostCenterId,
+                scenario.Timestamp);
+            var failingGate = inventoryControl is { IsAmbiguous: false, Control: not null } &&
+                CalculateCostCenterEntitlement(
+                    billing,
+                    attribution.CostCenterId!,
+                    scenario.Timestamp) is null
+                    ? "included-control.seat-inventory"
+                    : "pool.seat-inventory";
             return EconomicGuardrailEvaluation.Stop(
                 SimulationDecision.Indeterminate,
-                "pool.seat-inventory",
+                failingGate,
                 applied,
                 alerts,
                 new RemainingState(),
-                message: "An active pooled seat references a plan with an unknown included-credit allowance.");
+                message: failingGate == "included-control.seat-inventory"
+                    ? "The cost-center seat inventory contains an unknown plan allowance."
+                    : "An active pooled seat references a plan with an unknown included-credit allowance.");
         }
 
         var poolRemaining = Math.Max(0m, poolEntitlement.Value - snapshot.EnterprisePoolConsumedCredits);
