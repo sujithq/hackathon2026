@@ -37,6 +37,11 @@
                 <strong>Run the simulation.</strong>
                 Select <em>Apply overrides and simulate</em>, then inspect the decision and ordered checks.
             </li>
+            <li>
+                <strong>Repeat when needed.</strong>
+                Set Repeat task to simulate the same workload sequentially until every run completes
+                or a guardrail stops the next one.
+            </li>
         </ol>
     </section>
 
@@ -54,6 +59,16 @@
             The simulator does not infer exact usage from the task description. Enter an expected workload,
             or simulate several scenarios to create low, expected, and high estimates.
         </div>
+        <p>
+            Repeated runs carry forward AI-credit pool usage, effective ULB usage, included controls,
+            spending budgets, runtime counters, Actions minutes, and Actions spending. The run history
+            shows where execution stopped and the totals include only successful runs.
+        </p>
+        <p>
+            Each later click on <strong>Apply overrides and simulate</strong> continues from the working
+            balances left by previous successful simulations. Select a template or load a saved scenario
+            when you want to reset the starting state.
+        </p>
     </section>
 
     <section>
@@ -96,6 +111,12 @@
             <strong>First failing check</strong> is the stable identifier for the guardrail that stopped the simulation.
             AI credits show the calculated request cost. Included and metered values show how the request would be allocated.
             Attribution identifies the user, cost center, organization, and effective ULB.
+        </p>
+        <p>
+            When a run stops, the <strong>Why it stopped</strong> card names the blocking scope in plain language
+            (for example, agent runtime, individual ULB, cost-center control, or spending budget) and shows the
+            configured limit, prior usage, current request, and projected remainder. Checks that occur later in
+            the evaluation order are not the cause and may not have been evaluated.
         </p>
         <p>
             Guardrail checks appear in evaluation order. Each row includes its enforcement,
