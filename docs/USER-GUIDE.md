@@ -16,6 +16,8 @@ The task description records intent; it does not automatically predict tokens. F
 
 To simulate without a cost center, clear the **Cost center** field. The user is then attributed at organization/enterprise level. Cost-center ULBs, included controls, and budgets do not apply, while applicable organization and enterprise constraints remain active.
 
+Optional guardrails are configured with plain-language cards. Turn off the switch for an individual ULB, included-usage control, cost-center budget, organization budget, enterprise budget, or Actions budget to omit it from the simulation. Each enabled budget exposes its limit, current spending, and stop/alert behavior.
+
 ## Result decisions
 
 | Decision | Meaning |
@@ -40,9 +42,9 @@ To simulate without a cost center, clear the **Cost center** field. The user is 
 
 Each visible guardrail row reports its outcome, enforcement, limit, prior consumption, requested usage, projected remainder, and explanation. Display all checks, issues only, failures only, or selected categories.
 
-## Advanced scenario configuration
+## Developer scenario configuration
 
-The complete scenario JSON editor exposes every engine input:
+Most simulations do not require JSON. The optional complete scenario JSON editor exposes every engine input when a developer needs a setting that is not available in the guided form:
 
 - task metadata, operation, plan, product, SKU, timestamp, and repository visibility;
 - model calls, token classes, and multipliers;
