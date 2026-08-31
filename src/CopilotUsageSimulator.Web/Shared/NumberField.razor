@@ -1,0 +1,18 @@
+<div class="field">
+    <label>@Label</label>
+    <input type="number" min="0" value="@Value" @oninput="OnInput" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public long Value { get; set; }
+    [Parameter] public EventCallback<long> ValueChanged { get; set; }
+
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        if (long.TryParse(args.Value?.ToString(), out var value))
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+    }
+}

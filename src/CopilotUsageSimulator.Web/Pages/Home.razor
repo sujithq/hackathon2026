@@ -1,0 +1,674 @@
+@page "/"
+@inject ICopilotUsageSimulationEngine DefaultEngine
+@inject EngineConfiguration DefaultConfiguration
+@inject ScenarioJson ScenarioJson
+@inject IJSRuntime JS
+
+<PageTitle>Copilot usage simulator</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Agent task preflight</p>
+        <h1>Will this task run—and what will it cost?</h1>
+        <p>Configure the workload and enterprise guardrails, then inspect every decision the engine makes.</p>
+    </div>
+    <div class="hero-actions">
+        <button class="button secondary" @onclick="SaveAsync">Save locally</button>
+        <button class="button secondary" @onclick="LoadAsync">Load saved</button>
+        <button class="button secondary" @onclick="ExportAsync">Export JSON</button>
+        <label class="button secondary file-button">
+            Import JSON
+            <InputFile OnChange="ImportAsync" accept=".json,application/json" />
+        </label>
+    </div>
+</section>
+
+<section class="template-strip">
+    <span>Start from:</span>
+    <button @onclick="@(() => LoadTemplate("cloud-agent"))">Cloud agent</button>
+    <button @onclick="@(() => LoadTemplate("code-review"))">Code review</button>
+    <button @onclick="@(() => LoadTemplate("chat"))">Chat</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="message error"><strong>Simulation error</strong><span>@_error</span></div>
+}
+@if (!string.IsNullOrWhiteSpace(_notice))
+{
+    <div class="message success">@_notice</div>
+}
+
+<div class="workspace">
+    <section class="panel configuration-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Scenario</p>
+                <h2>Task and overrides</h2>
+            </div>
+            <span class="step">1</span>
+        </div>
+
+        <div class="field full">
+            <label for="task">Task for the agent</label>
+            <textarea id="task" rows="4" @bind="_form.Task"></textarea>
+            <small>The task is descriptive. Token and runtime values below define the estimate.</small>
+        </div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="operation">Operation</label>
+                <select id="operation" @bind="_form.OperationId">
+                    @foreach (var operation in ActiveConfiguration.Operations)
+                    {
+                        <option value="@operation.Id">@operation.Id</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="plan">Plan</label>
+                <select id="plan" @bind="_form.PlanId">
+                    @foreach (var plan in ActiveConfiguration.Plans)
+                    {
+                        <option value="@plan.Id">@plan.Id</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="visibility">Repository</label>
+                <select id="visibility" @bind="_form.RepositoryVisibility">
+                    @foreach (var value in Enum.GetValues<RepositoryVisibility>())
+                    {
+                        <option value="@value">@value</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="model">Model</label>
+                <select id="model" @bind="_form.ModelId">
+                    @foreach (var model in ActiveConfiguration.Models)
+                    {
+                        <option value="@model.Id">@model.Id</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <h3>Expected model call</h3>
+        <div class="form-grid compact">
+            <NumberField Label="Context tokens" @bind-Value="_form.ContextTokens" />
+            <NumberField Label="Fresh input" @bind-Value="_form.FreshInputTokens" />
+            <NumberField Label="Cached input" @bind-Value="_form.CachedInputTokens" />
+            <NumberField Label="Cache write" @bind-Value="_form.CacheWriteTokens" />
+            <NumberField Label="Output tokens" @bind-Value="_form.OutputTokens" />
+        </div>
+
+        <h3>Enterprise overrides</h3>
+        <div class="form-grid compact">
+            <div class="field">
+                <label>Cost center</label>
+                <input @bind="_form.CostCenterId" />
+            </div>
+            <DecimalField Label="Pool consumed" @bind-Value="_form.PoolConsumed" />
+            <DecimalField Label="ULB limit" @bind-Value="_form.UlbLimit" />
+            <DecimalField Label="ULB consumed" @bind-Value="_form.UlbConsumed" />
+            <div class="field">
+                <label>Paid usage</label>
+                <select @bind="_form.PaidUsage">
+                    @foreach (var value in Enum.GetValues<GuardrailValue>())
+                    {
+                        <option value="@value">@value</option>
+                    }
+                </select>
+            </div>
+            <DecimalField Label="Enterprise budget USD" @bind-Value="_form.EnterpriseBudgetLimit" />
+            <DecimalField Label="Enterprise spent USD" @bind-Value="_form.EnterpriseBudgetConsumed" />
+            <DecimalField Label="Actions minutes" @bind-Value="_form.ActionsMinutes" />
+        </div>
+
+        <div class="primary-actions">
+            <button class="button primary" @onclick="ApplyAndRun">Apply overrides and simulate</button>
+            <button class="button ghost" @onclick="ApplyOverrides">Apply without running</button>
+        </div>
+
+        <details class="advanced">
+            <summary>
+                <span>Advanced: complete scenario JSON</span>
+                <small>Every engine parameter can be overridden here</small>
+            </summary>
+            <textarea class="json-editor" spellcheck="false" @bind="_scenarioJson"></textarea>
+            <div class="primary-actions">
+                <button class="button primary" @onclick="RunJson">Simulate JSON</button>
+                <button class="button ghost" @onclick="ReloadGuidedFields">Load JSON into guided fields</button>
+            </div>
+        </details>
+
+        <details class="advanced">
+            <summary>
+                <span>Advanced: pricing and policy catalog</span>
+                <small>Plans, models, prices, operations, gates, multipliers, and runners</small>
+            </summary>
+            <textarea class="json-editor catalog-editor" spellcheck="false" @bind="_catalogJson"></textarea>
+            <div class="primary-actions">
+                <button class="button primary" @onclick="ApplyCatalog">Apply catalog</button>
+                <button class="button ghost" @onclick="ResetCatalog">Reset default catalog</button>
+            </div>
+        </details>
+    </section>
+
+    <section class="panel results-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Result</p>
+                <h2>Decision and cost</h2>
+            </div>
+            <span class="step">2</span>
+        </div>
+
+        @if (_result is null)
+        {
+            <div class="empty-state">Configure a scenario and start a simulation.</div>
+        }
+        else
+        {
+            <div class="decision-banner @StatusClass(_result.Decision.ToString())">
+                <div>
+                    <small>Decision</small>
+                    <strong>@FormatDecision(_result.Decision)</strong>
+                </div>
+                @if (_result.FirstFailingGate is not null)
+                {
+                    <div>
+                        <small>First failing check</small>
+                        <code>@_result.FirstFailingGate</code>
+                    </div>
+                }
+            </div>
+
+            <div class="metrics">
+                <Metric Label="AI credits" Value="@Format(_result.Allocation.TotalCredits)" />
+                <Metric Label="Included credits" Value="@Format(_result.Allocation.IncludedCredits)" />
+                <Metric Label="Metered credits" Value="@Format(_result.Allocation.MeteredCredits)" />
+                <Metric Label="Metered cost" Value="@_result.Allocation.MeteredUsd.ToString("C")" />
+                <Metric Label="Actions cost" Value="@((_result.ActionsUsage?.AdditionalUsd ?? 0m).ToString("C"))" />
+                <Metric Label="Pool remaining" Value="@Format(_result.Remaining.IncludedPoolCredits)" />
+            </div>
+
+            <div class="summary-grid">
+                <div>
+                    <small>Attributed user</small>
+                    <strong>@(_result.Attribution?.UserId ?? "—")</strong>
+                </div>
+                <div>
+                    <small>Cost center</small>
+                    <strong>@(_result.Attribution?.CostCenterId ?? "Enterprise only")</strong>
+                </div>
+                <div>
+                    <small>Organization</small>
+                    <strong>@(_result.Attribution?.LicensingOrganizationId ?? "—")</strong>
+                </div>
+                <div>
+                    <small>Effective ULB</small>
+                    <strong>@(_result.EffectiveUlb?.Id ?? "None")</strong>
+                </div>
+            </div>
+
+            <div class="trace-heading">
+                <div>
+                    <h3>Guardrail checks</h3>
+                    <p>@VisibleGuardrails.Count() of @_result.AppliedGuardrails.Count checks shown</p>
+                </div>
+                <select aria-label="Check visibility" @bind="_visibilityMode">
+                    <option value="all">Show all</option>
+                    <option value="issues">Failures and warnings</option>
+                    <option value="failures">Failures only</option>
+                    <option value="custom">Custom categories</option>
+                </select>
+            </div>
+
+            @if (_visibilityMode == "custom")
+            {
+                <div class="category-filter">
+                    @foreach (var category in _result.AppliedGuardrails.Select(x => x.Category).Distinct())
+                    {
+                        <label>
+                            <input type="checkbox"
+                                   checked="@(!_hiddenCategories.Contains(category))"
+                                   @onchange="eventArgs => SetCategory(category, eventArgs)" />
+                            @category
+                        </label>
+                    }
+                </div>
+            }
+
+            <div class="check-list">
+                @{
+                    var checkNumber = 0;
+                }
+                @foreach (var guardrail in VisibleGuardrails)
+                {
+                    checkNumber++;
+                    <article class="check">
+                        <span class="check-index">@checkNumber</span>
+                        <span class="status-dot @StatusClass(guardrail.Outcome.ToString())"></span>
+                        <div class="check-body">
+                            <div class="check-title">
+                                <strong>@guardrail.Id</strong>
+                                <span>@guardrail.Category</span>
+                                <span class="outcome @StatusClass(guardrail.Outcome.ToString())">@guardrail.Outcome</span>
+                            </div>
+                            <p>@guardrail.Message</p>
+                            @if (guardrail.Limit is not null || guardrail.Requested is not null)
+                            {
+                                <div class="check-values">
+                                    <span>Limit <strong>@FormatNullable(guardrail.Limit)</strong></span>
+                                    <span>Before <strong>@FormatNullable(guardrail.ConsumedBefore)</strong></span>
+                                    <span>Requested <strong>@FormatNullable(guardrail.Requested)</strong></span>
+                                    <span>After <strong>@FormatNullable(guardrail.RemainingAfter)</strong></span>
+                                </div>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+
+            @if (_result.Explanation.Count > 0)
+            {
+                <details class="explanation">
+                    <summary>Decision trace and assumptions</summary>
+                    <ol>
+                        @foreach (var entry in _result.Explanation)
+                        {
+                            <li><code>@entry.Code</code> @entry.Message</li>
+                        }
+                    </ol>
+                    @foreach (var assumption in _result.Assumptions)
+                    {
+                        <p class="assumption">@assumption</p>
+                    }
+                </details>
+            }
+        }
+    </section>
+</div>
+
+@code {
+    private const string StorageKey = "copilot-usage-simulator.scenario.v1";
+    private const string CatalogStorageKey = "copilot-usage-simulator.catalog.v1";
+    private const string PreferenceStorageKey = "copilot-usage-simulator.preferences.v1";
+    private readonly HashSet<string> _hiddenCategories = new(StringComparer.OrdinalIgnoreCase);
+    private EngineConfiguration? _activeConfiguration;
+    private ICopilotUsageSimulationEngine? _activeEngine;
+    private GuidedForm _form = new();
+    private string _scenarioJson = "";
+    private string _catalogJson = "";
+    private string _visibilityMode = "all";
+    private string? _error;
+    private string? _notice;
+    private SimulationResult? _result;
+
+    private EngineConfiguration ActiveConfiguration => _activeConfiguration ?? DefaultConfiguration;
+    private ICopilotUsageSimulationEngine ActiveEngine => _activeEngine ?? DefaultEngine;
+    private IEnumerable<AppliedGuardrail> VisibleGuardrails =>
+        _result?.AppliedGuardrails.Where(ShouldShow) ?? [];
+
+    protected override void OnInitialized()
+    {
+        ResetCatalog();
+        LoadTemplate("cloud-agent");
+    }
+
+    private void LoadTemplate(string template)
+    {
+        var scenario = ExampleScenarioFactory.Create(ActiveConfiguration, template);
+        _scenarioJson = ScenarioJson.Serialize(scenario);
+        LoadForm(scenario);
+        RunScenario(scenario);
+        _notice = null;
+    }
+
+    private void ApplyOverrides()
+    {
+        try
+        {
+            var scenario = ScenarioJson.Deserialize(_scenarioJson);
+            var call = scenario.Calls.FirstOrDefault() ?? new ModelCallInput { ModelId = _form.ModelId };
+            call = call with
+            {
+                ModelId = _form.ModelId,
+                ContextTokens = _form.ContextTokens,
+                FreshInputTokens = _form.FreshInputTokens,
+                CachedInputTokens = _form.CachedInputTokens,
+                CacheWriteTokens = _form.CacheWriteTokens,
+                OutputTokens = _form.OutputTokens
+            };
+
+            var metadata = new Dictionary<string, string>(scenario.Metadata, StringComparer.OrdinalIgnoreCase)
+            {
+                ["task"] = _form.Task
+            };
+            var attribution = scenario.Attribution is null
+                ? null
+                : scenario.Attribution with
+                {
+                    DirectAssignments = string.IsNullOrWhiteSpace(_form.CostCenterId)
+                        ? []
+                        : [new EffectiveCostCenterAssignment { CostCenterId = _form.CostCenterId }]
+                };
+            var billing = scenario.BillingContext is null
+                ? null
+                : scenario.BillingContext with
+                {
+                    SeatAssignments = scenario.BillingContext.SeatAssignments
+                        .Select(seat => seat.UserId == scenario.Attribution?.UserId
+                            ? seat with
+                            {
+                                CostCenterId = string.IsNullOrWhiteSpace(_form.CostCenterId)
+                                    ? null
+                                    : _form.CostCenterId
+                            }
+                            : seat)
+                        .ToArray()
+                };
+            var economic = UpdateEconomic(scenario.EconomicGuardrails);
+            var actionsUsage = scenario.ActionsUsage is null
+                ? null
+                : scenario.ActionsUsage with { Minutes = _form.ActionsMinutes };
+
+            scenario = scenario with
+            {
+                OperationId = _form.OperationId,
+                PlanId = _form.PlanId,
+                RepositoryVisibility = _form.RepositoryVisibility,
+                Calls = [call],
+                Metadata = metadata,
+                Attribution = attribution,
+                BillingContext = billing,
+                EconomicGuardrails = economic,
+                ActionsUsage = actionsUsage
+            };
+            _scenarioJson = ScenarioJson.Serialize(scenario);
+            _error = null;
+            _notice = "Guided overrides applied to the complete scenario.";
+        }
+        catch (Exception exception) when (exception is JsonException or SimulationException)
+        {
+            _error = exception.Message;
+            _notice = null;
+        }
+    }
+
+    private EconomicGuardrailSnapshot? UpdateEconomic(EconomicGuardrailSnapshot? economic)
+    {
+        if (economic is null)
+        {
+            return null;
+        }
+
+        var budgets = economic.SpendingBudgets
+            .Select(budget => budget.Scope == SpendingBudgetScope.Enterprise
+                ? budget with
+                {
+                    LimitUsd = _form.EnterpriseBudgetLimit,
+                    ConsumedUsd = _form.EnterpriseBudgetConsumed
+                }
+                : budget)
+            .ToArray();
+        var ulbs = economic.UserLevelBudgets
+            .Select(ulb => ulb.Kind == UserLevelBudgetKind.Individual
+                ? ulb with { LimitCredits = _form.UlbLimit, ConsumedCredits = _form.UlbConsumed }
+                : ulb)
+            .ToArray();
+        return economic with
+        {
+            EnterprisePoolConsumedCredits = _form.PoolConsumed,
+            PaidUsage = economic.PaidUsage with { State = _form.PaidUsage },
+            SpendingBudgets = budgets,
+            UserLevelBudgets = ulbs
+        };
+    }
+
+    private void ApplyAndRun()
+    {
+        ApplyOverrides();
+        if (_error is null)
+        {
+            RunJson();
+        }
+    }
+
+    private void RunJson()
+    {
+        try
+        {
+            RunScenario(ScenarioJson.Deserialize(_scenarioJson));
+        }
+        catch (Exception exception) when (exception is JsonException or SimulationException or InvalidOperationException)
+        {
+            _result = null;
+            _error = exception is SimulationException simulation
+                ? $"{simulation.Code}: {simulation.Message}"
+                : exception.Message;
+            _notice = null;
+        }
+    }
+
+    private void RunScenario(SimulationScenario scenario)
+    {
+        _result = ActiveEngine.Simulate(scenario);
+        _error = null;
+    }
+
+    private void ReloadGuidedFields()
+    {
+        try
+        {
+            LoadForm(ScenarioJson.Deserialize(_scenarioJson));
+            _error = null;
+            _notice = "Guided fields refreshed from JSON.";
+        }
+        catch (JsonException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private void LoadForm(SimulationScenario scenario)
+    {
+        var call = scenario.Calls.FirstOrDefault();
+        var individualUlb = scenario.EconomicGuardrails?.UserLevelBudgets
+            .FirstOrDefault(x => x.Kind == UserLevelBudgetKind.Individual);
+        var enterpriseBudget = scenario.EconomicGuardrails?.SpendingBudgets
+            .FirstOrDefault(x => x.Scope == SpendingBudgetScope.Enterprise);
+        _form = new GuidedForm
+        {
+            Task = scenario.Metadata.GetValueOrDefault("task", ""),
+            OperationId = scenario.OperationId,
+            PlanId = scenario.PlanId,
+            RepositoryVisibility = scenario.RepositoryVisibility,
+            ModelId = call?.ModelId ?? ActiveConfiguration.Models.First().Id,
+            ContextTokens = call?.ContextTokens ?? 0,
+            FreshInputTokens = call?.FreshInputTokens ?? 0,
+            CachedInputTokens = call?.CachedInputTokens ?? 0,
+            CacheWriteTokens = call?.CacheWriteTokens ?? 0,
+            OutputTokens = call?.OutputTokens ?? 0,
+            CostCenterId = scenario.Attribution?.DirectAssignments.FirstOrDefault()?.CostCenterId
+                ?? "",
+            PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
+            UlbLimit = individualUlb?.LimitCredits ?? 0,
+            UlbConsumed = individualUlb?.ConsumedCredits ?? 0,
+            PaidUsage = scenario.EconomicGuardrails?.PaidUsage.State ?? GuardrailValue.Unknown,
+            EnterpriseBudgetLimit = enterpriseBudget?.LimitUsd ?? 0,
+            EnterpriseBudgetConsumed = enterpriseBudget?.ConsumedUsd ?? 0,
+            ActionsMinutes = scenario.ActionsUsage?.Minutes ?? 0
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, _scenarioJson);
+            await JS.InvokeVoidAsync("localStorage.setItem", CatalogStorageKey, _catalogJson);
+            var preferences = JsonSerializer.Serialize(new DisplayPreferences(
+                _visibilityMode,
+                _hiddenCategories.ToArray()));
+            await JS.InvokeVoidAsync("localStorage.setItem", PreferenceStorageKey, preferences);
+            _notice = "Scenario saved in this browser.";
+            _error = null;
+        }
+        catch (JSException exception)
+        {
+            _error = $"Browser storage is unavailable: {exception.Message}";
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (string.IsNullOrWhiteSpace(saved))
+            {
+                _error = "No saved scenario was found in this browser.";
+                return;
+            }
+
+            var savedCatalog = await JS.InvokeAsync<string?>("localStorage.getItem", CatalogStorageKey);
+            if (!string.IsNullOrWhiteSpace(savedCatalog))
+            {
+                _catalogJson = savedCatalog;
+                ApplyCatalog();
+            }
+
+            var savedPreferences = await JS.InvokeAsync<string?>("localStorage.getItem", PreferenceStorageKey);
+            if (!string.IsNullOrWhiteSpace(savedPreferences))
+            {
+                var preferences = JsonSerializer.Deserialize<DisplayPreferences>(savedPreferences);
+                if (preferences is not null)
+                {
+                    _visibilityMode = preferences.VisibilityMode;
+                    _hiddenCategories.Clear();
+                    _hiddenCategories.UnionWith(preferences.HiddenCategories);
+                }
+            }
+
+            _scenarioJson = saved;
+            ReloadGuidedFields();
+            RunJson();
+            _notice = "Saved scenario loaded.";
+        }
+        catch (JSException exception)
+        {
+            _error = $"Browser storage is unavailable: {exception.Message}";
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("simulator.downloadText", "copilot-simulation.json", _scenarioJson);
+        }
+        catch (JSException exception)
+        {
+            _error = $"The scenario could not be exported: {exception.Message}";
+        }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            await using var stream = args.File.OpenReadStream(2 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _scenarioJson = await reader.ReadToEndAsync();
+            ReloadGuidedFields();
+            RunJson();
+            _notice = $"Imported {args.File.Name}.";
+        }
+        catch (Exception exception) when (exception is IOException or JsonException)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private bool ShouldShow(AppliedGuardrail guardrail) =>
+        _visibilityMode switch
+        {
+            "issues" => guardrail.Outcome != GuardrailOutcome.Passed,
+            "failures" => guardrail.Outcome is GuardrailOutcome.Blocked or GuardrailOutcome.Indeterminate,
+            "custom" => !_hiddenCategories.Contains(guardrail.Category),
+            _ => true
+        };
+
+    private void SetCategory(string category, ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            _hiddenCategories.Remove(category);
+        }
+        else
+        {
+            _hiddenCategories.Add(category);
+        }
+    }
+
+    private void ApplyCatalog()
+    {
+        try
+        {
+            _activeConfiguration = ScenarioJson.DeserializeConfiguration(_catalogJson);
+            _activeEngine = new CopilotUsageSimulationEngine(_activeConfiguration);
+            _error = null;
+            _notice = $"Catalog '{_activeConfiguration.Version}' applied.";
+        }
+        catch (Exception exception) when (exception is JsonException or ConfigurationException)
+        {
+            _error = exception.Message;
+            _notice = null;
+        }
+    }
+
+    private void ResetCatalog()
+    {
+        _activeConfiguration = DefaultConfiguration;
+        _activeEngine = DefaultEngine;
+        _catalogJson = ScenarioJson.SerializeConfiguration(DefaultConfiguration);
+        _error = null;
+    }
+
+    private static string StatusClass(string value) => value.ToLowerInvariant().Replace("stopped", "-stopped");
+    private static string FormatDecision(SimulationDecision decision) => decision switch
+    {
+        SimulationDecision.PartiallySimulated => "Partially simulated",
+        SimulationDecision.SoftStopped => "Soft stopped",
+        _ => decision.ToString()
+    };
+    private static string Format(decimal value) => value.ToString("0.####");
+    private static string FormatNullable(decimal? value) => value?.ToString("0.####") ?? "—";
+
+    private sealed class GuidedForm
+    {
+        public string Task { get; set; } = "";
+        public string OperationId { get; set; } = "cloud-agent";
+        public string PlanId { get; set; } = "business";
+        public RepositoryVisibility RepositoryVisibility { get; set; } = RepositoryVisibility.Private;
+        public string ModelId { get; set; } = "gpt-5.6-luna";
+        public long ContextTokens { get; set; }
+        public long FreshInputTokens { get; set; }
+        public long CachedInputTokens { get; set; }
+        public long CacheWriteTokens { get; set; }
+        public long OutputTokens { get; set; }
+        public string CostCenterId { get; set; } = "";
+        public decimal PoolConsumed { get; set; }
+        public decimal UlbLimit { get; set; }
+        public decimal UlbConsumed { get; set; }
+        public GuardrailValue PaidUsage { get; set; }
+        public decimal EnterpriseBudgetLimit { get; set; }
+        public decimal EnterpriseBudgetConsumed { get; set; }
+        public decimal ActionsMinutes { get; set; }
+    }
+
+    private sealed record DisplayPreferences(string VisibilityMode, string[] HiddenCategories);
+}

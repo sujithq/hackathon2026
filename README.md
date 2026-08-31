@@ -9,6 +9,7 @@ The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Toke
 | Project | Purpose |
 |---|---|
 | `src/CopilotUsageSimulator.Engine` | Pure simulation domain and JSON configuration loader |
+| `src/CopilotUsageSimulator.Web` | Standalone Blazor WebAssembly simulator for GitHub Pages |
 | `tests/CopilotUsageSimulator.Engine.Tests` | Contract and calculation tests |
 
 ## Use the engine
@@ -133,6 +134,20 @@ var result = engine.Simulate(scenario);
 ```
 
 `AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access and spending are evaluated before AI-credit allocation, so denied or waiting workflows leave both meters unchanged. Existing callers can continue using `BudgetState`; adding any rich economic input requires all three rich inputs.
+
+## Web simulator
+
+The standalone web client runs the engine entirely in the browser. It provides guided task, workload, cost-center, ULB, budget, and Actions overrides, plus complete JSON editors for every scenario and catalog setting. Every evaluated check is visible by default and can be filtered by outcome or category.
+
+See the [end-user guide](docs/USER-GUIDE.md), which is also available from the **User guide** link inside the app.
+
+```powershell
+dotnet run --project src\CopilotUsageSimulator.Web
+```
+
+Scenarios, custom catalogs, and display preferences can be saved to browser storage. Scenario JSON can also be imported and exported. No usage data is sent to a server.
+
+The workflow in `.github\workflows\deploy-pages.yml` publishes the static WebAssembly output to GitHub Pages on pushes to `main`. Enable **Settings → Pages → Source: GitHub Actions** in the destination repository.
 
 ## Build
 

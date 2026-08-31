@@ -1,0 +1,21 @@
+﻿@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="">
+            <span class="brand-mark">C</span>
+            <span>
+                <strong>Copilot usage simulator</strong>
+                <small>Policy and cost preview</small>
+            </span>
+        </a>
+        <nav class="topnav">
+            <NavLink href="" Match="NavLinkMatch.All">Simulator</NavLink>
+            <NavLink href="guide">User guide</NavLink>
+            <span class="local-badge">Runs locally in your browser</span>
+        </nav>
+    </header>
+    <main>
+        @Body
+    </main>
+</div>
