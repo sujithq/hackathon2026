@@ -11,6 +11,7 @@ The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Toke
 | `src/CopilotUsageSimulator.Engine` | Pure simulation domain and JSON configuration loader |
 | `src/CopilotUsageSimulator.Web` | Standalone Blazor WebAssembly simulator for GitHub Pages |
 | `tests/CopilotUsageSimulator.Engine.Tests` | Contract and calculation tests |
+| `tests/CopilotUsageSimulator.Web.Tests` | bUnit component, guided-workflow, and serialization tests |
 
 ## Use the engine
 
@@ -149,10 +150,14 @@ Scenarios, custom catalogs, and display preferences can be saved to browser stor
 
 The workflow in `.github\workflows\deploy-pages.yml` publishes the static WebAssembly output to GitHub Pages on pushes to `main`. Enable **Settings → Pages → Source: GitHub Actions** in the destination repository.
 
-## Build
+## Build and test
 
 ```powershell
 dotnet test CopilotUsageSimulator.slnx
 ```
+
+The web tests run through bUnit without starting a browser. They cover template rendering,
+cost-only visibility, repeated simulations, blocking-setting highlights, validation errors,
+official documentation links, shared controls, and JSON round trips.
 
 The repository pins `.NET SDK 11.0.100-preview.7.26381.103` through `global.json`. The SDK is installed in `.dotnet` and the system-wide installation remains unchanged.
