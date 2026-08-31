@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CopilotUsageSimulator.Engine/CopilotUsageSimulator.Engine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CopilotUsageSimulator.Engine.Tests/CopilotUsageSimulator.Engine.Tests.csproj" />
+  </Folder>
+</Solution>

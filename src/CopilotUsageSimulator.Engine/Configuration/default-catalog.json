@@ -1,0 +1,264 @@
+{
+  "version": "2026-08-31",
+  "usdPerCredit": 0.01,
+  "poolOverflowBehavior": "split",
+  "plans": [
+    { "id": "free", "includedCreditsPerUser": null, "isPooled": false },
+    { "id": "student", "includedCreditsPerUser": null, "isPooled": false },
+    { "id": "pro", "includedCreditsPerUser": 1500, "isPooled": false },
+    { "id": "pro-plus", "includedCreditsPerUser": 7000, "isPooled": false },
+    { "id": "max", "includedCreditsPerUser": 20000, "isPooled": false },
+    { "id": "business", "includedCreditsPerUser": 1900, "isPooled": true },
+    { "id": "enterprise", "includedCreditsPerUser": 3900, "isPooled": true }
+  ],
+  "operations": [
+    { "id": "code-completion", "isBilled": false, "actionsMetering": "none" },
+    { "id": "next-edit-suggestion", "isBilled": false, "actionsMetering": "none" },
+    { "id": "utility-model", "isBilled": false, "actionsMetering": "none" },
+    { "id": "chat", "isBilled": true, "actionsMetering": "none" },
+    { "id": "ide-agent", "isBilled": true, "actionsMetering": "none" },
+    { "id": "cli", "isBilled": true, "actionsMetering": "none" },
+    { "id": "copilot-app", "isBilled": true, "actionsMetering": "none" },
+    { "id": "cloud-agent", "isBilled": true, "actionsMetering": "always" },
+    { "id": "code-review", "isBilled": true, "actionsMetering": "privateRepositories" },
+    { "id": "spaces", "isBilled": true, "actionsMetering": "none" },
+    { "id": "third-party-agent", "isBilled": true, "actionsMetering": "none" }
+  ],
+  "gates": [
+    { "id": "license-seat", "sequence": 10, "passWhenUnspecified": true },
+    { "id": "policy", "sequence": 20, "passWhenUnspecified": true },
+    { "id": "content-exclusion", "sequence": 30, "passWhenUnspecified": true },
+    { "id": "public-code", "sequence": 40, "passWhenUnspecified": true },
+    { "id": "responsible-ai", "sequence": 50, "passWhenUnspecified": true },
+    { "id": "technical-limits", "sequence": 60, "passWhenUnspecified": true },
+    { "id": "network", "sequence": 70, "passWhenUnspecified": true },
+    { "id": "authentication", "sequence": 80, "passWhenUnspecified": true },
+    { "id": "rate-limit", "sequence": 90, "passWhenUnspecified": true },
+    { "id": "model-availability", "sequence": 100, "passWhenUnspecified": true },
+    {
+      "id": "cloud-agent-runtime",
+      "sequence": 110,
+      "applicableOperationIds": [ "cloud-agent" ],
+      "passWhenUnspecified": true
+    }
+  ],
+  "multipliers": [
+    {
+      "id": "auto-model-selection",
+      "factor": 0.90,
+      "applicableOperationIds": [ "chat", "cli", "copilot-app", "cloud-agent" ]
+    },
+    { "id": "data-residency-fedramp", "factor": 1.10 }
+  ],
+  "actionsRunners": [
+    { "id": "linux-1-core", "usdPerMinute": 0.002 },
+    { "id": "linux-2-core", "usdPerMinute": 0.006 },
+    { "id": "linux-arm64", "usdPerMinute": 0.005 },
+    { "id": "windows-2-core", "usdPerMinute": 0.010 },
+    { "id": "windows-arm64", "usdPerMinute": 0.010 },
+    { "id": "macos-3-4-core", "usdPerMinute": 0.062 },
+    { "id": "self-hosted", "usdPerMinute": 0.000 }
+  ],
+  "models": [
+    {
+      "id": "gpt-5-mini",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.25, "cachedInputUsdPerMillion": 0.025, "outputUsdPerMillion": 2.00 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 1.75, "cachedInputUsdPerMillion": 0.175, "outputUsdPerMillion": 14.00 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.4",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 272000, "inputUsdPerMillion": 2.50, "cachedInputUsdPerMillion": 0.25, "outputUsdPerMillion": 15.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 272000, "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "outputUsdPerMillion": 22.50 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.75, "cachedInputUsdPerMillion": 0.075, "outputUsdPerMillion": 4.50 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.4-nano",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.20, "cachedInputUsdPerMillion": 0.02, "outputUsdPerMillion": 1.25 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 272000, "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "outputUsdPerMillion": 30.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 272000, "inputUsdPerMillion": 10.00, "cachedInputUsdPerMillion": 1.00, "outputUsdPerMillion": 45.00 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 200000, "inputUsdPerMillion": 0.20, "cachedInputUsdPerMillion": 0.02, "cacheWriteUsdPerMillion": 0.25, "outputUsdPerMillion": 1.20 },
+        { "id": "long-context", "minimumContextTokensExclusive": 200000, "inputUsdPerMillion": 0.40, "cachedInputUsdPerMillion": 0.04, "cacheWriteUsdPerMillion": 0.50, "outputUsdPerMillion": 1.80 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "effectiveTo": "2026-09-04T00:00:00Z", "tiers": [
+        { "id": "promotional-default", "maximumContextTokensInclusive": 272000, "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.20, "cacheWriteUsdPerMillion": 2.50, "outputUsdPerMillion": 10.00 },
+        { "id": "promotional-long-context", "minimumContextTokensExclusive": 272000, "inputUsdPerMillion": 4.00, "cachedInputUsdPerMillion": 0.40, "cacheWriteUsdPerMillion": 5.00, "outputUsdPerMillion": 15.00 }
+      ]}]
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 272000, "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.20, "cacheWriteUsdPerMillion": 2.50, "outputUsdPerMillion": 12.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 272000, "inputUsdPerMillion": 4.00, "cachedInputUsdPerMillion": 0.40, "cacheWriteUsdPerMillion": 5.00, "outputUsdPerMillion": 18.00 }
+      ]}]
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 1.00, "cachedInputUsdPerMillion": 0.10, "cacheWriteUsdPerMillion": 1.25, "outputUsdPerMillion": 5.00 }
+      ]}]
+    },
+    {
+      "id": "claude-sonnet-4",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 3.00, "cachedInputUsdPerMillion": 0.30, "cacheWriteUsdPerMillion": 3.75, "outputUsdPerMillion": 15.00 }
+      ]}]
+    },
+    {
+      "id": "claude-sonnet-4.5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 3.00, "cachedInputUsdPerMillion": 0.30, "cacheWriteUsdPerMillion": 3.75, "outputUsdPerMillion": 15.00 }
+      ]}]
+    },
+    {
+      "id": "claude-sonnet-4.6",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 3.00, "cachedInputUsdPerMillion": 0.30, "cacheWriteUsdPerMillion": 3.75, "outputUsdPerMillion": 15.00 }
+      ]}]
+    },
+    {
+      "id": "claude-sonnet-5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.20, "cacheWriteUsdPerMillion": 2.50, "outputUsdPerMillion": 10.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-4.5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "cacheWriteUsdPerMillion": 6.25, "outputUsdPerMillion": 25.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-4.6",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "cacheWriteUsdPerMillion": 6.25, "outputUsdPerMillion": 25.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-4.7",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "cacheWriteUsdPerMillion": 6.25, "outputUsdPerMillion": 25.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-4.8",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "cacheWriteUsdPerMillion": 6.25, "outputUsdPerMillion": 25.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 5.00, "cachedInputUsdPerMillion": 0.50, "cacheWriteUsdPerMillion": 6.25, "outputUsdPerMillion": 25.00 }
+      ]}]
+    },
+    {
+      "id": "claude-opus-4.8-fast",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 10.00, "cachedInputUsdPerMillion": 1.00, "cacheWriteUsdPerMillion": 12.50, "outputUsdPerMillion": 50.00 }
+      ]}]
+    },
+    {
+      "id": "claude-fable-5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 10.00, "cachedInputUsdPerMillion": 1.00, "cacheWriteUsdPerMillion": 12.50, "outputUsdPerMillion": 50.00 }
+      ]}]
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 200000, "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.20, "outputUsdPerMillion": 12.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 200000, "inputUsdPerMillion": 4.00, "cachedInputUsdPerMillion": 0.40, "outputUsdPerMillion": 18.00 }
+      ]}]
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 1.50, "cachedInputUsdPerMillion": 0.15, "outputUsdPerMillion": 9.00 }
+      ]}]
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "effectiveTo": "2027-01-01T00:00:00Z", "tiers": [
+        { "id": "promotional", "inputUsdPerMillion": 0.75, "cachedInputUsdPerMillion": 0.075, "outputUsdPerMillion": 3.75 }
+      ]}]
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "effectiveTo": "2027-01-01T00:00:00Z", "tiers": [
+        { "id": "promotional", "inputUsdPerMillion": 0.75, "cachedInputUsdPerMillion": 0.075, "outputUsdPerMillion": 3.75 }
+      ]}]
+    },
+    {
+      "id": "grok-4.5",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 200000, "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.50, "outputUsdPerMillion": 6.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 200000, "inputUsdPerMillion": 4.00, "cachedInputUsdPerMillion": 1.00, "outputUsdPerMillion": 12.00 }
+      ]}]
+    },
+    {
+      "id": "grok-4.6",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "maximumContextTokensInclusive": 200000, "inputUsdPerMillion": 2.00, "cachedInputUsdPerMillion": 0.50, "outputUsdPerMillion": 6.00 },
+        { "id": "long-context", "minimumContextTokensExclusive": 200000, "inputUsdPerMillion": 4.00, "cachedInputUsdPerMillion": 1.00, "outputUsdPerMillion": 12.00 }
+      ]}]
+    },
+    {
+      "id": "mai-code-1-flash",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.75, "cachedInputUsdPerMillion": 0.075, "outputUsdPerMillion": 4.50 }
+      ]}]
+    },
+    {
+      "id": "mai-code-1.1-flash",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.20, "cachedInputUsdPerMillion": 0.02, "outputUsdPerMillion": 1.20 }
+      ]}]
+    },
+    {
+      "id": "kimi-k2.7-code",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.95, "cachedInputUsdPerMillion": 0.19, "outputUsdPerMillion": 4.00 }
+      ]}]
+    },
+    {
+      "id": "kimi-k3",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 3.00, "cachedInputUsdPerMillion": 0.30, "outputUsdPerMillion": 15.00 }
+      ]}]
+    },
+    {
+      "id": "raptor-mini",
+      "pricePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "tiers": [
+        { "id": "default", "inputUsdPerMillion": 0.25, "cachedInputUsdPerMillion": 0.025, "outputUsdPerMillion": 2.00 }
+      ]}]
+    }
+  ]
+}

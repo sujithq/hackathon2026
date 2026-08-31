@@ -1,0 +1,7 @@
+.dotnet/
+**/bin/
+**/obj/
+TestResults/
+artifacts/
+*.nupkg
+*.snupkg
