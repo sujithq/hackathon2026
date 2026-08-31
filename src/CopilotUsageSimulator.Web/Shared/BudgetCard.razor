@@ -1,4 +1,4 @@
-<section class="setting-card budget-card">
+<section id="@Id" class="setting-card budget-card @(Highlighted ? "impacted-setting" : "")">
     <label class="setting-toggle">
         <input type="checkbox" checked="@Enabled" @onchange="Toggle" />
         <span>
@@ -26,6 +26,8 @@
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter, EditorRequired] public string Help { get; set; } = "";
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public bool Highlighted { get; set; }
     [Parameter] public bool Enabled { get; set; }
     [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
     [Parameter] public decimal Limit { get; set; }

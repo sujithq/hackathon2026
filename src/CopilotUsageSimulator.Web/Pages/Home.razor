@@ -50,7 +50,7 @@
         </div>
 
         <div class="field full">
-            <label for="task">Task for the agent</label>
+            <label for="task">Task for the agent <span class="json-sync-badge">Scenario JSON</span></label>
             <textarea id="task" rows="4" @bind="_form.Task"></textarea>
             <small>The task is descriptive. Token and runtime values below define the estimate.</small>
         </div>
@@ -94,7 +94,7 @@
             </div>
         </div>
 
-        <h3>Expected model call</h3>
+        <h3 class="synced-heading">Expected model call <span class="json-sync-badge">Scenario JSON</span></h3>
         <div class="form-grid compact">
             <NumberField Label="Context tokens" @bind-Value="_form.ContextTokens" />
             <NumberField Label="Fresh input" @bind-Value="_form.FreshInputTokens" />
@@ -103,7 +103,7 @@
             <NumberField Label="Output tokens" @bind-Value="_form.OutputTokens" />
         </div>
 
-        <h3>Enterprise overrides</h3>
+        <h3 class="synced-heading">Enterprise overrides <span class="json-sync-badge">Scenario JSON</span></h3>
         <div class="form-grid compact">
             <div class="field">
                 <label>Cost center</label>
@@ -113,8 +113,10 @@
                 <label>Licensing organization</label>
                 <input @bind="_form.OrganizationId" />
             </div>
-            <DecimalField Label="Pool consumed" @bind-Value="_form.PoolConsumed" />
-            <div class="field">
+            <div id="pool-settings" class="@ImpactClass("included-pool")">
+                <DecimalField Label="Pool consumed" @bind-Value="_form.PoolConsumed" />
+            </div>
+            <div id="paid-usage-settings" class="field @ImpactClass("paid-usage-authorization")">
                 <label>Paid usage</label>
                 <select @bind="_form.PaidUsage">
                     @foreach (var value in Enum.GetValues<GuardrailValue>())
@@ -131,9 +133,9 @@
             </div>
         </div>
 
-        <h3>Optional guardrails</h3>
+        <h3 class="synced-heading">Optional guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
         <div class="guardrail-editor">
-            <section class="setting-card">
+            <section id="individual-ulb-settings" class="setting-card @ImpactClass("user-level-budget")">
                 <label class="setting-toggle">
                     <input type="checkbox" @bind="_form.UseIndividualUlb" />
                     <span>
@@ -150,7 +152,7 @@
                 }
             </section>
 
-            <section class="setting-card">
+            <section id="included-control-settings" class="setting-card @ImpactClass("included-usage-control")">
                 <label class="setting-toggle">
                     <input type="checkbox" @bind="_form.UseIncludedControl" />
                     <span>
@@ -176,28 +178,85 @@
             </section>
         </div>
 
-        <h3>Spending budgets</h3>
+        <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
+        <section id="runtime-settings" class="setting-card @ImpactClass("runtime")">
+            <label class="setting-toggle">
+                <input type="checkbox" @bind="_form.UseRuntimeGuardrails" />
+                <span>
+                    <strong>Agent runtime limits</strong>
+                    <small>Operational limits for cumulative calls, duration, depth, and CLI credits.</small>
+                </span>
+            </label>
+            @if (_form.UseRuntimeGuardrails)
+            {
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Maximum model calls</label>
+                        <input type="number" min="0" @bind="_form.MaximumModelCalls" />
+                    </div>
+                    <div class="field">
+                        <label>Model calls already used</label>
+                        <input type="number" min="0" @bind="_form.ModelCallsConsumed" />
+                    </div>
+                    <div class="field">
+                        <label>Maximum duration (minutes)</label>
+                        <input type="number" min="0" step="0.1" @bind="_form.MaximumDurationMinutes" />
+                    </div>
+                    <div class="field">
+                        <label>Duration already used (minutes)</label>
+                        <input type="number" min="0" step="0.1" @bind="_form.ElapsedDurationMinutes" />
+                    </div>
+                    <div class="field">
+                        <label>Duration needed per run (minutes)</label>
+                        <input type="number" min="0" step="0.1" @bind="_form.RequestedDurationMinutes" />
+                    </div>
+                    <div class="field">
+                        <label>Maximum subagent depth</label>
+                        <input type="number" min="0" @bind="_form.MaximumSubagentDepth" />
+                    </div>
+                    <div class="field">
+                        <label>Requested subagent depth</label>
+                        <input type="number" min="0" @bind="_form.RequestedSubagentDepth" />
+                    </div>
+                    <div class="field">
+                        <label>CLI session credit limit</label>
+                        <input type="number" min="0" step="0.01" @bind="_form.CliSoftCreditLimit" />
+                    </div>
+                    <DecimalField Label="CLI credits already used" @bind-Value="_form.CliCreditsConsumed" />
+                </div>
+            }
+        </section>
+
+        <h3 class="synced-heading">Spending budgets <span class="json-sync-badge">Scenario JSON</span></h3>
         <p class="section-help">Enable only the budget scopes you want to test. Disabled budgets are not evaluated.</p>
         <div class="budget-grid">
             <BudgetCard Title="Cost-center budget"
+                        Id="cost-center-budget-settings"
+                        Highlighted="@IsBlockingGate("budget-cost-center")"
                         Help="Applies to metered usage attributed to this cost center."
                         @bind-Enabled="_form.UseCostCenterBudget"
                         @bind-Limit="_form.CostCenterBudgetLimit"
                         @bind-Consumed="_form.CostCenterBudgetConsumed"
                         @bind-Enforcement="_form.CostCenterBudgetEnforcement" />
             <BudgetCard Title="Organization budget"
+                        Id="organization-budget-settings"
+                        Highlighted="@IsBlockingGate("budget-organization")"
                         Help="Used when organization-level metered spending is constrained."
                         @bind-Enabled="_form.UseOrganizationBudget"
                         @bind-Limit="_form.OrganizationBudgetLimit"
                         @bind-Consumed="_form.OrganizationBudgetConsumed"
                         @bind-Enforcement="_form.OrganizationBudgetEnforcement" />
             <BudgetCard Title="Enterprise budget"
+                        Id="enterprise-budget-settings"
+                        Highlighted="@IsBlockingGate("budget-enterprise")"
                         Help="Applies across the enterprise unless the cost center is excluded."
                         @bind-Enabled="_form.UseEnterpriseBudget"
                         @bind-Limit="_form.EnterpriseBudgetLimit"
                         @bind-Consumed="_form.EnterpriseBudgetConsumed"
                         @bind-Enforcement="_form.EnterpriseBudgetEnforcement" />
             <BudgetCard Title="Actions budget"
+                        Id="actions-budget-settings"
+                        Highlighted="@IsBlockingCategory("actions-budget")"
                         Help="Controls additional GitHub Actions runner charges."
                         @bind-Enabled="_form.UseActionsBudget"
                         @bind-Limit="_form.ActionsBudgetLimit"
@@ -213,10 +272,12 @@
             Successful runs advance the working balances. Choose a template or load a saved scenario to reset the starting state.
         </p>
 
-        <details class="advanced">
+        <details id="scenario-json"
+                 class="advanced @ImpactClass("scenario-json")"
+                 open="@IsBlockingAdvancedSetting">
             <summary>
                 <span>Developer options: complete scenario JSON</span>
-                <small>Optional escape hatch for settings not shown above</small>
+                <small>Fields marked “Scenario JSON” synchronize with this document</small>
             </summary>
             <textarea class="json-editor" spellcheck="false" @bind="_scenarioJson"></textarea>
             <div class="primary-actions">
@@ -289,6 +350,7 @@
                         </div>
                     }
                     <p class="blocking-message">@(blocker?.Message ?? "The simulation stopped at this check.")</p>
+                    <a class="button ghost blocking-link" href="#@BlockingSettingsAnchor(blocker)">Review highlighted setting</a>
                 </section>
             }
 
@@ -531,6 +593,7 @@
                 ? null
                 : scenario.ActionsUsage with { Minutes = _form.ActionsMinutes };
             var actionsGuardrails = UpdateActionsGuardrails(scenario.ActionsGuardrails);
+            var runtimeGuardrails = UpdateRuntimeGuardrails(scenario.RuntimeGuardrails);
 
             scenario = scenario with
             {
@@ -543,7 +606,8 @@
                 BillingContext = billing,
                 EconomicGuardrails = economic,
                 ActionsUsage = actionsUsage,
-                ActionsGuardrails = actionsGuardrails
+                ActionsGuardrails = actionsGuardrails,
+                RuntimeGuardrails = runtimeGuardrails
             };
             _scenarioJson = ScenarioJson.Serialize(scenario);
             _error = null;
@@ -654,6 +718,29 @@
                     Enforcement = _form.ActionsBudgetEnforcement
                 }]
                 : []
+        };
+    }
+
+    private RuntimeGuardrailSnapshot? UpdateRuntimeGuardrails(RuntimeGuardrailSnapshot? snapshot)
+    {
+        if (!_form.UseRuntimeGuardrails)
+        {
+            return null;
+        }
+
+        return (snapshot ?? new RuntimeGuardrailSnapshot()) with
+        {
+            MaximumModelCalls = _form.MaximumModelCalls,
+            ModelCallsConsumed = _form.ModelCallsConsumed,
+            MaximumSubagentDepth = _form.MaximumSubagentDepth,
+            RequestedSubagentDepth = _form.RequestedSubagentDepth,
+            MaximumDuration = _form.MaximumDurationMinutes is null
+                ? null
+                : TimeSpan.FromMinutes((double)_form.MaximumDurationMinutes.Value),
+            ElapsedDuration = TimeSpan.FromMinutes((double)_form.ElapsedDurationMinutes),
+            RequestedDuration = TimeSpan.FromMinutes((double)_form.RequestedDurationMinutes),
+            CliSoftCreditLimit = _form.CliSoftCreditLimit,
+            CliCreditsConsumed = _form.CliCreditsConsumed
         };
     }
 
@@ -859,6 +946,18 @@
             ActionsBudgetLimit = actionsBudget?.LimitUsd ?? 0,
             ActionsBudgetConsumed = actionsBudget?.ConsumedUsd ?? 0,
             ActionsBudgetEnforcement = actionsBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
+            UseRuntimeGuardrails = scenario.RuntimeGuardrails is not null,
+            MaximumModelCalls = scenario.RuntimeGuardrails?.MaximumModelCalls,
+            ModelCallsConsumed = scenario.RuntimeGuardrails?.ModelCallsConsumed ?? 0,
+            MaximumSubagentDepth = scenario.RuntimeGuardrails?.MaximumSubagentDepth,
+            RequestedSubagentDepth = scenario.RuntimeGuardrails?.RequestedSubagentDepth ?? 0,
+            MaximumDurationMinutes = scenario.RuntimeGuardrails?.MaximumDuration is null
+                ? null
+                : (decimal)scenario.RuntimeGuardrails.MaximumDuration.Value.TotalMinutes,
+            ElapsedDurationMinutes = (decimal)(scenario.RuntimeGuardrails?.ElapsedDuration.TotalMinutes ?? 0),
+            RequestedDurationMinutes = (decimal)(scenario.RuntimeGuardrails?.RequestedDuration.TotalMinutes ?? 0),
+            CliSoftCreditLimit = scenario.RuntimeGuardrails?.CliSoftCreditLimit,
+            CliCreditsConsumed = scenario.RuntimeGuardrails?.CliCreditsConsumed ?? 0,
             RepeatCount = ReadRepeatCount(scenario.Metadata)
         };
     }
@@ -1056,6 +1155,36 @@
         guardrail.RemainingAfter < 0 ? "Shortfall" : "Projected remaining";
     private static string FormatBlockingProjection(AppliedGuardrail guardrail) =>
         guardrail.RemainingAfter is null ? "—" : Format(Math.Abs(guardrail.RemainingAfter.Value));
+    private bool IsBlockingCategory(string category) =>
+        string.Equals(BlockingGuardrail?.Category, category, StringComparison.OrdinalIgnoreCase);
+    private bool IsBlockingGate(string gateId) =>
+        string.Equals(_result?.FirstFailingGate, gateId, StringComparison.OrdinalIgnoreCase);
+    private string ImpactClass(string category) =>
+        _result?.FirstFailingGate is null
+            ? ""
+            : category == "scenario-json"
+                ? BlockingSettingsAnchor(BlockingGuardrail) == "scenario-json" ? "impacted-setting" : ""
+                : IsBlockingCategory(category) ? "impacted-setting" : "";
+    private bool IsBlockingAdvancedSetting =>
+        _result?.FirstFailingGate is not null &&
+        BlockingSettingsAnchor(BlockingGuardrail) == "scenario-json";
+    private string BlockingSettingsAnchor(AppliedGuardrail? guardrail) => guardrail?.Category switch
+    {
+        "runtime" => "runtime-settings",
+        "user-level-budget" when _result?.EffectiveUlb?.Kind == UserLevelBudgetKind.Individual =>
+            "individual-ulb-settings",
+        "included-usage-control" => "included-control-settings",
+        "included-pool" => "pool-settings",
+        "paid-usage-authorization" => "paid-usage-settings",
+        "metered-spending-budget" when IsBlockingGate("budget-cost-center") =>
+            "cost-center-budget-settings",
+        "metered-spending-budget" when IsBlockingGate("budget-organization") =>
+            "organization-budget-settings",
+        "metered-spending-budget" when IsBlockingGate("budget-enterprise") =>
+            "enterprise-budget-settings",
+        "actions-budget" => "actions-budget-settings",
+        _ => "scenario-json"
+    };
     private static string FriendlyGuardrailId(string? id) =>
         string.IsNullOrWhiteSpace(id)
             ? "Policy guardrail"
@@ -1109,6 +1238,16 @@
         public decimal ActionsBudgetLimit { get; set; }
         public decimal ActionsBudgetConsumed { get; set; }
         public GuardrailEnforcement ActionsBudgetEnforcement { get; set; }
+        public bool UseRuntimeGuardrails { get; set; }
+        public int? MaximumModelCalls { get; set; }
+        public int ModelCallsConsumed { get; set; }
+        public int? MaximumSubagentDepth { get; set; }
+        public int RequestedSubagentDepth { get; set; }
+        public decimal? MaximumDurationMinutes { get; set; }
+        public decimal ElapsedDurationMinutes { get; set; }
+        public decimal RequestedDurationMinutes { get; set; }
+        public decimal? CliSoftCreditLimit { get; set; }
+        public decimal CliCreditsConsumed { get; set; }
         public int RepeatCount { get; set; } = 1;
     }
 

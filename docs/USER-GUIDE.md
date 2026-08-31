@@ -41,6 +41,11 @@ or spending budget. It also shows the configured limit, already-used amount, cur
 request, and projected remainder. Later checks may not appear because evaluation stops
 at the first blocking guardrail.
 
+Guided sections marked **Scenario JSON** update the corresponding values in the complete
+scenario document. After a run stops, the responsible control is outlined in red and marked
+**Stopped here**. Use **Review highlighted setting** to jump to it. If that setting has no
+guided control, the complete scenario JSON opens and is highlighted instead.
+
 ## Cost and attribution
 
 - **AI credits** is the calculated request total.
