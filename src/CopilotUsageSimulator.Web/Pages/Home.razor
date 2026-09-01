@@ -561,23 +561,25 @@
                 scenario.ActionsGuardrails ?? operationDefaults?.ActionsGuardrails);
             var runtimeGuardrails = UpdateRuntimeGuardrails(scenario.RuntimeGuardrails);
 
-            scenario = scenario with
-            {
-                OperationId = _form.OperationId,
-                PlanId = _form.PlanId,
-                CheckScope = _form.CostChecksOnly
-                    ? SimulationCheckScope.CostRelatedOnly
-                    : SimulationCheckScope.All,
-                RepositoryVisibility = _form.RepositoryVisibility,
-                Calls = PatchFirst(scenario.Calls, true, _ => call, () => call),
-                Metadata = metadata,
-                Attribution = attribution,
-                BillingContext = billing,
-                EconomicGuardrails = economic,
-                ActionsUsage = actionsUsage,
-                ActionsGuardrails = actionsGuardrails,
-                RuntimeGuardrails = runtimeGuardrails
-            };
+            scenario = EditorMapper.ApplyPlanSelection(
+                scenario with
+                {
+                    OperationId = _form.OperationId,
+                    CheckScope = _form.CostChecksOnly
+                        ? SimulationCheckScope.CostRelatedOnly
+                        : SimulationCheckScope.All,
+                    RepositoryVisibility = _form.RepositoryVisibility,
+                    Calls = PatchFirst(scenario.Calls, true, _ => call, () => call),
+                    Metadata = metadata,
+                    Attribution = attribution,
+                    BillingContext = billing,
+                    EconomicGuardrails = economic,
+                    ActionsUsage = actionsUsage,
+                    ActionsGuardrails = actionsGuardrails,
+                    RuntimeGuardrails = runtimeGuardrails
+                },
+                _form.PlanId,
+                string.IsNullOrWhiteSpace(_form.CostCenterId) ? null : _form.CostCenterId);
             _scenarioJson = ScenarioJson.Serialize(scenario);
             CapturePatchedIds(scenario);
             _error = null;

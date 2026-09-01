@@ -6,6 +6,57 @@ namespace CopilotUsageSimulator.Web.Services;
 
 public sealed class ScenarioEditorMapper
 {
+    public SimulationScenario ApplyPlanSelection(
+        SimulationScenario scenario,
+        string planId,
+        string? costCenterId)
+    {
+        ArgumentNullException.ThrowIfNull(scenario);
+        ArgumentException.ThrowIfNullOrWhiteSpace(planId);
+
+        if (scenario.BillingContext is null || scenario.Attribution is null)
+        {
+            return scenario with { PlanId = planId };
+        }
+
+        var userId = scenario.Attribution.UserId;
+        var matchedEffectiveSeat = false;
+        var seatAssignments = scenario.BillingContext.SeatAssignments
+            .Select(seat =>
+            {
+                if (!string.Equals(seat.UserId, userId, StringComparison.OrdinalIgnoreCase) ||
+                    scenario.Timestamp < seat.EffectiveFrom ||
+                    (seat.EffectiveTo is not null && scenario.Timestamp >= seat.EffectiveTo))
+                {
+                    return seat;
+                }
+
+                matchedEffectiveSeat = true;
+                return seat with { PlanId = planId };
+            })
+            .ToList();
+
+        if (!matchedEffectiveSeat)
+        {
+            seatAssignments.Add(new EffectiveSeatAssignment
+            {
+                UserId = userId,
+                PlanId = planId,
+                CostCenterId = costCenterId,
+                EffectiveFrom = scenario.Timestamp
+            });
+        }
+
+        return scenario with
+        {
+            PlanId = planId,
+            BillingContext = scenario.BillingContext with
+            {
+                SeatAssignments = seatAssignments
+            }
+        };
+    }
+
     public ScenarioEditorState MapFromScenario(
         SimulationScenario scenario,
         EngineConfiguration configuration)

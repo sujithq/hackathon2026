@@ -63,6 +63,34 @@ public sealed class HomeTests : BunitContext
     }
 
     [Fact]
+    public void ChangingPlanUpdatesEffectiveSeatAndIncludedCreditEntitlement()
+    {
+        var serializer = new ScenarioJson();
+        var cut = Render<Home>();
+        FindInputByLabel(cut, "Pool consumed").Input("5800");
+
+        FindButton(cut, "Apply overrides and simulate").Click();
+
+        Assert.Equal("0", FindMetricValue(cut, "Included credits"));
+
+        cut.Find("#plan").Change("enterprise");
+        FindButton(cut, "Apply overrides and simulate").Click();
+
+        var editor = Assert.IsAssignableFrom<IHtmlTextAreaElement>(
+            cut.Find("textarea.json-editor:not(.catalog-editor)"));
+        var json = editor.GetAttribute("value") ?? editor.TextContent;
+        var scenario = serializer.Deserialize(json);
+        var effectiveSeat = scenario.BillingContext!.SeatAssignments.Single(seat =>
+            string.Equals(seat.UserId, scenario.Attribution!.UserId, StringComparison.OrdinalIgnoreCase) &&
+            scenario.Timestamp >= seat.EffectiveFrom &&
+            (seat.EffectiveTo is null || scenario.Timestamp < seat.EffectiveTo));
+
+        Assert.Equal("enterprise", scenario.PlanId);
+        Assert.Equal("enterprise", effectiveSeat.PlanId);
+        Assert.NotEqual("0", FindMetricValue(cut, "Included credits"));
+    }
+
+    [Fact]
     public void BlockingUlbHighlightsItsGuidedSetting()
     {
         var cut = Render<Home>();
@@ -479,4 +507,15 @@ public sealed class HomeTests : BunitContext
         cut.FindAll("button")
             .Single(button =>
                 string.Equals(button.TextContent.Trim(), text, StringComparison.Ordinal));
+
+    private static string FindMetricValue(IRenderedComponent<Home> cut, string label) =>
+        cut.FindAll(".metric")
+            .Single(metric =>
+                string.Equals(
+                    metric.QuerySelector("small")?.TextContent.Trim(),
+                    label,
+                    StringComparison.Ordinal))
+            .QuerySelector("strong")!
+            .TextContent
+            .Trim();
 }
