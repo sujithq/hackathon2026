@@ -2,6 +2,7 @@
 @inject ICopilotUsageSimulationEngine DefaultEngine
 @inject EngineConfiguration DefaultConfiguration
 @inject ScenarioJson ScenarioJson
+@inject SimulationSessionRunner SessionRunner
 @inject IJSRuntime JS
 
 <PageTitle>Copilot usage simulator</PageTitle>
@@ -1255,108 +1256,19 @@
         SimulationScenario scenario,
         bool advanceWorkingState)
     {
-        if (_form.RepeatCount is < 1 or > 1000)
-        {
-            throw new SimulationException("Repeat task must be between 1 and 1000.", "repeat-count-invalid");
-        }
-
+        var session = SessionRunner.Run(ActiveEngine, scenario, _form.RepeatCount);
         _runs.Clear();
-        var current = scenario;
-        for (var iteration = 0; iteration < _form.RepeatCount; iteration++)
-        {
-            var result = ActiveEngine.Simulate(current);
-            _runs.Add(result);
-            if (result.Decision != SimulationDecision.Allowed)
-            {
-                break;
-            }
-
-            current = AdvanceScenario(current, result);
-        }
-
+        _runs.AddRange(session.Runs);
         _result = _runs[^1];
         if (advanceWorkingState)
         {
-            _scenarioJson = ScenarioJson.Serialize(current);
-            LoadForm(current);
+            _scenarioJson = ScenarioJson.Serialize(session.NextScenario);
+            LoadForm(session.NextScenario);
             _notice = CompletedRuns == 0
                 ? "No balances changed because the first run was not allowed."
                 : $"Working balances advanced by {CompletedRuns} successful run(s).";
         }
         _error = null;
-    }
-
-    private static SimulationScenario AdvanceScenario(
-        SimulationScenario scenario,
-        SimulationResult result)
-    {
-        var economic = scenario.EconomicGuardrails;
-        if (economic is not null)
-        {
-            economic = economic with
-            {
-                EnterprisePoolConsumedCredits =
-                    economic.EnterprisePoolConsumedCredits + result.Allocation.IncludedCredits,
-                UserLevelBudgets = economic.UserLevelBudgets
-                    .Select(budget => budget.Id == result.EffectiveUlb?.Id
-                        ? budget with
-                        {
-                            ConsumedCredits = budget.ConsumedCredits + result.Allocation.TotalCredits
-                        }
-                        : budget)
-                    .ToArray(),
-                IncludedUsageControls = economic.IncludedUsageControls
-                    .Select(control => control.CostCenterId == result.Attribution?.CostCenterId
-                        ? control with
-                        {
-                            ConsumedCredits = control.ConsumedCredits + result.Allocation.IncludedCredits
-                        }
-                        : control)
-                    .ToArray(),
-                SpendingBudgets = economic.SpendingBudgets
-                    .Select(budget => result.Allocation.MeteredBudgetRemainingUsd.ContainsKey(budget.Id)
-                        ? budget with
-                        {
-                            ConsumedUsd = budget.ConsumedUsd + result.Allocation.MeteredUsd
-                        }
-                        : budget)
-                    .ToArray()
-            };
-        }
-
-        var runtime = scenario.RuntimeGuardrails;
-        if (runtime is not null && scenario.CheckScope == SimulationCheckScope.All)
-        {
-            runtime = runtime with
-            {
-                ModelCallsConsumed = runtime.ModelCallsConsumed + scenario.Calls.Count,
-                ElapsedDuration = runtime.ElapsedDuration + runtime.RequestedDuration,
-                CliCreditsConsumed = runtime.CliCreditsConsumed + result.Allocation.TotalCredits
-            };
-        }
-
-        var actions = scenario.ActionsGuardrails;
-        if (actions is not null && result.ActionsUsage is not null)
-        {
-            actions = actions with
-            {
-                ConsumedIncludedMinutes =
-                    actions.ConsumedIncludedMinutes + result.ActionsUsage.IncludedMinutes,
-                Budgets = actions.Budgets
-                    .Select(budget => budget with
-                    {
-                        ConsumedUsd = budget.ConsumedUsd + result.ActionsUsage.AdditionalUsd
-                    })
-                    .ToArray()
-            };
-        }
-
-        return scenario with
-        {
-            EconomicGuardrails = economic,
-            RuntimeGuardrails = runtime,
-            ActionsGuardrails = actions
-        };
     }
 
     private void ReloadGuidedFields()

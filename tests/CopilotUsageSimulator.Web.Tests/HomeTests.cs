@@ -20,6 +20,7 @@ public sealed class HomeTests : BunitContext
         Services.AddSingleton(configuration);
         Services.AddSingleton<ICopilotUsageSimulationEngine>(
             new CopilotUsageSimulationEngine(configuration));
+        Services.AddSingleton<SimulationSessionRunner>();
         Services.AddSingleton<ScenarioJson>();
     }
 
