@@ -106,6 +106,26 @@ public sealed class HomeTests : BunitContext
     }
 
     [Fact]
+    public void CostRelatedInputsAndGroupsAreMarked()
+    {
+        var cut = Render<Home>();
+        var badges = cut.FindAll(".cost-related-badge");
+
+        Assert.True(badges.Count >= 8);
+        Assert.All(badges, badge => Assert.Equal("Cost related", badge.TextContent.Trim()));
+        Assert.Contains("Cost related", cut.Find("label[for=operation]").TextContent);
+        Assert.Contains("Cost related", cut.Find("label[for=plan]").TextContent);
+        Assert.Contains("Cost related", cut.Find("label[for=model]").TextContent);
+        Assert.DoesNotContain("Cost related", cut.Find("label[for=task]").TextContent);
+
+        cut.Find(".scope-card input[type=checkbox]").Change(false);
+
+        var runtimeHeading = cut.FindAll("h3")
+            .Single(heading => heading.TextContent.Contains("Runtime guardrails", StringComparison.Ordinal));
+        Assert.DoesNotContain("Cost related", runtimeHeading.TextContent);
+    }
+
+    [Fact]
     public void ChatTemplateHidesActionsSpecificInputs()
     {
         var cut = Render<Home>();

@@ -63,6 +63,10 @@ A **Docs ↗** link beside a setting opens the matching official GitHub document
 tab. Simulator-only controls, such as repeat count and custom runtime limits, intentionally
 have no GitHub Docs link because they do not represent GitHub billing settings.
 
+A green **Cost related** badge identifies fields and groups that affect pricing, credit
+allocation, cost attribution, or cost guardrails. Unmarked controls, such as the task
+description and runtime limits, do not directly affect the cost calculation.
+
 ## Cost and attribution
 
 - **AI credits** is the calculated request total.

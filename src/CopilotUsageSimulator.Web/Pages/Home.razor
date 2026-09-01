@@ -68,7 +68,7 @@
         <div class="form-grid">
             <div class="field">
                 <div class="field-label">
-                    <label for="operation">Operation</label>
+                    <label for="operation">Operation <span class="cost-related-badge">Cost related</span></label>
                     <DocsLink Url="@GitHubDocumentationLinks.CopilotBilling" Topic="billable Copilot features" />
                 </div>
                 <select id="operation" @bind="_form.OperationId">
@@ -80,7 +80,7 @@
             </div>
             <div class="field">
                 <div class="field-label">
-                    <label for="plan">Plan</label>
+                    <label for="plan">Plan <span class="cost-related-badge">Cost related</span></label>
                     <DocsLink Url="@GitHubDocumentationLinks.UsageBasedBilling" Topic="Copilot plan billing" />
                 </div>
                 <select id="plan" @bind="_form.PlanId">
@@ -93,7 +93,7 @@
             @if (OperationUsesRepositoryVisibility)
             {
                 <div class="field">
-                    <label for="visibility">Repository</label>
+                    <label for="visibility">Repository <span class="cost-related-badge">Cost related</span></label>
                     <select id="visibility" @bind="_form.RepositoryVisibility">
                         @foreach (var value in Enum.GetValues<RepositoryVisibility>())
                         {
@@ -106,7 +106,7 @@
             {
                 <div class="field">
                     <div class="field-label">
-                        <label for="model">Model</label>
+                        <label for="model">Model <span class="cost-related-badge">Cost related</span></label>
                         <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="Copilot models and pricing" />
                     </div>
                     <select id="model" @bind="_form.ModelId">
@@ -129,6 +129,7 @@
             <h3 class="synced-heading">
                 Expected model call
                 <span class="json-sync-badge">Scenario JSON</span>
+                <span class="cost-related-badge">Cost related</span>
                 <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="token pricing" />
             </h3>
             <div class="form-grid compact">
@@ -140,7 +141,11 @@
             </div>
         }
 
-        <h3 class="synced-heading">Simulation run <span class="json-sync-badge">Scenario JSON</span></h3>
+        <h3 class="synced-heading">
+            Simulation run
+            <span class="json-sync-badge">Scenario JSON</span>
+            <span class="cost-related-badge">Cost related</span>
+        </h3>
         <div class="form-grid compact">
             @if (OperationUsesActions)
             {
@@ -160,6 +165,7 @@
             <h3 class="synced-heading">
                 Billing and attribution
                 <span class="json-sync-badge">Scenario JSON</span>
+                <span class="cost-related-badge">Cost related</span>
                 <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
             </h3>
             <div class="form-grid compact">
@@ -194,7 +200,11 @@
                 </div>
             </div>
 
-            <h3 class="synced-heading">Optional guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
+            <h3 class="synced-heading">
+                Optional guardrails
+                <span class="json-sync-badge">Scenario JSON</span>
+                <span class="cost-related-badge">Cost related</span>
+            </h3>
             <p class="section-help">ULB precedence: Individual exception → Cost center → Universal default. Only the most specific applicable ULB is enforced.</p>
             <div class="guardrail-editor">
             <section id="universal-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Universal)">
@@ -341,7 +351,11 @@
 
         @if (OperationConsumesAiCredits || OperationUsesActions)
         {
-            <h3 class="synced-heading">Spending budgets <span class="json-sync-badge">Scenario JSON</span></h3>
+            <h3 class="synced-heading">
+                Spending budgets
+                <span class="json-sync-badge">Scenario JSON</span>
+                <span class="cost-related-badge">Cost related</span>
+            </h3>
             <p class="section-help">Only budget types used by this operation are shown. Disabled budgets are not evaluated.</p>
             <div class="budget-grid">
                 @if (OperationConsumesAiCredits)

@@ -99,6 +99,7 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .panel h3 { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: #cad3e7; margin: 1.5rem 0 .7rem; }
 .synced-heading { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .json-sync-badge { display: inline-flex; width: max-content; color: #b9abff; background: rgba(124,92,255,.13); border: 1px solid rgba(124,92,255,.35); border-radius: 999px; padding: .13rem .4rem; font-size: .58rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.cost-related-badge { display: inline-flex; width: max-content; color: #86efac; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35); border-radius: 999px; padding: .13rem .4rem; font-size: .58rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; vertical-align: middle; }
 .step { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .form-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
