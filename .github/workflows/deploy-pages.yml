@@ -23,18 +23,41 @@ jobs:
         with:
           dotnet-version: 11.0.100-preview.7.26381.103
       - name: Configure repository base path
+        id: pages-config
         shell: bash
+        env:
+          PAGES_DOMAIN: ${{ vars.PAGES_DOMAIN }}
         run: |
-          sed -i 's|<base href="/" />|<base href="/${{ github.event.repository.name }}/" />|' \
+          domain="${PAGES_DOMAIN%.}"
+          domain_pattern='^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$'
+
+          if [[ ${#domain} -le 253 && "$domain" =~ $domain_pattern ]]; then
+            base_path="/"
+            echo "custom_domain=$domain" >> "$GITHUB_OUTPUT"
+          else
+            base_path="/${{ github.event.repository.name }}/"
+            echo "custom_domain=" >> "$GITHUB_OUTPUT"
+            if [[ -n "$PAGES_DOMAIN" ]]; then
+              echo "::warning::Ignoring invalid PAGES_DOMAIN value and using $base_path"
+            fi
+          fi
+
+          sed -i "s|<base href=\"/\" />|<base href=\"$base_path\" />|" \
             src/CopilotUsageSimulator.Web/wwwroot/index.html
       - name: Publish
         run: dotnet publish src/CopilotUsageSimulator.Web/CopilotUsageSimulator.Web.csproj --configuration Release
       - name: Add SPA fallback
         shell: bash
+        env:
+          PAGES_DOMAIN: ${{ steps.pages-config.outputs.custom_domain }}
         run: |
           cp src/CopilotUsageSimulator.Web/bin/Release/net11.0/publish/wwwroot/index.html \
              src/CopilotUsageSimulator.Web/bin/Release/net11.0/publish/wwwroot/404.html
           touch src/CopilotUsageSimulator.Web/bin/Release/net11.0/publish/wwwroot/.nojekyll
+          if [[ -n "$PAGES_DOMAIN" ]]; then
+            printf '%s\n' "$PAGES_DOMAIN" > \
+              src/CopilotUsageSimulator.Web/bin/Release/net11.0/publish/wwwroot/CNAME
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
