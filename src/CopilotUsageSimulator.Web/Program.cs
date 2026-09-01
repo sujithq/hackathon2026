@@ -17,5 +17,7 @@ builder.Services.AddSingleton<ICopilotUsageSimulationEngine>(
     new CopilotUsageSimulationEngine(configuration));
 builder.Services.AddSingleton<SimulationSessionRunner>();
 builder.Services.AddSingleton<ScenarioJson>();
+builder.Services.AddSingleton<ScenarioEditorMapper>();
+builder.Services.AddScoped<BrowserScenarioPersistence>();
 
 await builder.Build().RunAsync();

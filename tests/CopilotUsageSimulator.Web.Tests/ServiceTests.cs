@@ -203,4 +203,42 @@ public sealed class ServiceTests
         Assert.Equal(ConfigurationException.InvalidContractCode, exception.Code);
         Assert.Contains("operations", exception.Message);
     }
+
+    [Fact]
+    public void ScenarioEditorMapperResolvesEffectiveScenarioValues()
+    {
+        var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent") with
+        {
+            Metadata = new Dictionary<string, string>
+            {
+                ["task"] = "Map this scenario",
+                ["repeatCount"] = "7"
+            }
+        };
+
+        var state = new ScenarioEditorMapper().MapFromScenario(scenario, _configuration);
+
+        Assert.Equal("Map this scenario", state.Task);
+        Assert.Equal(7, state.RepeatCount);
+        Assert.Equal(scenario.OperationId, state.OperationId);
+        Assert.Equal(scenario.Attribution?.UserId, scenario.BillingContext?.SeatAssignments[0].UserId);
+        Assert.NotNull(state.DirectAssignmentIndex);
+        Assert.NotEmpty(state.CostCenterId);
+    }
+
+    [Fact]
+    public void SimulationResultsStateClearsResultAndRunHistory()
+    {
+        var engine = new CopilotUsageSimulationEngine(_configuration);
+        var result = engine.Simulate(
+            ExampleScenarioFactory.Create(_configuration, "cloud-agent"));
+        var state = new SimulationResultsState();
+        state.SetRuns([result]);
+
+        state.Clear();
+
+        Assert.Null(state.Result);
+        Assert.Empty(state.Runs);
+        Assert.Equal(0, state.CompletedRuns);
+    }
 }

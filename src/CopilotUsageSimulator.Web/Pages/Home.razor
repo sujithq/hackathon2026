@@ -2,8 +2,9 @@
 @inject ICopilotUsageSimulationEngine DefaultEngine
 @inject EngineConfiguration DefaultConfiguration
 @inject ScenarioJson ScenarioJson
+@inject ScenarioEditorMapper EditorMapper
 @inject SimulationSessionRunner SessionRunner
-@inject IJSRuntime JS
+@inject BrowserScenarioPersistence BrowserPersistence
 
 <PageTitle>Copilot usage simulator</PageTitle>
 
@@ -441,207 +442,18 @@
         </details>
     </section>
 
-    <section class="panel results-panel">
-        <div class="panel-heading">
-            <div>
-                <p class="eyebrow">Result</p>
-                <h2>Decision and cost</h2>
-            </div>
-            <span class="step">2</span>
-        </div>
-
-        @if (_result is null)
-        {
-            <div class="empty-state">Configure a scenario and start a simulation.</div>
-        }
-        else
-        {
-            <div class="decision-banner @StatusClass(_result.Decision.ToString())">
-                <div>
-                    <small>Decision</small>
-                    <strong>@FormatDecision(_result.Decision)</strong>
-                </div>
-                @if (_result.FirstFailingGate is not null)
-                {
-                    <div>
-                        <small>First failing check</small>
-                        <code>@_result.FirstFailingGate</code>
-                    </div>
-                }
-            </div>
-
-            @if (_result.FirstFailingGate is not null)
-            {
-                var blocker = BlockingGuardrail;
-                <section class="blocking-explanation">
-                    <div class="blocking-heading">
-                        <div>
-                            <small>Why it stopped</small>
-                            <h3>@BlockingSourceLabel(blocker)</h3>
-                        </div>
-                        <code>@_result.FirstFailingGate</code>
-                    </div>
-                    <p>@BlockingScopeExplanation(blocker)</p>
-                    @if (blocker is not null && (blocker.Limit is not null || blocker.Requested is not null))
-                    {
-                        <div class="blocking-values">
-                            <span><small>Configured limit</small><strong>@FormatNullable(blocker.Limit) @BlockingUnit(blocker)</strong></span>
-                            <span><small>Already used</small><strong>@FormatNullable(blocker.ConsumedBefore) @BlockingUnit(blocker)</strong></span>
-                            <span><small>This run needs</small><strong>@FormatNullable(blocker.Requested) @BlockingUnit(blocker)</strong></span>
-                            <span><small>@BlockingProjectionLabel(blocker)</small><strong>@FormatBlockingProjection(blocker) @BlockingUnit(blocker)</strong></span>
-                        </div>
-                    }
-                    <p class="blocking-message">@(blocker?.Message ?? "The simulation stopped at this check.")</p>
-                    <a class="button ghost blocking-link" href="#@BlockingSettingsAnchor(blocker)">Review highlighted setting</a>
-                </section>
-            }
-
-            <div class="metrics">
-                <Metric Label="Runs completed" Value="@($"{CompletedRuns} / {_form.RepeatCount}")" />
-                <Metric Label="AI credits consumed" Value="@Format(TotalConsumedCredits)" />
-                <Metric Label="Included credits" Value="@Format(TotalIncludedCredits)" />
-                <Metric Label="Metered credits" Value="@Format(TotalMeteredCredits)" />
-                <Metric Label="Metered cost" Value="@TotalMeteredUsd.ToString("C")" />
-                <Metric Label="Actions cost" Value="@TotalActionsUsd.ToString("C")" />
-                <Metric Label="Pool remaining" Value="@Format(_result.Remaining.IncludedPoolCredits)" />
-            </div>
-
-            @if (_runs.Count > 1 || _form.RepeatCount > 1)
-            {
-                <details class="run-history">
-                    <summary>Run history (@_runs.Count evaluated)</summary>
-                    <div class="run-table">
-                        <span>#</span><span>Decision</span><span>Credits</span><span>Metered</span><span>Stopped by</span>
-                        @for (var index = 0; index < _runs.Count; index++)
-                        {
-                            var run = _runs[index];
-                            <strong>@(index + 1)</strong>
-                            <span class="@StatusClass(run.Decision.ToString())">@FormatDecision(run.Decision)</span>
-                            <span>@Format(run.Allocation.TotalCredits)</span>
-                            <span>@run.Allocation.MeteredUsd.ToString("C")</span>
-                            <code>@(run.FirstFailingGate ?? "—")</code>
-                        }
-                    </div>
-                </details>
-            }
-
-            <div class="summary-grid">
-                <div>
-                    <small>Attributed user</small>
-                    <strong>@(_result.Attribution?.UserId ?? "—")</strong>
-                </div>
-                <div>
-                    <small>Cost center</small>
-                    <strong>@(_result.Attribution?.CostCenterId ?? "Enterprise only")</strong>
-                </div>
-                <div>
-                    <small>Organization</small>
-                    <strong>@(_result.Attribution?.LicensingOrganizationId ?? "—")</strong>
-                </div>
-                <div>
-                    <small>Effective ULB</small>
-                    <strong>@(_result.EffectiveUlb?.Id ?? "None")</strong>
-                </div>
-            </div>
-
-            <div class="trace-heading">
-                <div>
-                    <h3>Guardrail checks</h3>
-                    <p>@VisibleGuardrails.Count() of @_result.AppliedGuardrails.Count checks shown</p>
-                </div>
-                <select aria-label="Check visibility" @bind="_visibilityMode">
-                    <option value="all">Show all</option>
-                    <option value="issues">Failures and warnings</option>
-                    <option value="failures">Failures only</option>
-                    <option value="custom">Custom categories</option>
-                </select>
-            </div>
-
-            @if (_visibilityMode == "custom")
-            {
-                <div class="category-filter">
-                    @foreach (var category in _result.AppliedGuardrails.Select(x => x.Category).Distinct())
-                    {
-                        <label>
-                            <input type="checkbox"
-                                   checked="@(!_hiddenCategories.Contains(category))"
-                                   @onchange="eventArgs => SetCategory(category, eventArgs)" />
-                            @category
-                        </label>
-                    }
-                </div>
-            }
-
-            <div class="check-list">
-                @{
-                    var checkNumber = 0;
-                }
-                @foreach (var guardrail in VisibleGuardrails)
-                {
-                    checkNumber++;
-                    <article class="check">
-                        <span class="check-index">@checkNumber</span>
-                        <span class="status-dot @StatusClass(guardrail.Outcome.ToString())"></span>
-                        <div class="check-body">
-                            <div class="check-title">
-                                <strong>@guardrail.Id</strong>
-                                <span>@guardrail.Category</span>
-                                @if (ResolveMetadata(guardrail).IsCostRelated)
-                                {
-                                    <span class="cost-related-badge">Cost related</span>
-                                }
-                                <span class="outcome @StatusClass(guardrail.Outcome.ToString())">@guardrail.Outcome</span>
-                            </div>
-                            <p>@guardrail.Message</p>
-                            @if (guardrail.Limit is not null || guardrail.Requested is not null)
-                            {
-                                <div class="check-values">
-                                    <span>Limit <strong>@FormatNullable(guardrail.Limit)</strong></span>
-                                    <span>Before <strong>@FormatNullable(guardrail.ConsumedBefore)</strong></span>
-                                    <span>Requested <strong>@FormatNullable(guardrail.Requested)</strong></span>
-                                    <span>After <strong>@FormatNullable(guardrail.RemainingAfter)</strong></span>
-                                </div>
-                            }
-                        </div>
-                    </article>
-                }
-            </div>
-
-            @if (_result.Explanation.Count > 0)
-            {
-                <details class="explanation">
-                    <summary>Decision trace and assumptions</summary>
-                    <ol>
-                        @foreach (var entry in _result.Explanation)
-                        {
-                            <li><code>@entry.Code</code> @entry.Message</li>
-                        }
-                    </ol>
-                    @foreach (var assumption in _result.Assumptions)
-                    {
-                        <p class="assumption">@assumption</p>
-                    }
-                </details>
-            }
-        }
-    </section>
+    <SimulationResults State="_results" RepeatCount="_form.RepeatCount" />
 </div>
 
 @code {
-    private const string StorageKey = "copilot-usage-simulator.scenario.v1";
-    private const string CatalogStorageKey = "copilot-usage-simulator.catalog.v1";
-    private const string PreferenceStorageKey = "copilot-usage-simulator.preferences.v1";
-    private readonly HashSet<string> _hiddenCategories = new(StringComparer.OrdinalIgnoreCase);
     private EngineConfiguration? _activeConfiguration;
     private ICopilotUsageSimulationEngine? _activeEngine;
-    private GuidedForm _form = new();
+    private ScenarioEditorState _form = new();
+    private readonly SimulationResultsState _results = new();
     private string _scenarioJson = "";
     private string _catalogJson = "";
-    private string _visibilityMode = "all";
     private string? _error;
     private string? _notice;
-    private SimulationResult? _result;
-    private readonly List<SimulationResult> _runs = [];
 
     private EngineConfiguration ActiveConfiguration => _activeConfiguration ?? DefaultConfiguration;
     private ICopilotUsageSimulationEngine ActiveEngine => _activeEngine ?? DefaultEngine;
@@ -670,33 +482,6 @@
         _ =>
             "This operation consumes AI credits but does not use GitHub Actions. Runner and repository controls are hidden and not evaluated."
     };
-    private IEnumerable<AppliedGuardrail> VisibleGuardrails =>
-        _result?.AppliedGuardrails.Where(ShouldShow) ?? [];
-    private AppliedGuardrail? BlockingGuardrail =>
-        _result?.AppliedGuardrails.FirstOrDefault(guardrail =>
-            string.Equals(guardrail.Id, _result.FirstFailingGate, StringComparison.OrdinalIgnoreCase))
-        ?? _result?.AppliedGuardrails.FirstOrDefault(guardrail =>
-            guardrail.Outcome is GuardrailOutcome.Blocked
-                or GuardrailOutcome.SoftStopped
-                or GuardrailOutcome.Waiting
-                or GuardrailOutcome.Indeterminate);
-    private int CompletedRuns => _runs.Count(run => run.Decision == SimulationDecision.Allowed);
-    private decimal TotalConsumedCredits => _runs
-        .Where(run => run.Decision == SimulationDecision.Allowed)
-        .Sum(run => run.Allocation.TotalCredits);
-    private decimal TotalIncludedCredits => _runs
-        .Where(run => run.Decision == SimulationDecision.Allowed)
-        .Sum(run => run.Allocation.IncludedCredits);
-    private decimal TotalMeteredCredits => _runs
-        .Where(run => run.Decision == SimulationDecision.Allowed)
-        .Sum(run => run.Allocation.MeteredCredits);
-    private decimal TotalMeteredUsd => _runs
-        .Where(run => run.Decision == SimulationDecision.Allowed)
-        .Sum(run => run.Allocation.MeteredUsd);
-    private decimal TotalActionsUsd => _runs
-        .Where(run => run.Decision == SimulationDecision.Allowed)
-        .Sum(run => run.ActionsUsage?.AdditionalUsd ?? 0m);
-
     protected override void OnInitialized()
     {
         ResetCatalog();
@@ -1253,7 +1038,7 @@
         }
         catch (Exception exception) when (exception is JsonException or SimulationException or InvalidOperationException)
         {
-            _result = null;
+            _results.Clear();
             _error = exception is SimulationException simulation
                 ? $"{simulation.Code}: {simulation.Message}"
                 : exception.Message;
@@ -1266,16 +1051,14 @@
         bool advanceWorkingState)
     {
         var session = SessionRunner.Run(ActiveEngine, scenario, _form.RepeatCount);
-        _runs.Clear();
-        _runs.AddRange(session.Runs);
-        _result = _runs[^1];
+        _results.SetRuns(session.Runs);
         if (advanceWorkingState)
         {
             _scenarioJson = ScenarioJson.Serialize(session.NextScenario);
             LoadForm(session.NextScenario);
-            _notice = CompletedRuns == 0
+            _notice = _results.CompletedRuns == 0
                 ? "No balances changed because the first run was not allowed."
-                : $"Working balances advanced by {CompletedRuns} successful run(s).";
+                : $"Working balances advanced by {_results.CompletedRuns} successful run(s).";
         }
         _error = null;
     }
@@ -1296,167 +1079,20 @@
 
     private void LoadForm(SimulationScenario scenario)
     {
-        var call = scenario.Calls.FirstOrDefault();
-        var userId = scenario.Attribution?.UserId;
-        var directAssignments = scenario.Attribution?.DirectAssignments ?? [];
-        var directAssignmentIndex = directAssignments
-            .Select((assignment, index) => new { assignment, index })
-            .Where(item =>
-                scenario.Timestamp >= item.assignment.EffectiveFrom &&
-                (item.assignment.EffectiveTo is null || scenario.Timestamp < item.assignment.EffectiveTo))
-            .Select(item => (int?)item.index)
-            .FirstOrDefault() ?? (directAssignments.Count > 0 ? 0 : null);
-        var costCenterId = directAssignmentIndex is null
-            ? null
-            : directAssignments[directAssignmentIndex.Value].CostCenterId;
-        var resolvedAttribution = scenario.Attribution is null
-            ? null
-            : new AttributionResolver().Resolve(scenario.Attribution, scenario.Timestamp);
-        costCenterId = resolvedAttribution?.Outcome == GuardrailOutcome.Passed
-            ? resolvedAttribution.CostCenterId
-            : costCenterId;
-        var applicability = new EconomicGuardrailApplicabilityResolver();
-        var economic = scenario.EconomicGuardrails;
-        var universalUlb = economic is null || resolvedAttribution is null
-            ? null
-            : applicability.ResolveUserLevelBudget(
-                economic,
-                resolvedAttribution,
-                UserLevelBudgetKind.Universal,
-                scenario.Timestamp).Value;
-        var costCenterUlb = economic is null || resolvedAttribution is null
-            ? null
-            : applicability.ResolveUserLevelBudget(
-                economic,
-                resolvedAttribution,
-                UserLevelBudgetKind.CostCenter,
-                scenario.Timestamp).Value;
-        var individualUlb = economic is null || resolvedAttribution is null
-            ? null
-            : applicability.ResolveUserLevelBudget(
-                economic,
-                resolvedAttribution,
-                UserLevelBudgetKind.Individual,
-                scenario.Timestamp).Value;
-        var includedControl = economic is null || resolvedAttribution is null
-            ? null
-            : applicability.ResolveIncludedUsageControl(
-                economic,
-                resolvedAttribution,
-                scenario.Timestamp).Value;
-        var spendingBudgets = economic is null || resolvedAttribution is null
-            ? []
-            : applicability.ResolveSpendingBudgets(
-                economic,
-                resolvedAttribution,
-                scenario.ProductId,
-                scenario.SkuId,
-                scenario.Timestamp);
-        var enterpriseBudget = EconomicGuardrailApplicabilityResolver.Select(
-            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.Enterprise)).Value;
-        var costCenterBudget = EconomicGuardrailApplicabilityResolver.Select(
-            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.CostCenter)).Value;
-        var organizationBudget = EconomicGuardrailApplicabilityResolver.Select(
-            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.Organization)).Value;
-        var actionsBudget = scenario.ActionsGuardrails?.Budgets.FirstOrDefault();
-        var organizationId = resolvedAttribution?.LicensingOrganizationId ??
-            scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault();
-        var licensingOrganizationIndex = scenario.Attribution?.LicensingOrganizationIds
-            .Select((id, index) => new { id, index })
-            .Where(item => string.Equals(
-                item.id,
-                organizationId,
-                StringComparison.OrdinalIgnoreCase))
-            .Select(item => (int?)item.index)
-            .FirstOrDefault();
-        _form = new GuidedForm
-        {
-            Task = scenario.Metadata.GetValueOrDefault("task", ""),
-            OperationId = scenario.OperationId,
-            PlanId = scenario.PlanId,
-            CostChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly,
-            RepositoryVisibility = scenario.RepositoryVisibility,
-            ModelId = call?.ModelId ?? ActiveConfiguration.Models.First().Id,
-            ContextTokens = call?.ContextTokens ?? 0,
-            FreshInputTokens = call?.FreshInputTokens ?? 0,
-            CachedInputTokens = call?.CachedInputTokens ?? 0,
-            CacheWriteTokens = call?.CacheWriteTokens ?? 0,
-            OutputTokens = call?.OutputTokens ?? 0,
-            CostCenterId = costCenterId ?? "",
-            DirectAssignmentIndex = directAssignmentIndex,
-            OrganizationId = organizationId ?? "",
-            LicensingOrganizationIndex = licensingOrganizationIndex,
-            PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
-            UseUniversalUlb = universalUlb is not null,
-            UniversalUlbId = universalUlb?.Id,
-            UniversalUlbLimit = universalUlb?.LimitCredits ?? 0,
-            UniversalUlbConsumed = universalUlb?.ConsumedCredits ?? 0,
-            UseCostCenterUlb = costCenterUlb is not null,
-            CostCenterUlbId = costCenterUlb?.Id,
-            CostCenterUlbLimit = costCenterUlb?.LimitCredits ?? 0,
-            CostCenterUlbConsumed = costCenterUlb?.ConsumedCredits ?? 0,
-            UseIndividualUlb = individualUlb is not null,
-            IndividualUlbId = individualUlb?.Id,
-            UlbLimit = individualUlb?.LimitCredits ?? 0,
-            UlbConsumed = individualUlb?.ConsumedCredits ?? 0,
-            UseIncludedControl = includedControl is not null,
-            IncludedControlId = includedControl?.Id,
-            IncludedControlConsumed = includedControl?.ConsumedCredits ?? 0,
-            IncludedOverflow = includedControl?.OverflowBehavior ?? IncludedOverflowBehavior.PaidUsage,
-            PaidUsage = scenario.EconomicGuardrails?.PaidUsage.State ?? GuardrailValue.Unknown,
-            UseCostCenterBudget = costCenterBudget is not null,
-            CostCenterBudgetId = costCenterBudget?.Id,
-            CostCenterBudgetLimit = costCenterBudget?.LimitUsd ?? 0,
-            CostCenterBudgetConsumed = costCenterBudget?.ConsumedUsd ?? 0,
-            CostCenterBudgetEnforcement = costCenterBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
-            UseOrganizationBudget = organizationBudget is not null,
-            OrganizationBudgetId = organizationBudget?.Id,
-            OrganizationBudgetLimit = organizationBudget?.LimitUsd ?? 0,
-            OrganizationBudgetConsumed = organizationBudget?.ConsumedUsd ?? 0,
-            OrganizationBudgetEnforcement = organizationBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
-            UseEnterpriseBudget = enterpriseBudget is not null,
-            EnterpriseBudgetId = enterpriseBudget?.Id,
-            EnterpriseBudgetLimit = enterpriseBudget?.LimitUsd ?? 0,
-            EnterpriseBudgetConsumed = enterpriseBudget?.ConsumedUsd ?? 0,
-            EnterpriseBudgetEnforcement = enterpriseBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
-            ActionsMinutes = scenario.ActionsUsage?.Minutes ?? 0,
-            UseActionsBudget = actionsBudget is not null,
-            ActionsBudgetId = actionsBudget?.Id,
-            ActionsBudgetLimit = actionsBudget?.LimitUsd ?? 0,
-            ActionsBudgetConsumed = actionsBudget?.ConsumedUsd ?? 0,
-            ActionsBudgetEnforcement = actionsBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
-            UseRuntimeGuardrails = scenario.RuntimeGuardrails is not null,
-            MaximumModelCalls = scenario.RuntimeGuardrails?.MaximumModelCalls,
-            ModelCallsConsumed = scenario.RuntimeGuardrails?.ModelCallsConsumed ?? 0,
-            MaximumSubagentDepth = scenario.RuntimeGuardrails?.MaximumSubagentDepth,
-            RequestedSubagentDepth = scenario.RuntimeGuardrails?.RequestedSubagentDepth ?? 0,
-            MaximumDurationMinutes = scenario.RuntimeGuardrails?.MaximumDuration is null
-                ? null
-                : (decimal)scenario.RuntimeGuardrails.MaximumDuration.Value.TotalMinutes,
-            ElapsedDurationMinutes = (decimal)(scenario.RuntimeGuardrails?.ElapsedDuration.TotalMinutes ?? 0),
-            RequestedDurationMinutes = (decimal)(scenario.RuntimeGuardrails?.RequestedDuration.TotalMinutes ?? 0),
-            CliSoftCreditLimit = scenario.RuntimeGuardrails?.CliSoftCreditLimit,
-            CliCreditsConsumed = scenario.RuntimeGuardrails?.CliCreditsConsumed ?? 0,
-            RepeatCount = ReadRepeatCount(scenario.Metadata)
-        };
+        _form = EditorMapper.MapFromScenario(scenario, ActiveConfiguration);
     }
 
     private async Task SaveAsync()
     {
         try
         {
-            await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, _scenarioJson);
-            await JS.InvokeVoidAsync("localStorage.setItem", CatalogStorageKey, _catalogJson);
-            var preferences = JsonSerializer.Serialize(new DisplayPreferences(
-                _visibilityMode,
-                _hiddenCategories.ToArray()));
-            await JS.InvokeVoidAsync("localStorage.setItem", PreferenceStorageKey, preferences);
+            await BrowserPersistence.SaveAsync(_scenarioJson, _catalogJson, _results.GetPreferences());
             _notice = "Scenario saved in this browser.";
             _error = null;
         }
-        catch (JSException exception)
+        catch (BrowserPersistenceException exception)
         {
-            _error = $"Browser storage is unavailable: {exception.Message}";
+            _error = $"{exception.Message} {exception.InnerException?.Message}";
         }
     }
 
@@ -1464,40 +1100,32 @@
     {
         try
         {
-            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-            if (string.IsNullOrWhiteSpace(saved))
+            var saved = await BrowserPersistence.LoadAsync();
+            if (saved is null)
             {
                 _error = "No saved scenario was found in this browser.";
                 return;
             }
 
-            var savedCatalog = await JS.InvokeAsync<string?>("localStorage.getItem", CatalogStorageKey);
-            if (!string.IsNullOrWhiteSpace(savedCatalog))
+            if (!string.IsNullOrWhiteSpace(saved.CatalogJson))
             {
-                _catalogJson = savedCatalog;
+                _catalogJson = saved.CatalogJson;
                 ApplyCatalog();
             }
 
-            var savedPreferences = await JS.InvokeAsync<string?>("localStorage.getItem", PreferenceStorageKey);
-            if (!string.IsNullOrWhiteSpace(savedPreferences))
+            if (saved.Preferences is not null)
             {
-                var preferences = JsonSerializer.Deserialize<DisplayPreferences>(savedPreferences);
-                if (preferences is not null)
-                {
-                    _visibilityMode = preferences.VisibilityMode;
-                    _hiddenCategories.Clear();
-                    _hiddenCategories.UnionWith(preferences.HiddenCategories);
-                }
+                _results.ApplyPreferences(saved.Preferences);
             }
 
-            _scenarioJson = saved;
+            _scenarioJson = saved.ScenarioJson;
             ReloadGuidedFields();
             RunJsonCore(advanceWorkingState: false);
             _notice = "Saved scenario loaded.";
         }
-        catch (JSException exception)
+        catch (BrowserPersistenceException exception)
         {
-            _error = $"Browser storage is unavailable: {exception.Message}";
+            _error = $"{exception.Message} {exception.InnerException?.Message}";
         }
     }
 
@@ -1505,11 +1133,11 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("simulator.downloadText", "copilot-simulation.json", _scenarioJson);
+            await BrowserPersistence.ExportAsync(_scenarioJson);
         }
-        catch (JSException exception)
+        catch (BrowserPersistenceException exception)
         {
-            _error = $"The scenario could not be exported: {exception.Message}";
+            _error = $"{exception.Message} {exception.InnerException?.Message}";
         }
     }
 
@@ -1517,9 +1145,7 @@
     {
         try
         {
-            await using var stream = args.File.OpenReadStream(2 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-            _scenarioJson = await reader.ReadToEndAsync();
+            _scenarioJson = await BrowserScenarioPersistence.ReadImportAsync(args.File);
             ReloadGuidedFields();
             RunJsonCore(advanceWorkingState: false);
             _notice = $"Imported {args.File.Name}.";
@@ -1527,27 +1153,6 @@
         catch (Exception exception) when (exception is IOException or JsonException)
         {
             _error = exception.Message;
-        }
-    }
-
-    private bool ShouldShow(AppliedGuardrail guardrail) =>
-        _visibilityMode switch
-        {
-            "issues" => guardrail.Outcome != GuardrailOutcome.Passed,
-            "failures" => guardrail.Outcome is GuardrailOutcome.Blocked or GuardrailOutcome.Indeterminate,
-            "custom" => !_hiddenCategories.Contains(guardrail.Category),
-            _ => true
-        };
-
-    private void SetCategory(string category, ChangeEventArgs args)
-    {
-        if (args.Value is true)
-        {
-            _hiddenCategories.Remove(category);
-        }
-        else
-        {
-            _hiddenCategories.Add(category);
         }
     }
 
@@ -1576,42 +1181,23 @@
         _error = null;
     }
 
-    private static string StatusClass(string value) => value.ToLowerInvariant().Replace("stopped", "-stopped");
-    private static string FormatDecision(SimulationDecision decision) => decision switch
-    {
-        SimulationDecision.PartiallySimulated => "Partially simulated",
-        SimulationDecision.SoftStopped => "Soft stopped",
-        _ => decision.ToString()
-    };
-    private static string Format(decimal value) => value.ToString("0.####");
-    private static string FormatNullable(decimal? value) => value?.ToString("0.####") ?? "—";
-    private string BlockingSourceLabel(AppliedGuardrail? guardrail) =>
-        ResolveMetadata(guardrail).Label;
-    private string BlockingScopeExplanation(AppliedGuardrail? guardrail) =>
-        ResolveMetadata(guardrail).BlockingExplanation;
-    private string BlockingUnit(AppliedGuardrail guardrail) =>
-        ResolveMetadata(guardrail).Unit;
-    private static string BlockingProjectionLabel(AppliedGuardrail guardrail) =>
-        guardrail.RemainingAfter < 0 ? "Shortfall" : "Projected remaining";
-    private static string FormatBlockingProjection(AppliedGuardrail guardrail) =>
-        guardrail.RemainingAfter is null ? "—" : Format(Math.Abs(guardrail.RemainingAfter.Value));
     private bool IsBlockingCategory(string category) =>
-        string.Equals(BlockingGuardrail?.Category, category, StringComparison.OrdinalIgnoreCase);
+        string.Equals(_results.BlockingGuardrail?.Category, category, StringComparison.OrdinalIgnoreCase);
     private bool IsBlockingGate(string gateId) =>
-        string.Equals(_result?.FirstFailingGate, gateId, StringComparison.OrdinalIgnoreCase);
+        string.Equals(_results.Result?.FirstFailingGate, gateId, StringComparison.OrdinalIgnoreCase);
     private string UlbImpactClass(UserLevelBudgetKind kind) =>
-        IsBlockingCategory(GuardrailCategories.UserLevelBudget) && _result?.EffectiveUlb?.Kind == kind
+        IsBlockingCategory(GuardrailCategories.UserLevelBudget) && _results.Result?.EffectiveUlb?.Kind == kind
             ? "impacted-setting"
             : "";
     private string ImpactClass(string category) =>
-        _result?.FirstFailingGate is null
+        _results.Result?.FirstFailingGate is null
             ? ""
             : category == GuardrailMetadataCatalog.ScenarioJsonAnchor
-                ? BlockingSettingsAnchor(BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor ? "impacted-setting" : ""
+                ? BlockingSettingsAnchor(_results.BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor ? "impacted-setting" : ""
                 : IsBlockingCategory(category) ? "impacted-setting" : "";
     private bool IsBlockingAdvancedSetting =>
-        _result?.FirstFailingGate is not null &&
-        BlockingSettingsAnchor(BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor;
+        _results.Result?.FirstFailingGate is not null &&
+        BlockingSettingsAnchor(_results.BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor;
     private string BlockingSettingsAnchor(AppliedGuardrail? guardrail) =>
         ResolveMetadata(guardrail).SettingsAnchor;
     private static GuardrailMetadata Metadata(string key) =>
@@ -1619,86 +1205,9 @@
     private GuardrailMetadata ResolveMetadata(AppliedGuardrail? guardrail) =>
         GuardrailMetadataCatalog.Resolve(
             guardrail?.MetadataKey,
-            guardrail?.Id ?? _result?.FirstFailingGate,
+            guardrail?.Id ?? _results.Result?.FirstFailingGate,
             guardrail?.Category);
     private static string Friendly(string value) =>
         string.Concat(value.Select((character, index) =>
             index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()));
-    private static int ReadRepeatCount(IReadOnlyDictionary<string, string> metadata) =>
-        metadata.TryGetValue("repeatCount", out var value) &&
-        int.TryParse(value, out var count) &&
-        count is >= 1 and <= 1000
-            ? count
-            : 1;
-
-    private sealed class GuidedForm
-    {
-        public string Task { get; set; } = "";
-        public string OperationId { get; set; } = "cloud-agent";
-        public string PlanId { get; set; } = "business";
-        public bool CostChecksOnly { get; set; } = true;
-        public RepositoryVisibility RepositoryVisibility { get; set; } = RepositoryVisibility.Private;
-        public string ModelId { get; set; } = "gpt-5.6-luna";
-        public long ContextTokens { get; set; }
-        public long FreshInputTokens { get; set; }
-        public long CachedInputTokens { get; set; }
-        public long CacheWriteTokens { get; set; }
-        public long OutputTokens { get; set; }
-        public string CostCenterId { get; set; } = "";
-        public int? DirectAssignmentIndex { get; set; }
-        public string OrganizationId { get; set; } = "";
-        public int? LicensingOrganizationIndex { get; set; }
-        public decimal PoolConsumed { get; set; }
-        public bool UseUniversalUlb { get; set; }
-        public string? UniversalUlbId { get; set; }
-        public decimal UniversalUlbLimit { get; set; }
-        public decimal UniversalUlbConsumed { get; set; }
-        public bool UseCostCenterUlb { get; set; }
-        public string? CostCenterUlbId { get; set; }
-        public decimal CostCenterUlbLimit { get; set; }
-        public decimal CostCenterUlbConsumed { get; set; }
-        public bool UseIndividualUlb { get; set; }
-        public string? IndividualUlbId { get; set; }
-        public decimal UlbLimit { get; set; }
-        public decimal UlbConsumed { get; set; }
-        public bool UseIncludedControl { get; set; }
-        public string? IncludedControlId { get; set; }
-        public decimal IncludedControlConsumed { get; set; }
-        public IncludedOverflowBehavior IncludedOverflow { get; set; }
-        public GuardrailValue PaidUsage { get; set; }
-        public bool UseCostCenterBudget { get; set; }
-        public string? CostCenterBudgetId { get; set; }
-        public decimal CostCenterBudgetLimit { get; set; }
-        public decimal CostCenterBudgetConsumed { get; set; }
-        public GuardrailEnforcement CostCenterBudgetEnforcement { get; set; }
-        public bool UseOrganizationBudget { get; set; }
-        public string? OrganizationBudgetId { get; set; }
-        public decimal OrganizationBudgetLimit { get; set; }
-        public decimal OrganizationBudgetConsumed { get; set; }
-        public GuardrailEnforcement OrganizationBudgetEnforcement { get; set; }
-        public bool UseEnterpriseBudget { get; set; }
-        public string? EnterpriseBudgetId { get; set; }
-        public decimal EnterpriseBudgetLimit { get; set; }
-        public decimal EnterpriseBudgetConsumed { get; set; }
-        public GuardrailEnforcement EnterpriseBudgetEnforcement { get; set; }
-        public decimal ActionsMinutes { get; set; }
-        public bool UseActionsBudget { get; set; }
-        public string? ActionsBudgetId { get; set; }
-        public decimal ActionsBudgetLimit { get; set; }
-        public decimal ActionsBudgetConsumed { get; set; }
-        public GuardrailEnforcement ActionsBudgetEnforcement { get; set; }
-        public bool UseRuntimeGuardrails { get; set; }
-        public int? MaximumModelCalls { get; set; }
-        public int ModelCallsConsumed { get; set; }
-        public int? MaximumSubagentDepth { get; set; }
-        public int RequestedSubagentDepth { get; set; }
-        public decimal? MaximumDurationMinutes { get; set; }
-        public decimal ElapsedDurationMinutes { get; set; }
-        public decimal RequestedDurationMinutes { get; set; }
-        public decimal? CliSoftCreditLimit { get; set; }
-        public decimal CliCreditsConsumed { get; set; }
-        public int RepeatCount { get; set; } = 1;
-    }
-
-    private sealed record DisplayPreferences(string VisibilityMode, string[] HiddenCategories);
 }
