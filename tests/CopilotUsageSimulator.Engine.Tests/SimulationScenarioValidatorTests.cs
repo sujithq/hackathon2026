@@ -1,0 +1,372 @@
+using CopilotUsageSimulator.Engine.Guardrails;
+using CopilotUsageSimulator.Engine.Simulation;
+
+namespace CopilotUsageSimulator.Engine.Tests;
+
+public sealed class SimulationScenarioValidatorTests
+{
+    private static readonly DateTimeOffset Timestamp =
+        new(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void RejectsBlankRequiredIdentifiers()
+    {
+        AssertInvalid(Scenario() with { OperationId = " " }, "operationId");
+        AssertInvalid(Scenario() with { PlanId = "" }, "planId");
+        AssertInvalid(Scenario() with { ProductId = "\t" }, "productId");
+        AssertInvalid(Scenario() with { SkuId = " " }, "skuId");
+        AssertInvalid(
+            Scenario() with { Calls = [new ModelCallInput { ModelId = " " }] },
+            "calls[0].modelId");
+        AssertInvalid(
+            Scenario() with
+            {
+                AccessGates = new Dictionary<string, AccessGateState>
+                {
+                    [" "] = new()
+                }
+            },
+            "accessGates");
+        AssertInvalid(
+            Scenario() with
+            {
+                ActionsUsage = new ActionsUsageInput { RunnerId = " " }
+            },
+            "actionsUsage.runnerId");
+    }
+
+    [Fact]
+    public void RejectsInvalidBillingAndAttributionContracts()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                BillingContext = new BillingContext
+                {
+                    BillingEntityId = " ",
+                    CycleStart = Timestamp,
+                    CycleEnd = Timestamp.AddDays(1)
+                }
+            },
+            "billingContext.billingEntityId");
+        AssertInvalid(
+            Scenario() with
+            {
+                BillingContext = Billing() with { CycleEnd = Timestamp }
+            },
+            "billingContext");
+        AssertInvalid(
+            Scenario() with
+            {
+                BillingContext = Billing() with
+                {
+                    SeatAssignments =
+                    [
+                        new EffectiveSeatAssignment
+                        {
+                            UserId = " ",
+                            PlanId = "business"
+                        }
+                    ]
+                }
+            },
+            "billingContext.seatAssignments[0].userId");
+        AssertInvalid(
+            Scenario() with
+            {
+                BillingContext = Billing() with
+                {
+                    SeatAssignments =
+                    [
+                        new EffectiveSeatAssignment
+                        {
+                            UserId = "user-1",
+                            PlanId = "business",
+                            EffectiveFrom = Timestamp,
+                            EffectiveTo = Timestamp
+                        }
+                    ]
+                }
+            },
+            "billingContext.seatAssignments[0].effectiveTo");
+        AssertInvalid(
+            Scenario() with
+            {
+                Attribution = new AttributionInput { UserId = " " }
+            },
+            "attribution.userId");
+        AssertInvalid(
+            Scenario() with
+            {
+                Attribution = new AttributionInput
+                {
+                    UserId = "user-1",
+                    DirectAssignments =
+                    [
+                        new EffectiveCostCenterAssignment { CostCenterId = " " }
+                    ]
+                }
+            },
+            "attribution.directAssignments[0].costCenterId");
+    }
+
+    [Fact]
+    public void RejectsNegativeEconomicValuesAndInvalidEffectivePeriods()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with { EnterprisePoolConsumedCredits = -1m }
+            },
+            "economicGuardrails.enterprisePoolConsumedCredits");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    UserLevelBudgets =
+                    [
+                        new UserLevelBudget
+                        {
+                            Id = "ulb",
+                            Kind = UserLevelBudgetKind.Individual,
+                            TargetId = "user-1",
+                            LimitCredits = -1m
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.userLevelBudgets[0].limitCredits");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    IncludedUsageControls =
+                    [
+                        new CostCenterIncludedUsageControl
+                        {
+                            Id = "included",
+                            CostCenterId = "cc-1",
+                            ConsumedCredits = -1m
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.includedUsageControls[0].consumedCredits");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    SpendingBudgets =
+                    [
+                        new SpendingBudget
+                        {
+                            Id = "budget",
+                            Scope = SpendingBudgetScope.CostCenter,
+                            ScopeId = "cc-1",
+                            LimitUsd = 1m,
+                            ConsumedUsd = -1m
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.spendingBudgets[0].consumedUsd");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    UserLevelBudgets =
+                    [
+                        new UserLevelBudget
+                        {
+                            Id = "ulb",
+                            Kind = UserLevelBudgetKind.Universal,
+                            EffectiveFrom = Timestamp,
+                            EffectiveTo = Timestamp
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.userLevelBudgets[0]");
+    }
+
+    [Fact]
+    public void RejectsMissingIdentifiersForScopedEconomicContracts()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    UserLevelBudgets =
+                    [
+                        new UserLevelBudget
+                        {
+                            Id = "ulb",
+                            Kind = UserLevelBudgetKind.CostCenter
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.userLevelBudgets[0].targetId");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    SpendingBudgets =
+                    [
+                        new SpendingBudget
+                        {
+                            Id = "budget",
+                            Scope = SpendingBudgetScope.Organization
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.spendingBudgets[0].scopeId");
+    }
+
+    [Fact]
+    public void RejectsInvalidRuntimeAndActionsGuardrailValues()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                RuntimeGuardrails = new RuntimeGuardrailSnapshot { MaximumModelCalls = -1 }
+            },
+            "runtimeGuardrails.maximumModelCalls");
+        AssertInvalid(
+            Scenario() with
+            {
+                RuntimeGuardrails = new RuntimeGuardrailSnapshot
+                {
+                    RequestedDuration = TimeSpan.FromSeconds(-1)
+                }
+            },
+            "runtimeGuardrails.requestedDuration");
+        AssertInvalid(
+            Scenario() with
+            {
+                ActionsGuardrails = new ActionsGuardrailSnapshot { IncludedMinutes = -1m }
+            },
+            "actionsGuardrails.includedMinutes");
+        AssertInvalid(
+            Scenario() with
+            {
+                ActionsGuardrails = new ActionsGuardrailSnapshot
+                {
+                    Budgets =
+                    [
+                        new ActionsSpendingBudget
+                        {
+                            Id = "actions",
+                            LimitUsd = -1m
+                        }
+                    ]
+                }
+            },
+            "actionsGuardrails.budgets[0].limitUsd");
+    }
+
+    [Fact]
+    public void RejectsNegativeUsageValuesAtTheContractBoundary()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                Calls =
+                [
+                    new ModelCallInput
+                    {
+                        ModelId = "gpt-5.6-luna",
+                        OutputTokens = -1
+                    }
+                ]
+            },
+            "calls[0].outputTokens");
+        AssertInvalid(
+            Scenario() with
+            {
+                ActionsUsage = new ActionsUsageInput
+                {
+                    RunnerId = "linux",
+                    IncludedMinutesRemaining = -1m
+                }
+            },
+            "actionsUsage.includedMinutesRemaining");
+    }
+
+    [Fact]
+    public void AllowsConsumedValuesToExceedLimits()
+    {
+        var scenario = Scenario() with
+        {
+            EconomicGuardrails = Economy() with
+            {
+                UserLevelBudgets =
+                [
+                    new UserLevelBudget
+                    {
+                        Id = "ulb",
+                        Kind = UserLevelBudgetKind.Universal,
+                        LimitCredits = 1m,
+                        ConsumedCredits = 2m
+                    }
+                ],
+                SpendingBudgets =
+                [
+                    new SpendingBudget
+                    {
+                        Id = "budget",
+                        Scope = SpendingBudgetScope.Enterprise,
+                        LimitUsd = 1m,
+                        ConsumedUsd = 2m
+                    }
+                ]
+            },
+            RuntimeGuardrails = new RuntimeGuardrailSnapshot
+            {
+                MaximumModelCalls = 1,
+                ModelCallsConsumed = 2
+            },
+            ActionsGuardrails = new ActionsGuardrailSnapshot
+            {
+                IncludedMinutes = 1m,
+                ConsumedIncludedMinutes = 2m
+            }
+        };
+
+        SimulationScenarioValidator.Validate(scenario);
+    }
+
+    private static void AssertInvalid(SimulationScenario scenario, string expectedPath)
+    {
+        var exception = Assert.Throws<SimulationException>(
+            () => SimulationScenarioValidator.Validate(scenario));
+
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains(expectedPath, exception.Message);
+    }
+
+    private static SimulationScenario Scenario() =>
+        new()
+        {
+            OperationId = "chat",
+            PlanId = "business",
+            Timestamp = Timestamp
+        };
+
+    private static BillingContext Billing() =>
+        new()
+        {
+            BillingEntityId = "enterprise-1",
+            CycleStart = Timestamp,
+            CycleEnd = Timestamp.AddDays(1)
+        };
+
+    private static EconomicGuardrailSnapshot Economy() => new();
+}

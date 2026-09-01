@@ -21,7 +21,6 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
     {
         ArgumentNullException.ThrowIfNull(scenario);
         SimulationScenarioValidator.Validate(scenario);
-        ValidateScenario(scenario);
 
         var explanation = new List<ExplanationEntry>();
         var assumptions = new List<string>();
@@ -455,24 +454,6 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
 
     private static ExplanationEntry Entry(string stage, string code, string message) =>
         new() { Stage = stage, Code = code, Message = message };
-
-    private static void ValidateScenario(SimulationScenario scenario)
-    {
-        foreach (var call in scenario.Calls)
-        {
-            if (call.ContextTokens < 0 || call.FreshInputTokens < 0 || call.CachedInputTokens < 0 ||
-                call.CacheWriteTokens < 0 || call.OutputTokens < 0)
-            {
-                throw new SimulationException("Token counts cannot be negative.", "negative-token-count");
-            }
-        }
-
-        if (scenario.ActionsUsage is { Minutes: < 0 } ||
-            scenario.ActionsUsage is { IncludedMinutesRemaining: < 0 })
-        {
-            throw new SimulationException("Usage and remaining balances cannot be negative.", "negative-balance");
-        }
-    }
 
     private readonly record struct GateFailure(string GateId);
 }
