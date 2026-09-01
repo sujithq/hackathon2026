@@ -11,6 +11,17 @@ public sealed record EngineConfiguration
     public IReadOnlyList<GateDefinition> Gates { get; init; } = [];
     public IReadOnlyList<MultiplierDefinition> Multipliers { get; init; } = [];
     public IReadOnlyList<ActionsRunnerDefinition> ActionsRunners { get; init; } = [];
+    public ExampleScenarioDefinition ExampleScenario { get; init; } = new();
+}
+
+public sealed record ExampleScenarioDefinition
+{
+    public string ProductId { get; init; } = "github-copilot";
+    public string SkuId { get; init; } = "copilot-ai-credits";
+    public string? PreferredOperationId { get; init; }
+    public string? PreferredPlanId { get; init; }
+    public string? PreferredModelId { get; init; }
+    public string? PreferredActionsRunnerId { get; init; }
 }
 
 public sealed record PlanDefinition
@@ -55,6 +66,8 @@ public sealed record OperationDefinition
     public required string Id { get; init; }
     public bool IsBilled { get; init; } = true;
     public ActionsMeteringMode ActionsMetering { get; init; }
+    public string? ExampleLabel { get; init; }
+    public string? ExampleTask { get; init; }
 }
 
 public enum ActionsMeteringMode

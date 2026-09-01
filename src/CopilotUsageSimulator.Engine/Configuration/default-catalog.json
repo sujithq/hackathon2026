@@ -2,6 +2,14 @@
   "version": "2026-08-31",
   "usdPerCredit": 0.01,
   "poolOverflowBehavior": "split",
+  "exampleScenario": {
+    "productId": "github-copilot",
+    "skuId": "copilot-ai-credits",
+    "preferredOperationId": "cloud-agent",
+    "preferredPlanId": "business",
+    "preferredModelId": "gpt-5.6-luna",
+    "preferredActionsRunnerId": "linux-2-core"
+  },
   "plans": [
     { "id": "free", "includedCreditsPerUser": null, "isPooled": false },
     { "id": "student", "includedCreditsPerUser": null, "isPooled": false },
@@ -15,12 +23,12 @@
     { "id": "code-completion", "isBilled": false, "actionsMetering": "none" },
     { "id": "next-edit-suggestion", "isBilled": false, "actionsMetering": "none" },
     { "id": "utility-model", "isBilled": false, "actionsMetering": "none" },
-    { "id": "chat", "isBilled": true, "actionsMetering": "none" },
+    { "id": "chat", "isBilled": true, "actionsMetering": "none", "exampleLabel": "Chat", "exampleTask": "Explain the architecture and propose a safe implementation plan." },
     { "id": "ide-agent", "isBilled": true, "actionsMetering": "none" },
     { "id": "cli", "isBilled": true, "actionsMetering": "none" },
     { "id": "copilot-app", "isBilled": true, "actionsMetering": "none" },
-    { "id": "cloud-agent", "isBilled": true, "actionsMetering": "always" },
-    { "id": "code-review", "isBilled": true, "actionsMetering": "privateRepositories" },
+    { "id": "cloud-agent", "isBilled": true, "actionsMetering": "always", "exampleLabel": "Cloud agent", "exampleTask": "Implement the requested feature, run checks, and report the result." },
+    { "id": "code-review", "isBilled": true, "actionsMetering": "privateRepositories", "exampleLabel": "Code review", "exampleTask": "Review the repository and explain the highest-risk defects." },
     { "id": "spaces", "isBilled": true, "actionsMetering": "none" },
     { "id": "third-party-agent", "isBilled": true, "actionsMetering": "none" }
   ],

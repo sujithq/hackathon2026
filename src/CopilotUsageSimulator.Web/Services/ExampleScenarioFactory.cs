@@ -6,40 +6,50 @@ namespace CopilotUsageSimulator.Web.Services;
 
 public static class ExampleScenarioFactory
 {
-    public static SimulationScenario Create(EngineConfiguration configuration, string template = "cloud-agent")
+    public static SimulationScenario Create(EngineConfiguration configuration, string operationId)
     {
         var timestamp = DateTimeOffset.UtcNow;
-        var operation = template == "code-review" ? "code-review" : template == "chat" ? "chat" : "cloud-agent";
-        var usesActions = operation is "cloud-agent" or "code-review";
-        var task = operation switch
-        {
-            "code-review" => "Review the repository and explain the highest-risk defects.",
-            "chat" => "Explain the architecture and propose a safe implementation plan.",
-            _ => "Implement the requested feature, run checks, and report the result."
-        };
+        var operation = configuration.Operations.SingleOrDefault(candidate =>
+            string.Equals(candidate.Id, operationId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new ConfigurationException($"Unknown example operation '{operationId}'.");
+        var plan = ResolvePlan(configuration);
+        var secondaryPlan = configuration.Plans.FirstOrDefault(candidate =>
+            candidate.IsPooled && !string.Equals(candidate.Id, plan.Id, StringComparison.OrdinalIgnoreCase))
+            ?? plan;
+        var model = operation.IsBilled ? ResolveModel(configuration, timestamp) : null;
+        var runner = operation.ActionsMetering == ActionsMeteringMode.None
+            ? null
+            : ResolveRunner(configuration);
+        var defaults = configuration.ExampleScenario;
 
         return new SimulationScenario
         {
-            OperationId = operation,
-            PlanId = "business",
-            ProductId = "github-copilot",
-            SkuId = "copilot-ai-credits",
+            OperationId = operation.Id,
+            PlanId = plan.Id,
+            ProductId = defaults.ProductId,
+            SkuId = defaults.SkuId,
             Timestamp = timestamp,
             CheckScope = SimulationCheckScope.CostRelatedOnly,
             RepositoryVisibility = RepositoryVisibility.Private,
-            Metadata = new Dictionary<string, string> { ["task"] = task, ["estimate"] = "expected" },
-            Calls =
-            [
-                new ModelCallInput
-                {
-                    ModelId = "gpt-5.6-luna",
-                    ContextTokens = 45_000,
-                    FreshInputTokens = 30_000,
-                    CachedInputTokens = 10_000,
-                    CacheWriteTokens = 2_000,
-                    OutputTokens = 8_000
-                }
-            ],
+            Metadata = new Dictionary<string, string>
+            {
+                ["task"] = operation.ExampleTask ?? "Run the selected operation and report the result.",
+                ["estimate"] = "expected"
+            },
+            Calls = model is null
+                ? []
+                :
+                [
+                    new ModelCallInput
+                    {
+                        ModelId = model.Id,
+                        ContextTokens = 45_000,
+                        FreshInputTokens = 30_000,
+                        CachedInputTokens = 10_000,
+                        CacheWriteTokens = 2_000,
+                        OutputTokens = 8_000
+                    }
+                ],
             AccessGates = configuration.Gates.ToDictionary(
                 gate => gate.Id,
                 _ => new AccessGateState { Passed = true },
@@ -54,13 +64,13 @@ public static class ExampleScenarioFactory
                     new EffectiveSeatAssignment
                     {
                         UserId = "user-1",
-                        PlanId = "business",
+                        PlanId = plan.Id,
                         CostCenterId = "cc-engineering"
                     },
                     new EffectiveSeatAssignment
                     {
                         UserId = "user-2",
-                        PlanId = "enterprise",
+                        PlanId = secondaryPlan.Id,
                         CostCenterId = "cc-engineering"
                     }
                 ]
@@ -113,8 +123,8 @@ public static class ExampleScenarioFactory
                 PaidUsage = new PaidUsageAuthorization
                 {
                     State = GuardrailValue.Enabled,
-                    ProductIds = new HashSet<string> { "github-copilot" },
-                    SkuIds = new HashSet<string> { "copilot-ai-credits" }
+                    ProductIds = new HashSet<string> { defaults.ProductId },
+                    SkuIds = new HashSet<string> { defaults.SkuId }
                 },
                 SpendingBudgets =
                 [
@@ -155,15 +165,15 @@ public static class ExampleScenarioFactory
                 RequestedDuration = TimeSpan.FromMinutes(10),
                 CliSoftCreditLimit = 2_000m
             },
-            ActionsUsage = usesActions
+            ActionsUsage = runner is not null
                 ? new ActionsUsageInput
                 {
-                    RunnerId = "linux-2-core",
+                    RunnerId = runner.Id,
                     Minutes = 10m,
                     IncludedMinutesRemaining = 1_000m
                 }
                 : null,
-            ActionsGuardrails = usesActions
+            ActionsGuardrails = runner is not null
                 ? new ActionsGuardrailSnapshot
                 {
                     ActionsEnabled = GuardrailValue.Enabled,
@@ -186,4 +196,54 @@ public static class ExampleScenarioFactory
                 : null
         };
     }
+
+    private static PlanDefinition ResolvePlan(EngineConfiguration configuration) =>
+        FindPreferred(configuration.Plans, configuration.ExampleScenario.PreferredPlanId, plan => plan.Id)
+        ?? configuration.Plans.FirstOrDefault(plan => plan.IsPooled && plan.IncludedCreditsPerUser is not null)
+        ?? configuration.Plans.FirstOrDefault()
+        ?? throw new ConfigurationException("An example scenario requires at least one plan.");
+
+    private static ModelDefinition ResolveModel(
+        EngineConfiguration configuration,
+        DateTimeOffset timestamp)
+    {
+        var preferred = FindPreferred(
+            configuration.Models,
+            configuration.ExampleScenario.PreferredModelId,
+            model => model.Id);
+        if (preferred is not null && HasEffectivePrice(preferred, timestamp))
+        {
+            return preferred;
+        }
+
+        return configuration.Models.FirstOrDefault(model => HasEffectivePrice(model, timestamp))
+            ?? throw new ConfigurationException(
+                $"An example scenario requires a model with pricing effective at {timestamp:O}.");
+    }
+
+    private static ActionsRunnerDefinition ResolveRunner(EngineConfiguration configuration) =>
+        FindPreferred(
+            configuration.ActionsRunners,
+            configuration.ExampleScenario.PreferredActionsRunnerId,
+            runner => runner.Id)
+        ?? configuration.ActionsRunners.FirstOrDefault()
+        ?? throw new ConfigurationException(
+            "An operation that uses GitHub Actions requires at least one Actions runner.");
+
+    private static T? FindPreferred<T>(
+        IEnumerable<T> values,
+        string? preferredId,
+        Func<T, string> idSelector) where T : class =>
+        string.IsNullOrWhiteSpace(preferredId)
+            ? null
+            : values.SingleOrDefault(value =>
+                string.Equals(idSelector(value), preferredId, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasEffectivePrice(ModelDefinition model, DateTimeOffset timestamp) =>
+        model.PricePeriods.Any(period =>
+            timestamp >= period.EffectiveFrom &&
+            (period.EffectiveTo is null || timestamp < period.EffectiveTo) &&
+            period.Tiers.Any(tier =>
+                (tier.MinimumContextTokensExclusive is null || 45_000 > tier.MinimumContextTokensExclusive) &&
+                (tier.MaximumContextTokensInclusive is null || 45_000 <= tier.MaximumContextTokensInclusive)));
 }

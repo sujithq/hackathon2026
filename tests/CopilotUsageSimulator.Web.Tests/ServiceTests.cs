@@ -1,5 +1,6 @@
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
+using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 using CopilotUsageSimulator.Web.Services;
 
@@ -28,6 +29,88 @@ public sealed class ServiceTests
         Assert.NotNull(scenario.BillingContext);
         Assert.NotNull(scenario.Attribution);
         Assert.NotNull(scenario.EconomicGuardrails);
+    }
+
+    [Fact]
+    public void CustomCatalogDerivesExampleReferencesWithoutKnownIds()
+    {
+        var configuration = new EngineConfiguration
+        {
+            ExampleScenario = new ExampleScenarioDefinition
+            {
+                ProductId = "custom-product",
+                SkuId = "custom-sku",
+                PreferredOperationId = "custom-operation"
+            },
+            Plans =
+            [
+                new PlanDefinition
+                {
+                    Id = "custom-plan",
+                    IsPooled = true,
+                    IncludedCreditsPerUser = 1_000m
+                }
+            ],
+            Operations =
+            [
+                new OperationDefinition
+                {
+                    Id = "custom-operation",
+                    ActionsMetering = ActionsMeteringMode.Always,
+                    ExampleLabel = "Custom operation",
+                    ExampleTask = "Execute the custom operation."
+                }
+            ],
+            Models =
+            [
+                new ModelDefinition
+                {
+                    Id = "custom-model",
+                    PricePeriods =
+                    [
+                        new ModelPricePeriod
+                        {
+                            EffectiveFrom = DateTimeOffset.MinValue,
+                            Tiers =
+                            [
+                                new TokenPriceTier
+                                {
+                                    Id = "custom-tier",
+                                    InputUsdPerMillion = 1m,
+                                    OutputUsdPerMillion = 1m
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            ActionsRunners =
+            [
+                new ActionsRunnerDefinition { Id = "custom-runner", UsdPerMinute = 0.01m }
+            ]
+        };
+        var engine = new CopilotUsageSimulationEngine(configuration);
+
+        var scenario = ExampleScenarioFactory.Create(configuration, "custom-operation");
+        var result = engine.Simulate(scenario);
+
+        Assert.Equal("custom-operation", scenario.OperationId);
+        Assert.Equal("custom-plan", scenario.PlanId);
+        Assert.Equal("custom-product", scenario.ProductId);
+        Assert.Equal("custom-sku", scenario.SkuId);
+        Assert.Equal("custom-model", Assert.Single(scenario.Calls).ModelId);
+        Assert.Equal("custom-runner", scenario.ActionsUsage?.RunnerId);
+        Assert.Equal("Execute the custom operation.", scenario.Metadata["task"]);
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+    }
+
+    [Fact]
+    public void UnknownTemplateOperationIsRejectedInsteadOfCoerced()
+    {
+        var exception = Assert.Throws<ConfigurationException>(() =>
+            ExampleScenarioFactory.Create(_configuration, "unknown-operation"));
+
+        Assert.Contains("Unknown example operation", exception.Message);
     }
 
     [Fact]

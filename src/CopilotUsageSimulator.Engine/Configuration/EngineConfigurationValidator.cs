@@ -17,6 +17,7 @@ public static class EngineConfigurationValidator
         Require(configuration.Gates, "gates");
         Require(configuration.Multipliers, "multipliers");
         Require(configuration.ActionsRunners, "actionsRunners");
+        Require(configuration.ExampleScenario, "exampleScenario");
         RequireItems(configuration.Plans, "plans");
         RequireItems(configuration.Models, "models");
         RequireItems(configuration.Operations, "operations");
@@ -33,6 +34,31 @@ public static class EngineConfigurationValidator
 
         var operationIds = configuration.Operations.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var modelIds = configuration.Models.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var planIds = configuration.Plans.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var runnerIds = configuration.ActionsRunners.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(configuration.ExampleScenario.ProductId) ||
+            string.IsNullOrWhiteSpace(configuration.ExampleScenario.SkuId))
+        {
+            throw new ConfigurationException("Example scenario productId and skuId cannot be empty.");
+        }
+
+        EnsureOptionalReference(
+            configuration.ExampleScenario.PreferredOperationId,
+            operationIds,
+            "example scenario operation");
+        EnsureOptionalReference(
+            configuration.ExampleScenario.PreferredPlanId,
+            planIds,
+            "example scenario plan");
+        EnsureOptionalReference(
+            configuration.ExampleScenario.PreferredModelId,
+            modelIds,
+            "example scenario model");
+        EnsureOptionalReference(
+            configuration.ExampleScenario.PreferredActionsRunnerId,
+            runnerIds,
+            "example scenario Actions runner");
 
         foreach (var gate in configuration.Gates)
         {
@@ -166,6 +192,17 @@ public static class EngineConfigurationValidator
         if (unknown is not null)
         {
             throw new ConfigurationException($"Unknown {label} id '{unknown}'.");
+        }
+    }
+
+    private static void EnsureOptionalReference(
+        string? reference,
+        IReadOnlySet<string> knownValues,
+        string label)
+    {
+        if (!string.IsNullOrWhiteSpace(reference) && !knownValues.Contains(reference))
+        {
+            throw new ConfigurationException($"Unknown {label} id '{reference}'.");
         }
     }
 }

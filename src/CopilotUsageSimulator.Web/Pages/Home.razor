@@ -26,9 +26,11 @@
 
 <section class="template-strip">
     <span>Start from:</span>
-    <button @onclick="@(() => LoadTemplate("cloud-agent"))">Cloud agent</button>
-    <button @onclick="@(() => LoadTemplate("code-review"))">Code review</button>
-    <button @onclick="@(() => LoadTemplate("chat"))">Chat</button>
+    @foreach (var operation in ExampleOperations)
+    {
+        var operationId = operation.Id;
+        <button @onclick="@(() => LoadTemplate(operationId))">@operation.ExampleLabel</button>
+    }
 </section>
 
 @if (!string.IsNullOrWhiteSpace(_error))
@@ -645,6 +647,13 @@
     private ICopilotUsageSimulationEngine ActiveEngine => _activeEngine ?? DefaultEngine;
     private OperationDefinition? SelectedOperation => ActiveConfiguration.Operations.FirstOrDefault(
         operation => string.Equals(operation.Id, _form.OperationId, StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<OperationDefinition> ExampleOperations =>
+        ActiveConfiguration.Operations.Where(operation => !string.IsNullOrWhiteSpace(operation.ExampleLabel));
+    private string InitialExampleOperationId =>
+        ActiveConfiguration.ExampleScenario.PreferredOperationId
+        ?? ExampleOperations.FirstOrDefault()?.Id
+        ?? ActiveConfiguration.Operations.FirstOrDefault()?.Id
+        ?? throw new ConfigurationException("The active catalog does not define an operation.");
     private bool OperationConsumesAiCredits => SelectedOperation?.IsBilled == true;
     private bool OperationUsesActions => SelectedOperation?.ActionsMetering != ActionsMeteringMode.None;
     private bool OperationUsesRepositoryVisibility =>
@@ -691,7 +700,7 @@
     protected override void OnInitialized()
     {
         ResetCatalog();
-        LoadTemplate("cloud-agent");
+        LoadTemplate(InitialExampleOperationId);
     }
 
     private void LoadTemplate(string template)
@@ -1548,6 +1557,7 @@
         {
             _activeConfiguration = ScenarioJson.DeserializeConfiguration(_catalogJson);
             _activeEngine = new CopilotUsageSimulationEngine(_activeConfiguration);
+            LoadTemplate(InitialExampleOperationId);
             _error = null;
             _notice = $"Catalog '{_activeConfiguration.Version}' applied.";
         }

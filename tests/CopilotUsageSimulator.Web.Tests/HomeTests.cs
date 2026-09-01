@@ -390,6 +390,39 @@ public sealed class HomeTests : BunitContext
         Assert.DoesNotContain("actions-budget", cut.Find(".check-list").TextContent);
     }
 
+    [Fact]
+    public void ApplyingCatalogUsesCatalogDefinedPreferredTemplate()
+    {
+        var serializer = new ScenarioJson();
+        var original = EngineConfigurationLoader.LoadDefault();
+        var custom = original with
+        {
+            ExampleScenario = original.ExampleScenario with
+            {
+                PreferredOperationId = "custom-operation"
+            },
+            Operations =
+            [
+                new OperationDefinition
+                {
+                    Id = "custom-operation",
+                    ExampleLabel = "Custom operation",
+                    ExampleTask = "Execute the custom operation."
+                }
+            ],
+            Gates = [],
+            Multipliers = []
+        };
+        var cut = Render<Home>();
+        cut.Find("textarea.catalog-editor").Change(serializer.SerializeConfiguration(custom));
+
+        FindButton(cut, "Apply catalog").Click();
+
+        Assert.NotNull(FindButton(cut, "Custom operation"));
+        Assert.Equal("custom-operation", cut.Find("#operation").GetAttribute("value"));
+        Assert.Contains("Catalog", cut.Find(".message.success").TextContent);
+    }
+
     public static IEnumerable<object[]> OperationCapabilities()
     {
         var configuration = EngineConfigurationLoader.LoadDefault();
