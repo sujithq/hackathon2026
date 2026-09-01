@@ -52,7 +52,7 @@ public sealed class SimulationSessionRunner
                         : budget)
                     .ToArray(),
                 IncludedUsageControls = economic.IncludedUsageControls
-                    .Select(control => IdEquals(control.CostCenterId, result.Attribution?.CostCenterId)
+                    .Select(control => IdEquals(control.Id, result.Allocation.IncludedUsageControlId)
                         ? control with
                         {
                             ConsumedCredits = control.ConsumedCredits + result.Allocation.IncludedCredits

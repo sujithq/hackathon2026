@@ -53,6 +53,7 @@ public sealed record CreditAllocation
 {
     public decimal TotalCredits { get; init; }
     public decimal IncludedCredits { get; init; }
+    public string? IncludedUsageControlId { get; init; }
     public decimal MeteredCredits { get; init; }
     public decimal MeteredUsd { get; init; }
     public string? MeteredBudgetId { get; init; }

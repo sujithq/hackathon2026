@@ -7,12 +7,14 @@ namespace CopilotUsageSimulator.Engine.Tests;
 public sealed class SimulationSessionRunnerTests
 {
     [Fact]
-    public void RepeatedRunsAdvanceAllWorkingBalancesUsingCaseInsensitiveIds()
+    public void RepeatedRunsAdvanceOnlyAppliedWorkingBalancesUsingCaseInsensitiveIds()
     {
+        var timestamp = new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero);
         var scenario = new SimulationScenario
         {
             OperationId = "operation",
             PlanId = "plan",
+            Timestamp = timestamp,
             CheckScope = SimulationCheckScope.All,
             Calls = [new ModelCallInput { ModelId = "model" }],
             EconomicGuardrails = new EconomicGuardrailSnapshot
@@ -34,6 +36,20 @@ public sealed class SimulationSessionRunnerTests
                         Id = "control",
                         CostCenterId = "COST-CENTER",
                         ConsumedCredits = 2m
+                    },
+                    new CostCenterIncludedUsageControl
+                    {
+                        Id = "expired-control",
+                        CostCenterId = "cost-center",
+                        ConsumedCredits = 20m,
+                        EffectiveTo = timestamp
+                    },
+                    new CostCenterIncludedUsageControl
+                    {
+                        Id = "future-control",
+                        CostCenterId = "cost-center",
+                        ConsumedCredits = 30m,
+                        EffectiveFrom = timestamp.AddDays(1)
                     }
                 ],
                 SpendingBudgets =
@@ -76,7 +92,21 @@ public sealed class SimulationSessionRunnerTests
         Assert.Equal(2, session.Runs.Count);
         Assert.Equal(16m, session.NextScenario.EconomicGuardrails!.EnterprisePoolConsumedCredits);
         Assert.Equal(11m, session.NextScenario.EconomicGuardrails.UserLevelBudgets.Single().ConsumedCredits);
-        Assert.Equal(8m, session.NextScenario.EconomicGuardrails.IncludedUsageControls.Single().ConsumedCredits);
+        Assert.Equal(
+            8m,
+            session.NextScenario.EconomicGuardrails.IncludedUsageControls
+                .Single(control => control.Id == "control")
+                .ConsumedCredits);
+        Assert.Equal(
+            20m,
+            session.NextScenario.EconomicGuardrails.IncludedUsageControls
+                .Single(control => control.Id == "expired-control")
+                .ConsumedCredits);
+        Assert.Equal(
+            30m,
+            session.NextScenario.EconomicGuardrails.IncludedUsageControls
+                .Single(control => control.Id == "future-control")
+                .ConsumedCredits);
         Assert.Equal(11m, session.NextScenario.EconomicGuardrails.SpendingBudgets.Single().ConsumedUsd);
         Assert.Equal(6, session.NextScenario.RuntimeGuardrails!.ModelCallsConsumed);
         Assert.Equal(TimeSpan.FromMinutes(9), session.NextScenario.RuntimeGuardrails.ElapsedDuration);
@@ -131,6 +161,7 @@ public sealed class SimulationSessionRunnerTests
             {
                 TotalCredits = 5m,
                 IncludedCredits = 3m,
+                IncludedUsageControlId = "CONTROL",
                 MeteredUsd = 4m,
                 MeteredBudgetRemainingUsd = new Dictionary<string, decimal>
                 {

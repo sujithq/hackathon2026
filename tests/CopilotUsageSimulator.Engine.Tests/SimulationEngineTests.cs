@@ -208,6 +208,28 @@ public sealed class SimulationEngineTests
     }
 
     [Fact]
+    public void AllocationIdentifiesAppliedIncludedUsageControl()
+    {
+        var scenario = Scenario(Call(fresh: 1_000)) with
+        {
+            EconomicGuardrails = Economy(
+                includedControls:
+                [
+                    new CostCenterIncludedUsageControl
+                    {
+                        Id = "cost-center-control",
+                        CostCenterId = "cc-1"
+                    }
+                ])
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+        Assert.Equal("cost-center-control", result.Allocation.IncludedUsageControlId);
+    }
+
+    [Fact]
     public void AlertOnlyMeteredBudgetAllowsOverspend()
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with

@@ -318,6 +318,7 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         {
             TotalCredits = requestedCredits,
             IncludedCredits = includedCredits,
+            IncludedUsageControlId = includedControl.Value?.Id,
             MeteredCredits = meteredCredits,
             MeteredUsd = meteredUsd,
             MeteredBudgetId = blockingBudget?.Id ?? applicableBudgets.FirstOrDefault()?.Id,
