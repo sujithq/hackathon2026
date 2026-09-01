@@ -27,22 +27,18 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         var appliedGuardrails = new List<AppliedGuardrail>();
         var alerts = new List<ThresholdEvent>();
         var operation = Find(_configuration.Operations, scenario.OperationId, x => x.Id, "operation");
-        var plan = Find(_configuration.Plans, scenario.PlanId, x => x.Id, "plan");
+        _ = Find(_configuration.Plans, scenario.PlanId, x => x.Id, "plan");
         var costChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly;
-        var hasRichGuardrails = scenario.BillingContext is not null ||
-            scenario.Attribution is not null ||
-            scenario.EconomicGuardrails is not null;
-        var richGuardrails = operation.IsBilled && hasRichGuardrails;
         AttributionResult? attribution = null;
 
-        if (richGuardrails)
+        if (operation.IsBilled)
         {
             if (scenario.BillingContext is null || scenario.Attribution is null ||
                 scenario.EconomicGuardrails is null)
             {
                 throw new SimulationException(
-                    "BillingContext, Attribution, and EconomicGuardrails must be supplied together.",
-                    "incomplete-rich-guardrails");
+                    "Billed operations require BillingContext, Attribution, and EconomicGuardrails.",
+                    "economic-context-required");
             }
 
             attribution = new AttributionResolver().Resolve(scenario.Attribution, scenario.Timestamp);
@@ -189,58 +185,34 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
             }
         }
 
-        BudgetEvaluation? legacyBudgetResult = null;
-        EconomicGuardrailEvaluation? economicResult = null;
-        if (richGuardrails)
+        var economicResult = new EconomicGuardrailEvaluator(_configuration)
+            .Evaluate(scenario, attribution!, totalCredits);
+        appliedGuardrails.AddRange(economicResult.AppliedGuardrails);
+        alerts.AddRange(economicResult.Alerts);
+        if (economicResult.Message is not null)
         {
-            economicResult = new EconomicGuardrailEvaluator(_configuration)
-                .Evaluate(scenario, attribution!, totalCredits);
-            appliedGuardrails.AddRange(economicResult.AppliedGuardrails);
-            alerts.AddRange(economicResult.Alerts);
-            if (economicResult.Message is not null)
-            {
-                explanation.Add(Entry("guardrail", economicResult.FailingGuardrailId ?? "indeterminate", economicResult.Message));
-            }
-
-            if (economicResult.Decision != SimulationDecision.Allowed)
-            {
-                return new SimulationResult
-                {
-                    Decision = economicResult.Decision,
-                    FirstFailingGate = economicResult.FailingGuardrailId,
-                    Calls = calls,
-                    Allocation = economicResult.Allocation,
-                    Attribution = attribution,
-                    EffectiveUlb = economicResult.EffectiveUlb,
-                    AppliedGuardrails = appliedGuardrails,
-                    Alerts = alerts,
-                    Remaining = economicResult.Remaining,
-                    Assumptions = assumptions,
-                    Explanation = explanation
-                };
-            }
-        }
-        else
-        {
-            legacyBudgetResult = AllocateBudgets(totalCredits, plan, scenario, explanation);
-            if (legacyBudgetResult.FailingGate is not null)
-            {
-                return new SimulationResult
-                {
-                    Decision = SimulationDecision.Blocked,
-                    FirstFailingGate = legacyBudgetResult.FailingGate,
-                    Calls = calls,
-                    Allocation = legacyBudgetResult.Allocation,
-                    AppliedGuardrails = appliedGuardrails,
-                    Remaining = legacyBudgetResult.Remaining,
-                    Assumptions = assumptions,
-                    Explanation = explanation
-                };
-            }
+            explanation.Add(Entry("guardrail", economicResult.FailingGuardrailId ?? "indeterminate", economicResult.Message));
         }
 
-        var allocation = economicResult?.Allocation ?? legacyBudgetResult!.Allocation;
-        var remaining = (economicResult?.Remaining ?? legacyBudgetResult!.Remaining) with
+        if (economicResult.Decision != SimulationDecision.Allowed)
+        {
+            return new SimulationResult
+            {
+                Decision = economicResult.Decision,
+                FirstFailingGate = economicResult.FailingGuardrailId,
+                Calls = calls,
+                Allocation = economicResult.Allocation,
+                Attribution = attribution,
+                EffectiveUlb = economicResult.EffectiveUlb,
+                AppliedGuardrails = appliedGuardrails,
+                Alerts = alerts,
+                Remaining = economicResult.Remaining,
+                Assumptions = assumptions,
+                Explanation = explanation
+            };
+        }
+
+        var remaining = economicResult.Remaining with
         {
             ActionsIncludedMinutes = actionsUsage is null
                 ? null
@@ -258,10 +230,10 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         {
             Decision = SimulationDecision.Allowed,
             Calls = calls,
-            Allocation = allocation,
+            Allocation = economicResult.Allocation,
             ActionsUsage = actionsUsage,
             Attribution = attribution,
-            EffectiveUlb = economicResult?.EffectiveUlb,
+            EffectiveUlb = economicResult.EffectiveUlb,
             AppliedGuardrails = appliedGuardrails,
             Alerts = alerts,
             Remaining = remaining,
@@ -367,118 +339,6 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         };
     }
 
-    private BudgetEvaluation AllocateBudgets(
-        decimal totalCredits,
-        PlanDefinition plan,
-        SimulationScenario scenario,
-        List<ExplanationEntry> explanation)
-    {
-        var budgets = scenario.Budgets;
-        var effectiveUserBudget = budgets.UserBudgets
-            .OrderByDescending(x => x.Scope)
-            .FirstOrDefault();
-
-        if (effectiveUserBudget is not null && effectiveUserBudget.CreditsRemaining < totalCredits)
-        {
-            explanation.Add(Entry("budget", "user-budget-exceeded", "The effective user-level budget cannot cover the request."));
-            return BudgetEvaluation.Blocked(
-                "budget.user",
-                totalCredits,
-                CreateUnchangedRemaining(scenario) with
-                {
-                    EffectiveUserBudgetCredits = effectiveUserBudget.CreditsRemaining
-                });
-        }
-
-        var includedPool = budgets.IncludedPoolCreditsRemaining ?? plan.IncludedCreditsPerUser ?? 0m;
-        var includedAvailable = Math.Max(0m, includedPool);
-        var control = budgets.IncludedUsageControl;
-        if (control is not null)
-        {
-            includedAvailable = Math.Min(includedAvailable, Math.Max(0m, control.CreditsRemaining));
-        }
-
-        var splitAllocation = _configuration.PoolOverflowBehavior == PoolOverflowBehavior.Split;
-        var includedCredits = totalCredits <= includedAvailable
-            ? totalCredits
-            : splitAllocation ? includedAvailable : 0m;
-        var meteredCredits = totalCredits - includedCredits;
-
-        if (control is not null &&
-            control.OverflowBehavior == IncludedUsageOverflowBehavior.Block &&
-            totalCredits > control.CreditsRemaining)
-        {
-            explanation.Add(Entry("budget", "included-control-exceeded", "The cost-center included-usage control blocks overflow."));
-            return BudgetEvaluation.Blocked(
-                "budget.included-usage-control",
-                totalCredits,
-                CreateUnchangedRemaining(scenario) with
-                {
-                    EffectiveUserBudgetCredits = effectiveUserBudget?.CreditsRemaining,
-                    IncludedUsageControlCredits = control.CreditsRemaining
-                });
-        }
-
-        if (meteredCredits > 0 && !budgets.PaidUsageEnabled)
-        {
-            explanation.Add(Entry("budget", "paid-usage-disabled", "The included pool cannot cover the request and paid usage is disabled."));
-            return BudgetEvaluation.Blocked(
-                "budget.paid-usage",
-                totalCredits,
-                CreateUnchangedRemaining(scenario) with
-                {
-                    EffectiveUserBudgetCredits = effectiveUserBudget?.CreditsRemaining,
-                    IncludedUsageControlCredits = control?.CreditsRemaining
-                });
-        }
-
-        var meteredUsd = meteredCredits * _configuration.UsdPerCredit;
-        var meteredBudget = meteredCredits > 0 ? ResolveMeteredBudget(budgets) : null;
-        if (meteredBudget is not null &&
-            meteredBudget.StopUsageWhenLimitReached &&
-            meteredBudget.UsdRemaining < meteredUsd)
-        {
-            explanation.Add(Entry("budget", "metered-budget-exceeded", $"Metered budget '{meteredBudget.Id}' blocks the charge."));
-            return BudgetEvaluation.Blocked(
-                $"budget.{meteredBudget.Scope.ToString().ToLowerInvariant()}",
-                totalCredits,
-                CreateUnchangedRemaining(scenario) with
-                {
-                    EffectiveUserBudgetCredits = effectiveUserBudget?.CreditsRemaining,
-                    IncludedUsageControlCredits = control?.CreditsRemaining,
-                    MeteredBudgetUsd = meteredBudget.UsdRemaining
-                });
-        }
-
-        var allocation = new CreditAllocation
-        {
-            TotalCredits = totalCredits,
-            IncludedCredits = includedCredits,
-            MeteredCredits = meteredCredits,
-            MeteredUsd = meteredUsd,
-            MeteredBudgetId = meteredBudget?.Id
-        };
-        var remaining = new RemainingState
-        {
-            IncludedPoolCredits = Math.Max(0m, includedPool - includedCredits),
-            EffectiveUserBudgetCredits = effectiveUserBudget is null
-                ? null
-                : effectiveUserBudget.CreditsRemaining - totalCredits,
-            IncludedUsageControlCredits = control is null
-                ? null
-                : Math.Max(0m, control.CreditsRemaining - includedCredits),
-            MeteredBudgetUsd = meteredBudget is null
-                ? null
-                : meteredBudget.UsdRemaining - meteredUsd
-        };
-
-        explanation.Add(Entry(
-            "budget",
-            "credits-allocated",
-            $"Allocated {includedCredits:G29} included credits and {meteredCredits:G29} metered credits."));
-        return new BudgetEvaluation(null, allocation, remaining);
-    }
-
     private ActionsUsageResult? CalculateActions(
         OperationDefinition operation,
         SimulationScenario scenario,
@@ -521,26 +381,6 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         explanation.Add(Entry("actions", "actions-priced", $"Actions usage adds {result.AdditionalUsd:C} in runner charges."));
         return result;
     }
-
-    private static MeteredBudget? ResolveMeteredBudget(BudgetState state)
-    {
-        if (state.CostCenterId is not null)
-        {
-            return FindBudget(state, MeteredBudgetScope.CostCenter, state.CostCenterId);
-        }
-
-        if (state.OrganizationId is not null)
-        {
-            return FindBudget(state, MeteredBudgetScope.Organization, state.OrganizationId);
-        }
-
-        return FindBudget(state, MeteredBudgetScope.Enterprise, state.EnterpriseId);
-    }
-
-    private static MeteredBudget? FindBudget(BudgetState state, MeteredBudgetScope scope, string? scopeId) =>
-        state.MeteredBudgets.FirstOrDefault(x =>
-            x.Scope == scope &&
-            (x.ScopeId is null || string.Equals(x.ScopeId, scopeId, StringComparison.OrdinalIgnoreCase)));
 
     private static bool Applies(IReadOnlySet<string> configuredIds, string actualId) =>
         configuredIds.Count == 0 || configuredIds.Contains(actualId, StringComparer.OrdinalIgnoreCase);
@@ -588,12 +428,8 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
             };
         }
 
-        var effective = scenario.Budgets.UserBudgets.OrderByDescending(x => x.Scope).FirstOrDefault();
         return new RemainingState
         {
-            IncludedPoolCredits = scenario.Budgets.IncludedPoolCreditsRemaining ?? 0m,
-            EffectiveUserBudgetCredits = effective?.CreditsRemaining,
-            IncludedUsageControlCredits = scenario.Budgets.IncludedUsageControl?.CreditsRemaining,
             ActionsIncludedMinutes = scenario.ActionsUsage?.IncludedMinutesRemaining
         };
     }
@@ -630,27 +466,11 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
             }
         }
 
-        if (scenario.Budgets.IncludedPoolCreditsRemaining < 0 ||
-            scenario.Budgets.UserBudgets.Any(x => x.CreditsRemaining < 0) ||
-            scenario.Budgets.IncludedUsageControl is { CreditsRemaining: < 0 } ||
-            scenario.Budgets.MeteredBudgets.Any(x => x.UsdRemaining < 0) ||
-            scenario.ActionsUsage is { Minutes: < 0 } ||
+        if (scenario.ActionsUsage is { Minutes: < 0 } ||
             scenario.ActionsUsage is { IncludedMinutesRemaining: < 0 })
         {
             throw new SimulationException("Usage and remaining balances cannot be negative.", "negative-balance");
         }
-    }
-
-    private sealed record BudgetEvaluation(
-        string? FailingGate,
-        CreditAllocation Allocation,
-        RemainingState Remaining)
-    {
-        public static BudgetEvaluation Blocked(
-            string gate,
-            decimal totalCredits,
-            RemainingState remaining) =>
-            new(gate, new CreditAllocation { TotalCredits = totalCredits }, remaining);
     }
 
     private readonly record struct GateFailure(string GateId);

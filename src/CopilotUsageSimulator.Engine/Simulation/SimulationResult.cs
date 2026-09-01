@@ -84,7 +84,6 @@ public sealed record RemainingState
     public decimal IncludedPoolCredits { get; init; }
     public decimal? EffectiveUserBudgetCredits { get; init; }
     public decimal? IncludedUsageControlCredits { get; init; }
-    public decimal? MeteredBudgetUsd { get; init; }
     public decimal? ActionsIncludedMinutes { get; init; }
 }
 

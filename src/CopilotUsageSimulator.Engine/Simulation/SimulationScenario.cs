@@ -14,7 +14,6 @@ public sealed record SimulationScenario
     public IReadOnlyList<ModelCallInput> Calls { get; init; } = [];
     public IReadOnlyDictionary<string, AccessGateState> AccessGates { get; init; } =
         new Dictionary<string, AccessGateState>();
-    public BudgetState Budgets { get; init; } = new();
     public ActionsUsageInput? ActionsUsage { get; init; }
     public BillingContext? BillingContext { get; init; }
     public AttributionInput? Attribution { get; init; }

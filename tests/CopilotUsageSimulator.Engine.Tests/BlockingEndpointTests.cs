@@ -19,7 +19,7 @@ public sealed class BlockingEndpointTests
     [MemberData(nameof(CatalogGateEndpoints))]
     public void EveryCatalogAccessGateCanBlock(string gateId)
     {
-        var scenario = LegacyScenario(operation: "cloud-agent") with
+        var scenario = RichScenario(operation: "cloud-agent") with
         {
             AccessGates = new Dictionary<string, AccessGateState>
             {
@@ -60,7 +60,7 @@ public sealed class BlockingEndpointTests
             _ => throw new ArgumentOutOfRangeException(nameof(gateId))
         };
 
-        var result = _engine.Simulate(LegacyScenario() with { RuntimeGuardrails = guardrails });
+        var result = _engine.Simulate(RichScenario() with { RuntimeGuardrails = guardrails });
 
         AssertTerminal(result, SimulationDecision.Blocked, gateId);
         Assert.Empty(result.Calls);
@@ -69,7 +69,7 @@ public sealed class BlockingEndpointTests
     [Fact]
     public void CliCreditLimitCanSoftStop()
     {
-        var scenario = LegacyScenario() with
+        var scenario = RichScenario() with
         {
             RuntimeGuardrails = new RuntimeGuardrailSnapshot
             {
@@ -413,62 +413,6 @@ public sealed class BlockingEndpointTests
         AssertTerminal(result, SimulationDecision.Blocked, id);
     }
 
-    [Fact]
-    public void LegacyPaidUsageCanBlock()
-    {
-        var scenario = LegacyScenario() with
-        {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 0m,
-                PaidUsageEnabled = false
-            }
-        };
-
-        var result = _engine.Simulate(scenario);
-
-        AssertTerminal(result, SimulationDecision.Blocked, "budget.paid-usage");
-    }
-
-    [Theory]
-    [InlineData(MeteredBudgetScope.CostCenter, "cc-1", null, null, "budget.costcenter")]
-    [InlineData(MeteredBudgetScope.Organization, null, "org-1", null, "budget.organization")]
-    [InlineData(MeteredBudgetScope.Enterprise, null, null, "enterprise-1", "budget.enterprise")]
-    public void EveryLegacyMeteredBudgetScopeCanBlock(
-        MeteredBudgetScope scope,
-        string? costCenterId,
-        string? organizationId,
-        string? enterpriseId,
-        string gateId)
-    {
-        var scenario = LegacyScenario() with
-        {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 0m,
-                PaidUsageEnabled = true,
-                CostCenterId = costCenterId,
-                OrganizationId = organizationId,
-                EnterpriseId = enterpriseId,
-                MeteredBudgets =
-                [
-                    new()
-                    {
-                        Id = "legacy-hard-stop",
-                        Scope = scope,
-                        ScopeId = costCenterId ?? organizationId ?? enterpriseId,
-                        UsdRemaining = 0.01m,
-                        StopUsageWhenLimitReached = true
-                    }
-                ]
-            }
-        };
-
-        var result = _engine.Simulate(scenario);
-
-        AssertTerminal(result, SimulationDecision.Blocked, gateId);
-    }
-
     private static void AssertTerminal(
         SimulationResult result,
         SimulationDecision expectedDecision,
@@ -479,7 +423,7 @@ public sealed class BlockingEndpointTests
     }
 
     private static SimulationScenario ActionsScenario(ActionsGuardrailSnapshot guardrails) =>
-        LegacyScenario(operation: "code-review") with
+        RichScenario(operation: "code-review") with
         {
             ActionsUsage = new ActionsUsageInput
             {
@@ -498,31 +442,16 @@ public sealed class BlockingEndpointTests
             RepositoryRulesPermitRun = GuardrailValue.Enabled
         };
 
-    private static SimulationScenario LegacyScenario(string operation = "chat") =>
-        new()
-        {
-            OperationId = operation,
-            PlanId = "business",
-            Timestamp = Timestamp,
-            RepositoryVisibility = RepositoryVisibility.Private,
-            Calls = [Call()],
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 10_000m,
-                PaidUsageEnabled = false
-            }
-        };
-
     private static SimulationScenario MeteredRichScenario() =>
         RichScenario() with
         {
             EconomicGuardrails = Economy(poolConsumed: 1_900m)
         };
 
-    private static SimulationScenario RichScenario() =>
+    private static SimulationScenario RichScenario(string operation = "chat") =>
         new()
         {
-            OperationId = "chat",
+            OperationId = operation,
             PlanId = "business",
             ProductId = "github-copilot",
             SkuId = "copilot-ai-credits",

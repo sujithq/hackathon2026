@@ -25,7 +25,7 @@ The largest conceptual gap is that guardrails are not a single sequence of indep
 - alerts observe threshold crossings but do not authorize usage;
 - unknown attribution or undocumented billing behavior must remain indeterminate.
 
-Implementing more fields on the existing `BudgetState` would not be sufficient. The domain model must first separate identity, attribution, entitlements, controls, consumption state, and evaluation evidence.
+Extending the former balance-only budget model would not have been sufficient. The domain model instead separates identity, attribution, entitlements, controls, consumption state, and evaluation evidence.
 
 ## 2. Authoritative behavior established
 

@@ -112,18 +112,24 @@ public sealed class SimulationEngineTests
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 1_000m,
-                UserBudgets = [new() { Scope = UserBudgetScope.Individual, CreditsRemaining = 10m }]
-            }
+            EconomicGuardrails = Economy(
+                userBudgets:
+                [
+                    new UserLevelBudget
+                    {
+                        Id = "individual-ulb",
+                        Kind = UserLevelBudgetKind.Individual,
+                        TargetId = "user-1",
+                        LimitCredits = 10m
+                    }
+                ])
         };
 
         var result = _engine.Simulate(scenario);
 
         Assert.Equal(SimulationDecision.Blocked, result.Decision);
-        Assert.Equal("budget.user", result.FirstFailingGate);
-        Assert.Equal(1_000m, result.Remaining.IncludedPoolCredits);
+        Assert.Equal("individual-ulb", result.FirstFailingGate);
+        Assert.Equal(1_900m, result.Remaining.IncludedPoolCredits);
     }
 
     [Fact]
@@ -131,23 +137,19 @@ public sealed class SimulationEngineTests
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 10m,
-                PaidUsageEnabled = true,
-                EnterpriseId = "enterprise-1",
-                MeteredBudgets =
+            EconomicGuardrails = Economy(
+                poolConsumed: 1_890m,
+                paidUsage: GuardrailValue.Enabled,
+                spendingBudgets:
                 [
-                    new()
+                    new SpendingBudget
                     {
                         Id = "enterprise-budget",
-                        Scope = MeteredBudgetScope.Enterprise,
-                        ScopeId = "enterprise-1",
-                        UsdRemaining = 10m,
-                        StopUsageWhenLimitReached = true
+                        Scope = SpendingBudgetScope.Enterprise,
+                        LimitUsd = 10m,
+                        Enforcement = GuardrailEnforcement.HardStop
                     }
-                ]
-            }
+                ])
         };
 
         var result = _engine.Simulate(scenario);
@@ -156,7 +158,7 @@ public sealed class SimulationEngineTests
         Assert.Equal(10m, result.Allocation.IncludedCredits);
         Assert.Equal(10m, result.Allocation.MeteredCredits);
         Assert.Equal(0.10m, result.Allocation.MeteredUsd);
-        Assert.Equal(9.90m, result.Remaining.MeteredBudgetUsd);
+        Assert.Equal(9.90m, result.Allocation.MeteredBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]
@@ -169,11 +171,9 @@ public sealed class SimulationEngineTests
         var engine = new CopilotUsageSimulationEngine(configuration);
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 10m,
-                PaidUsageEnabled = true
-            }
+            EconomicGuardrails = Economy(
+                poolConsumed: 1_890m,
+                paidUsage: GuardrailValue.Enabled)
         };
 
         var result = engine.Simulate(scenario);
@@ -188,22 +188,23 @@ public sealed class SimulationEngineTests
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 100m,
-                PaidUsageEnabled = true,
-                IncludedUsageControl = new()
-                {
-                    CreditsRemaining = 10m,
-                    OverflowBehavior = IncludedUsageOverflowBehavior.Block
-                }
-            }
+            EconomicGuardrails = Economy(
+                includedControls:
+                [
+                    new CostCenterIncludedUsageControl
+                    {
+                        Id = "cost-center-control",
+                        CostCenterId = "cc-1",
+                        ConsumedCredits = 1_890m,
+                        OverflowBehavior = IncludedOverflowBehavior.Block
+                    }
+                ])
         };
 
         var result = _engine.Simulate(scenario);
 
         Assert.Equal(SimulationDecision.Blocked, result.Decision);
-        Assert.Equal("budget.included-usage-control", result.FirstFailingGate);
+        Assert.Equal("cost-center-control", result.FirstFailingGate);
     }
 
     [Fact]
@@ -211,29 +212,25 @@ public sealed class SimulationEngineTests
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState
-            {
-                IncludedPoolCreditsRemaining = 0m,
-                PaidUsageEnabled = true,
-                EnterpriseId = "enterprise-1",
-                MeteredBudgets =
+            EconomicGuardrails = Economy(
+                poolConsumed: 1_900m,
+                paidUsage: GuardrailValue.Enabled,
+                spendingBudgets:
                 [
-                    new()
+                    new SpendingBudget
                     {
                         Id = "alert-only",
-                        Scope = MeteredBudgetScope.Enterprise,
-                        ScopeId = "enterprise-1",
-                        UsdRemaining = 0.05m,
-                        StopUsageWhenLimitReached = false
+                        Scope = SpendingBudgetScope.Enterprise,
+                        LimitUsd = 0.05m,
+                        Enforcement = GuardrailEnforcement.AlertOnly
                     }
-                ]
-            }
+                ])
         };
 
         var result = _engine.Simulate(scenario);
 
         Assert.Equal(SimulationDecision.Allowed, result.Decision);
-        Assert.Equal(-0.15m, result.Remaining.MeteredBudgetUsd);
+        Assert.Equal(-0.15m, result.Allocation.MeteredBudgetRemainingUsd["alert-only"]);
     }
 
     [Fact]
@@ -265,6 +262,22 @@ public sealed class SimulationEngineTests
         Assert.Equal(SimulationDecision.Allowed, result.Decision);
         Assert.Empty(result.Calls);
         Assert.Equal(0m, result.Allocation.TotalCredits);
+    }
+
+    [Fact]
+    public void BilledOperationRequiresCompleteEconomicContext()
+    {
+        var scenario = new SimulationScenario
+        {
+            OperationId = "chat",
+            PlanId = "business",
+            Timestamp = CatalogDate,
+            Calls = [Call()]
+        };
+
+        var exception = Assert.Throws<SimulationException>(() => _engine.Simulate(scenario));
+
+        Assert.Equal("economic-context-required", exception.Code);
     }
 
     [Fact]
@@ -314,7 +327,7 @@ public sealed class SimulationEngineTests
     {
         var scenario = Scenario(Call(fresh: 1_000_000)) with
         {
-            Budgets = new BudgetState { PaidUsageEnabled = false }
+            EconomicGuardrails = Economy()
         };
 
         var result = _engine.Simulate(scenario);
@@ -352,11 +365,43 @@ public sealed class SimulationEngineTests
             Timestamp = CatalogDate,
             RepositoryVisibility = RepositoryVisibility.Private,
             Calls = call is null ? [] : [call],
-            Budgets = new BudgetState
+            BillingContext = new BillingContext
             {
-                IncludedPoolCreditsRemaining = 10_000m,
-                PaidUsageEnabled = false
-            }
+                BillingEntityId = "enterprise-1",
+                CycleStart = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero),
+                CycleEnd = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+                SeatAssignments =
+                [
+                    new EffectiveSeatAssignment
+                    {
+                        UserId = "user-1",
+                        PlanId = "business",
+                        CostCenterId = "cc-1"
+                    }
+                ]
+            },
+            Attribution = new AttributionInput
+            {
+                UserId = "user-1",
+                LicensingOrganizationIds = ["org-1"],
+                DirectAssignments = [new EffectiveCostCenterAssignment { CostCenterId = "cc-1" }]
+            },
+            EconomicGuardrails = Economy()
+        };
+
+    private static EconomicGuardrailSnapshot Economy(
+        decimal poolConsumed = 0m,
+        GuardrailValue paidUsage = GuardrailValue.Disabled,
+        IReadOnlyList<UserLevelBudget>? userBudgets = null,
+        IReadOnlyList<CostCenterIncludedUsageControl>? includedControls = null,
+        IReadOnlyList<SpendingBudget>? spendingBudgets = null) =>
+        new()
+        {
+            EnterprisePoolConsumedCredits = poolConsumed,
+            PaidUsage = new PaidUsageAuthorization { State = paidUsage },
+            UserLevelBudgets = userBudgets ?? [],
+            IncludedUsageControls = includedControls ?? [],
+            SpendingBudgets = spendingBudgets ?? []
         };
 
     private static ModelCallInput Call(

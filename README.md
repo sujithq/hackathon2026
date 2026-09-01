@@ -20,6 +20,7 @@ The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Toke
 ```csharp
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
+using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 
 var configuration = EngineConfigurationLoader.LoadDefault();
@@ -29,6 +30,8 @@ var result = engine.Simulate(new SimulationScenario
 {
     OperationId = "chat",
     PlanId = "business",
+    ProductId = "github-copilot",
+    SkuId = "copilot-ai-credits",
     Timestamp = DateTimeOffset.Parse("2026-08-31T12:00:00Z"),
     Calls =
     [
@@ -42,10 +45,20 @@ var result = engine.Simulate(new SimulationScenario
             EnabledMultiplierIds = new HashSet<string> { "auto-model-selection" }
         }
     ],
-    Budgets = new BudgetState
+    BillingContext = new BillingContext
     {
-        IncludedPoolCreditsRemaining = 1_900,
-        PaidUsageEnabled = false
+        BillingEntityId = "enterprise-1",
+        CycleStart = DateTimeOffset.Parse("2026-08-01T00:00:00Z"),
+        CycleEnd = DateTimeOffset.Parse("2026-09-01T00:00:00Z"),
+        SeatAssignments =
+        [
+            new EffectiveSeatAssignment { UserId = "user-1", PlanId = "business" }
+        ]
+    },
+    Attribution = new AttributionInput { UserId = "user-1" },
+    EconomicGuardrails = new EconomicGuardrailSnapshot
+    {
+        PaidUsage = new PaidUsageAuthorization { State = GuardrailValue.Disabled }
     }
 });
 
@@ -97,7 +110,7 @@ Unspecified gates use the catalog's `passWhenUnspecified` setting. Set it to `fa
 
 ## Budget integration
 
-`BudgetState` is an immutable snapshot supplied with each request. The engine returns projected remaining balances but does not persist them. This keeps simulations deterministic and lets the host use a database, browser state, files, or no persistence.
+`BillingContext`, `Attribution`, and `EconomicGuardrails` are immutable snapshots supplied with every billed request. The engine returns projected remaining balances but does not persist them. This keeps simulations deterministic and lets the host use a database, browser state, files, or no persistence.
 
 The budget engine supports:
 
@@ -109,13 +122,13 @@ The budget engine supports:
 - hard-stop and alert-only metered budgets;
 - split allocation between the remaining pool and metered usage.
 
-Set `poolOverflowBehavior` to `split` or `meterEntireRequest` in the catalog. When a scenario omits `IncludedPoolCreditsRemaining`, the engine derives the initial allowance from its plan; provide an explicit balance for an in-progress billing cycle.
+Set `poolOverflowBehavior` to `split` or `meterEntireRequest` in the catalog. The engine derives the pool entitlement from effective seat assignments and subtracts `EnterprisePoolConsumedCredits` for the in-progress billing cycle.
 
 Persist returned balances only after the host accepts a simulation as actual usage. Concurrent consumers should apply their own optimistic concurrency or transaction boundary.
 
-### Rich guardrails
+### Economic guardrails
 
-For enterprise attribution and concurrent guardrails, supply `BillingContext`, `Attribution`, and `EconomicGuardrails` together. This opt-in path derives pooled entitlement from effective Business and Enterprise seats, resolves cost centers and licensing organizations, selects the effective ULB, and evaluates every applicable cost-center, organization, and enterprise spending constraint.
+The single economic model derives pooled entitlement from effective Business and Enterprise seats, resolves cost centers and licensing organizations, selects the effective ULB, and evaluates every applicable cost-center, organization, and enterprise spending constraint.
 
 ```csharp
 var scenario = new SimulationScenario
@@ -136,7 +149,7 @@ var scenario = new SimulationScenario
 var result = engine.Simulate(scenario);
 ```
 
-`AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access and spending are evaluated before AI-credit allocation, so denied or waiting workflows leave both meters unchanged. Existing callers can continue using `BudgetState`; adding any rich economic input requires all three rich inputs.
+`AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access and spending are evaluated before AI-credit allocation, so denied or waiting workflows leave both meters unchanged.
 
 ## Web simulator
 
