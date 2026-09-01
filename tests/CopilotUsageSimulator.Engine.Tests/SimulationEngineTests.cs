@@ -281,6 +281,17 @@ public sealed class SimulationEngineTests
     }
 
     [Fact]
+    public void DirectSimulationRejectsNullCollectionsWithDomainError()
+    {
+        var scenario = Scenario() with { Calls = null! };
+
+        var exception = Assert.Throws<SimulationException>(() => _engine.Simulate(scenario));
+
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains("calls", exception.Message);
+    }
+
+    [Fact]
     public void UnbilledOperationIgnoresBillingAndRuntimeGuardrails()
     {
         var scenario = Scenario(operation: "code-completion") with

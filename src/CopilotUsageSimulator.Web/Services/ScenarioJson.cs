@@ -17,9 +17,13 @@ public sealed class ScenarioJson
     public string Serialize(SimulationScenario scenario) =>
         JsonSerializer.Serialize(scenario, _options);
 
-    public SimulationScenario Deserialize(string json) =>
-        JsonSerializer.Deserialize<SimulationScenario>(json, _options)
-        ?? throw new JsonException("The scenario document is empty.");
+    public SimulationScenario Deserialize(string json)
+    {
+        var scenario = JsonSerializer.Deserialize<SimulationScenario>(json, _options)
+            ?? throw new JsonException("The scenario document is empty.");
+        SimulationScenarioValidator.Validate(scenario);
+        return scenario;
+    }
 
     public string SerializeConfiguration(EngineConfiguration configuration) =>
         JsonSerializer.Serialize(configuration, _options);

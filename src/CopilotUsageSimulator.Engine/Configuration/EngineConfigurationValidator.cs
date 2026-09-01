@@ -11,6 +11,19 @@ public static class EngineConfigurationValidator
             throw new ConfigurationException("usdPerCredit must be greater than zero.");
         }
 
+        Require(configuration.Plans, "plans");
+        Require(configuration.Models, "models");
+        Require(configuration.Operations, "operations");
+        Require(configuration.Gates, "gates");
+        Require(configuration.Multipliers, "multipliers");
+        Require(configuration.ActionsRunners, "actionsRunners");
+        RequireItems(configuration.Plans, "plans");
+        RequireItems(configuration.Models, "models");
+        RequireItems(configuration.Operations, "operations");
+        RequireItems(configuration.Gates, "gates");
+        RequireItems(configuration.Multipliers, "multipliers");
+        RequireItems(configuration.ActionsRunners, "actionsRunners");
+
         EnsureUnique(configuration.Plans.Select(x => x.Id), "plan");
         EnsureUnique(configuration.Models.Select(x => x.Id), "model");
         EnsureUnique(configuration.Operations.Select(x => x.Id), "operation");
@@ -23,11 +36,18 @@ public static class EngineConfigurationValidator
 
         foreach (var gate in configuration.Gates)
         {
+            Require(gate.ApplicableOperationIds, $"gates['{gate.Id}'].applicableOperationIds");
             EnsureReferences(gate.ApplicableOperationIds, operationIds, $"gate '{gate.Id}' operation");
         }
 
         foreach (var multiplier in configuration.Multipliers)
         {
+            Require(
+                multiplier.ApplicableOperationIds,
+                $"multipliers['{multiplier.Id}'].applicableOperationIds");
+            Require(
+                multiplier.ApplicableModelIds,
+                $"multipliers['{multiplier.Id}'].applicableModelIds");
             if (multiplier.Factor < 0)
             {
                 throw new ConfigurationException($"Multiplier '{multiplier.Id}' cannot have a negative factor.");
@@ -44,6 +64,8 @@ public static class EngineConfigurationValidator
 
         foreach (var model in configuration.Models)
         {
+            Require(model.PricePeriods, $"models['{model.Id}'].pricePeriods");
+            RequireItems(model.PricePeriods, $"models['{model.Id}'].pricePeriods");
             if (model.PricePeriods.Count == 0)
             {
                 throw new ConfigurationException($"Model '{model.Id}' must define at least one price period.");
@@ -61,6 +83,8 @@ public static class EngineConfigurationValidator
 
             foreach (var period in model.PricePeriods)
             {
+                Require(period.Tiers, $"models['{model.Id}'].pricePeriods.tiers");
+                RequireItems(period.Tiers, $"models['{model.Id}'].pricePeriods.tiers");
                 if (period.EffectiveTo <= period.EffectiveFrom)
                 {
                     throw new ConfigurationException($"Model '{model.Id}' has an invalid effective date range.");
@@ -108,6 +132,19 @@ public static class EngineConfigurationValidator
         }
     }
 
+    private static T Require<T>(T? value, string path) where T : class =>
+        value ?? throw new ConfigurationException(
+            $"Configuration property '{path}' cannot be null.",
+            ConfigurationException.InvalidContractCode);
+
+    private static void RequireItems<T>(IReadOnlyList<T> values, string path) where T : class
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            Require(values[index], $"{path}[{index}]");
+        }
+    }
+
     private static void EnsureUnique(IEnumerable<string> values, string label)
     {
         var duplicate = values
@@ -133,4 +170,12 @@ public static class EngineConfigurationValidator
     }
 }
 
-public sealed class ConfigurationException(string message) : Exception(message);
+public sealed class ConfigurationException(
+    string message,
+    string code = ConfigurationException.InvalidConfigurationCode) : Exception(message)
+{
+    public const string InvalidConfigurationCode = "configuration-invalid";
+    public const string InvalidContractCode = "configuration-contract-invalid";
+
+    public string Code { get; } = code;
+}

@@ -1,3 +1,4 @@
+using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Simulation;
 using CopilotUsageSimulator.Web.Services;
@@ -94,5 +95,29 @@ public sealed class ServiceTests
         Assert.Equal(_configuration.Operations.Count, roundTripped.Operations.Count);
         Assert.Equal(_configuration.Models.Count, roundTripped.Models.Count);
         Assert.Equal(_configuration.Gates.Count, roundTripped.Gates.Count);
+    }
+
+    [Fact]
+    public void ScenarioJsonRejectsExplicitNullCollectionsWithDomainError()
+    {
+        var serializer = new ScenarioJson();
+
+        var exception = Assert.Throws<SimulationException>(() => serializer.Deserialize(
+            """{"operationId":"chat","planId":"business","calls":null}"""));
+
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains("calls", exception.Message);
+    }
+
+    [Fact]
+    public void CatalogJsonRejectsExplicitNullCollectionsWithDomainError()
+    {
+        var serializer = new ScenarioJson();
+
+        var exception = Assert.Throws<ConfigurationException>(() =>
+            serializer.DeserializeConfiguration("""{"operations":null}"""));
+
+        Assert.Equal(ConfigurationException.InvalidContractCode, exception.Code);
+        Assert.Contains("operations", exception.Message);
     }
 }

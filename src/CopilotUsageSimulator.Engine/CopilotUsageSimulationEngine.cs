@@ -20,6 +20,7 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
     public SimulationResult Simulate(SimulationScenario scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
+        SimulationScenarioValidator.Validate(scenario);
         ValidateScenario(scenario);
 
         var explanation = new List<ExplanationEntry>();
