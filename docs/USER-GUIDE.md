@@ -57,7 +57,9 @@ at the first blocking guardrail.
 Guided sections marked **Scenario JSON** update the corresponding values in the complete
 scenario document. Guided changes patch the displayed guardrail by its ID; additional
 guardrails and advanced properties such as applicability filters and effective dates are
-preserved. After a run stops, the responsible control is outlined in red and marked
+preserved. Additional model calls, licensing organizations, and effective-dated assignments
+are also retained; the guided fields update the displayed call or assignment only. After a
+run stops, the responsible control is outlined in red and marked
 **Stopped here**. Use **Review highlighted setting** to jump to it. If that setting has no
 guided control, the complete scenario JSON opens and is highlighted instead.
 

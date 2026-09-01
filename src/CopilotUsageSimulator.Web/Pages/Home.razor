@@ -723,31 +723,36 @@
                 ["task"] = _form.Task,
                 ["repeatCount"] = _form.RepeatCount.ToString()
             };
+            var licensingOrganizations = PatchAt(
+                scenario.Attribution?.LicensingOrganizationIds ?? [],
+                _form.LicensingOrganizationIndex,
+                !string.IsNullOrWhiteSpace(_form.OrganizationId),
+                _ => _form.OrganizationId,
+                () => _form.OrganizationId);
+            var directAssignments = PatchAt(
+                scenario.Attribution?.DirectAssignments ?? [],
+                _form.DirectAssignmentIndex,
+                !string.IsNullOrWhiteSpace(_form.CostCenterId),
+                assignment => assignment with { CostCenterId = _form.CostCenterId },
+                () => new EffectiveCostCenterAssignment { CostCenterId = _form.CostCenterId });
             var attribution = scenario.Attribution is null
                 ? null
                 : scenario.Attribution with
                 {
-                    LicensingOrganizationIds = string.IsNullOrWhiteSpace(_form.OrganizationId)
-                        ? []
-                        : [_form.OrganizationId],
-                    DirectAssignments = string.IsNullOrWhiteSpace(_form.CostCenterId)
-                        ? []
-                        : [new EffectiveCostCenterAssignment { CostCenterId = _form.CostCenterId }]
+                    LicensingOrganizationIds = licensingOrganizations,
+                    DirectAssignments = directAssignments
                 };
             var billing = scenario.BillingContext is null
                 ? null
                 : scenario.BillingContext with
                 {
-                    SeatAssignments = scenario.BillingContext.SeatAssignments
-                        .Select(seat => seat.UserId == scenario.Attribution?.UserId
-                            ? seat with
-                            {
-                                CostCenterId = string.IsNullOrWhiteSpace(_form.CostCenterId)
-                                    ? null
-                                    : _form.CostCenterId
-                            }
-                            : seat)
-                        .ToArray()
+                    SeatAssignments = PatchEffectiveSeat(
+                        scenario.BillingContext.SeatAssignments,
+                        scenario.Attribution?.UserId,
+                        scenario.Timestamp,
+                        string.IsNullOrWhiteSpace(_form.CostCenterId)
+                            ? null
+                            : _form.CostCenterId)
                 };
             var economic = UpdateEconomic(scenario.EconomicGuardrails, attribution?.UserId);
             var operationDefaults = OperationUsesActions
@@ -769,7 +774,7 @@
                     ? SimulationCheckScope.CostRelatedOnly
                     : SimulationCheckScope.All,
                 RepositoryVisibility = _form.RepositoryVisibility,
-                Calls = [call],
+                Calls = PatchFirst(scenario.Calls, true, _ => call, () => call),
                 Metadata = metadata,
                 Attribution = attribution,
                 BillingContext = billing,
@@ -1023,8 +1028,89 @@
         return patched;
     }
 
+    private static IReadOnlyList<T> PatchFirst<T>(
+        IReadOnlyList<T> values,
+        bool enabled,
+        Func<T, T> update,
+        Func<T> create)
+    {
+        var patched = values.ToList();
+        if (patched.Count > 0)
+        {
+            if (enabled)
+            {
+                patched[0] = update(patched[0]);
+            }
+            else
+            {
+                patched.RemoveAt(0);
+            }
+        }
+        else if (enabled)
+        {
+            patched.Add(create());
+        }
+
+        return patched;
+    }
+
+    private static IReadOnlyList<T> PatchAt<T>(
+        IReadOnlyList<T> values,
+        int? selectedIndex,
+        bool enabled,
+        Func<T, T> update,
+        Func<T> create)
+    {
+        var patched = values.ToList();
+        if (selectedIndex is >= 0 && selectedIndex < patched.Count)
+        {
+            if (enabled)
+            {
+                patched[selectedIndex.Value] = update(patched[selectedIndex.Value]);
+            }
+            else
+            {
+                patched.RemoveAt(selectedIndex.Value);
+            }
+        }
+        else if (enabled)
+        {
+            patched.Add(create());
+        }
+
+        return patched;
+    }
+
+    private static IReadOnlyList<EffectiveSeatAssignment> PatchEffectiveSeat(
+        IReadOnlyList<EffectiveSeatAssignment> seats,
+        string? userId,
+        DateTimeOffset timestamp,
+        string? costCenterId)
+    {
+        var patched = seats.ToList();
+        var index = patched.FindIndex(seat =>
+            string.Equals(seat.UserId, userId, StringComparison.OrdinalIgnoreCase) &&
+            timestamp >= seat.EffectiveFrom &&
+            (seat.EffectiveTo is null || timestamp < seat.EffectiveTo));
+        if (index >= 0)
+        {
+            patched[index] = patched[index] with { CostCenterId = costCenterId };
+        }
+
+        return patched;
+    }
+
     private void CapturePatchedIds(SimulationScenario scenario)
     {
+        _form.LicensingOrganizationIndex = ResolvePatchedIndex(
+            scenario.Attribution?.LicensingOrganizationIds.Count ?? 0,
+            _form.LicensingOrganizationIndex,
+            !string.IsNullOrWhiteSpace(_form.OrganizationId));
+        _form.DirectAssignmentIndex = ResolvePatchedIndex(
+            scenario.Attribution?.DirectAssignments.Count ?? 0,
+            _form.DirectAssignmentIndex,
+            !string.IsNullOrWhiteSpace(_form.CostCenterId));
+
         var economic = scenario.EconomicGuardrails;
         if (economic is not null)
         {
@@ -1101,6 +1187,18 @@
             ?? values
                 .Select(idSelector)
                 .FirstOrDefault(id => string.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static int? ResolvePatchedIndex(int count, int? selectedIndex, bool enabled)
+    {
+        if (!enabled || count == 0)
+        {
+            return null;
+        }
+
+        return selectedIndex is >= 0 && selectedIndex < count
+            ? selectedIndex
+            : count - 1;
     }
 
     private RuntimeGuardrailSnapshot? UpdateRuntimeGuardrails(RuntimeGuardrailSnapshot? snapshot)
@@ -1279,7 +1377,17 @@
     {
         var call = scenario.Calls.FirstOrDefault();
         var userId = scenario.Attribution?.UserId;
-        var costCenterId = scenario.Attribution?.DirectAssignments.FirstOrDefault()?.CostCenterId;
+        var directAssignments = scenario.Attribution?.DirectAssignments ?? [];
+        var directAssignmentIndex = directAssignments
+            .Select((assignment, index) => new { assignment, index })
+            .Where(item =>
+                scenario.Timestamp >= item.assignment.EffectiveFrom &&
+                (item.assignment.EffectiveTo is null || scenario.Timestamp < item.assignment.EffectiveTo))
+            .Select(item => (int?)item.index)
+            .FirstOrDefault() ?? (directAssignments.Count > 0 ? 0 : null);
+        var costCenterId = directAssignmentIndex is null
+            ? null
+            : directAssignments[directAssignmentIndex.Value].CostCenterId;
         var universalUlb = scenario.EconomicGuardrails?.UserLevelBudgets
             .FirstOrDefault(x => x.Kind == UserLevelBudgetKind.Universal);
         var costCenterUlb = scenario.EconomicGuardrails?.UserLevelBudgets
@@ -1312,7 +1420,10 @@
             CacheWriteTokens = call?.CacheWriteTokens ?? 0,
             OutputTokens = call?.OutputTokens ?? 0,
             CostCenterId = costCenterId ?? "",
+            DirectAssignmentIndex = directAssignmentIndex,
             OrganizationId = scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault() ?? "",
+            LicensingOrganizationIndex =
+                scenario.Attribution?.LicensingOrganizationIds.Count > 0 ? 0 : null,
             PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
             UseUniversalUlb = universalUlb is not null,
             UniversalUlbId = universalUlb?.Id,
@@ -1571,7 +1682,9 @@
         public long CacheWriteTokens { get; set; }
         public long OutputTokens { get; set; }
         public string CostCenterId { get; set; } = "";
+        public int? DirectAssignmentIndex { get; set; }
         public string OrganizationId { get; set; } = "";
+        public int? LicensingOrganizationIndex { get; set; }
         public decimal PoolConsumed { get; set; }
         public bool UseUniversalUlb { get; set; }
         public string? UniversalUlbId { get; set; }

@@ -4,6 +4,7 @@ using Bunit;
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Guardrails;
+using CopilotUsageSimulator.Engine.Simulation;
 using CopilotUsageSimulator.Web.Pages;
 using CopilotUsageSimulator.Web.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,6 +98,42 @@ public sealed class HomeTests : BunitContext
             EngineConfigurationLoader.LoadDefault(),
             "cloud-agent");
         var timestamp = original.Timestamp;
+        var primaryCall = original.Calls.Single() with
+        {
+            EnabledMultiplierIds = ["auto-model-selection"],
+            Metadata = new Dictionary<string, string> { ["phase"] = "primary" }
+        };
+        var extraCall = new ModelCallInput
+        {
+            ModelId = "claude-sonnet-5",
+            ContextTokens = 20_000,
+            FreshInputTokens = 15_000,
+            Metadata = new Dictionary<string, string> { ["phase"] = "secondary" }
+        };
+        var historicalAssignment = new EffectiveCostCenterAssignment
+        {
+            CostCenterId = "cc-legacy",
+            EffectiveFrom = timestamp.AddMonths(-2),
+            EffectiveTo = timestamp.AddMonths(-1)
+        };
+        var currentAssignment = new EffectiveCostCenterAssignment
+        {
+            CostCenterId = "cc-engineering",
+            EffectiveFrom = timestamp.AddMonths(-1),
+            EffectiveTo = timestamp.AddMonths(1)
+        };
+        var currentSeat = original.BillingContext!.SeatAssignments
+            .Single(seat => seat.UserId == "user-1") with
+        {
+            EffectiveFrom = timestamp.AddMonths(-1),
+            EffectiveTo = timestamp.AddMonths(1)
+        };
+        var historicalSeat = currentSeat with
+        {
+            CostCenterId = "cc-legacy",
+            EffectiveFrom = timestamp.AddMonths(-2),
+            EffectiveTo = timestamp.AddMonths(-1)
+        };
         var primaryBudget = original.EconomicGuardrails!.SpendingBudgets
             .Single(budget => budget.Scope == SpendingBudgetScope.CostCenter) with
         {
@@ -156,6 +193,21 @@ public sealed class HomeTests : BunitContext
         };
         var scenario = original with
         {
+            Calls = [primaryCall, extraCall],
+            Attribution = original.Attribution! with
+            {
+                LicensingOrganizationIds = ["org-engineering", "org-secondary"],
+                DirectAssignments = [historicalAssignment, currentAssignment]
+            },
+            BillingContext = original.BillingContext with
+            {
+                SeatAssignments =
+                [
+                    historicalSeat,
+                    currentSeat,
+                    .. original.BillingContext.SeatAssignments.Where(seat => seat.UserId != "user-1")
+                ]
+            },
             EconomicGuardrails = original.EconomicGuardrails with
             {
                 SpendingBudgets =
@@ -214,6 +266,20 @@ public sealed class HomeTests : BunitContext
         Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget => budget.Id == extraUlb.Id);
         Assert.Contains(updated.ActionsGuardrails!.Budgets, budget => budget.Id == primaryActionsBudget.Id);
         Assert.Contains(updated.ActionsGuardrails.Budgets, budget => budget.Id == extraActionsBudget.Id);
+        Assert.Equal(2, updated.Calls.Count);
+        Assert.Equal(primaryCall.EnabledMultiplierIds, updated.Calls[0].EnabledMultiplierIds);
+        Assert.Equal("primary", updated.Calls[0].Metadata["phase"]);
+        Assert.Equal(extraCall.ModelId, updated.Calls[1].ModelId);
+        Assert.Equal("secondary", updated.Calls[1].Metadata["phase"]);
+        Assert.Equal(
+            ["org-engineering", "org-secondary"],
+            updated.Attribution!.LicensingOrganizationIds);
+        Assert.Equal(2, updated.Attribution.DirectAssignments.Count);
+        Assert.Equal(historicalAssignment, updated.Attribution.DirectAssignments[0]);
+        Assert.Equal(currentAssignment, updated.Attribution.DirectAssignments[1]);
+        Assert.Equal(2, updated.BillingContext!.SeatAssignments.Count(seat => seat.UserId == "user-1"));
+        Assert.Contains(updated.BillingContext.SeatAssignments, seat => seat == historicalSeat);
+        Assert.Contains(updated.BillingContext.SeatAssignments, seat => seat == currentSeat);
     }
 
     [Fact]
