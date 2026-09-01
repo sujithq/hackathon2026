@@ -1,7 +1,9 @@
 using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
 using Bunit;
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
+using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Web.Pages;
 using CopilotUsageSimulator.Web.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,7 +69,7 @@ public sealed class HomeTests : BunitContext
         var individualUlb = cut.Find("#individual-ulb-settings");
         Assert.True(individualUlb.ClassList.Contains("impacted-setting"));
         Assert.Contains("Why it stopped", cut.Markup);
-        Assert.Contains("ulb-individual", cut.Find(".blocking-explanation").TextContent);
+        Assert.Contains("ulb-user-1", cut.Find(".blocking-explanation").TextContent);
         Assert.Contains("Individual ULB", cut.Find(".blocking-explanation").TextContent);
         Assert.Contains(
             "The effective ULB for this user stopped the run.",
@@ -85,6 +87,133 @@ public sealed class HomeTests : BunitContext
         var error = cut.Find(".message.error").TextContent;
         Assert.Contains("repeat-count-invalid", error);
         Assert.Contains("between 1 and 1000", error);
+    }
+
+    [Fact]
+    public void GuidedOverridesPreserveAdvancedGuardrailConfiguration()
+    {
+        var serializer = new ScenarioJson();
+        var original = ExampleScenarioFactory.Create(
+            EngineConfigurationLoader.LoadDefault(),
+            "cloud-agent");
+        var timestamp = original.Timestamp;
+        var primaryBudget = original.EconomicGuardrails!.SpendingBudgets
+            .Single(budget => budget.Scope == SpendingBudgetScope.CostCenter) with
+        {
+            Id = "custom-cost-center-budget",
+            ProductIds = new HashSet<string> { "github-copilot" },
+            SkuIds = new HashSet<string> { "copilot-ai-credits" },
+            EffectiveFrom = timestamp.AddDays(-10),
+            EffectiveTo = timestamp.AddDays(10),
+            TrackingStartedAt = timestamp.AddDays(-5)
+        };
+        var extraBudget = new SpendingBudget
+        {
+            Id = "secondary-cost-center-budget",
+            Scope = SpendingBudgetScope.CostCenter,
+            ScopeId = "cc-secondary",
+            LimitUsd = 50m,
+            ProductIds = new HashSet<string> { "another-product" },
+            EffectiveFrom = timestamp.AddDays(-20)
+        };
+        var primaryControl = original.EconomicGuardrails.IncludedUsageControls.Single() with
+        {
+            Id = "custom-included-control",
+            EffectiveFrom = timestamp.AddDays(-10),
+            EffectiveTo = timestamp.AddDays(10)
+        };
+        var extraControl = new CostCenterIncludedUsageControl
+        {
+            Id = "secondary-included-control",
+            CostCenterId = "cc-secondary",
+            ConsumedCredits = 25m,
+            EffectiveFrom = timestamp.AddDays(-20)
+        };
+        var primaryUlb = original.EconomicGuardrails.UserLevelBudgets
+            .Single(budget => budget.Kind == UserLevelBudgetKind.Individual) with
+        {
+            Id = "custom-individual-ulb",
+            EffectiveFrom = timestamp.AddDays(-10),
+            EffectiveTo = timestamp.AddDays(10)
+        };
+        var extraUlb = new UserLevelBudget
+        {
+            Id = "secondary-individual-ulb",
+            Kind = UserLevelBudgetKind.Individual,
+            TargetId = "user-2",
+            LimitCredits = 300m,
+            EffectiveFrom = timestamp.AddDays(-20)
+        };
+        var primaryActionsBudget = original.ActionsGuardrails!.Budgets.Single() with
+        {
+            Id = "custom-actions-budget"
+        };
+        var extraActionsBudget = new ActionsSpendingBudget
+        {
+            Id = "secondary-actions-budget",
+            LimitUsd = 25m,
+            Enforcement = GuardrailEnforcement.AlertOnly
+        };
+        var scenario = original with
+        {
+            EconomicGuardrails = original.EconomicGuardrails with
+            {
+                SpendingBudgets =
+                [
+                    primaryBudget,
+                    extraBudget,
+                    .. original.EconomicGuardrails.SpendingBudgets
+                        .Where(budget => budget.Scope != SpendingBudgetScope.CostCenter)
+                ],
+                IncludedUsageControls = [primaryControl, extraControl],
+                UserLevelBudgets =
+                [
+                    .. original.EconomicGuardrails.UserLevelBudgets
+                        .Where(budget => budget.Kind != UserLevelBudgetKind.Individual),
+                    primaryUlb,
+                    extraUlb
+                ]
+            },
+            ActionsGuardrails = original.ActionsGuardrails with
+            {
+                Budgets = [primaryActionsBudget, extraActionsBudget]
+            }
+        };
+        var cut = Render<Home>();
+        var editor = Assert.IsAssignableFrom<IHtmlTextAreaElement>(
+            cut.Find("textarea.json-editor:not(.catalog-editor)"));
+        editor.Change(serializer.Serialize(scenario));
+        FindButton(cut, "Load JSON into guided fields").Click();
+        FindInputByLabel(cut, "Limit (USD)", "#cost-center-budget-settings").Input("123");
+
+        FindButton(cut, "Apply without running").Click();
+
+        var updatedEditor = Assert.IsAssignableFrom<IHtmlTextAreaElement>(
+            cut.Find("textarea.json-editor:not(.catalog-editor)"));
+        var updatedJson = updatedEditor.GetAttribute("value") ?? updatedEditor.TextContent;
+        var updated = serializer.Deserialize(updatedJson);
+        var updatedBudget = updated.EconomicGuardrails!.SpendingBudgets
+            .Single(budget => budget.Id == primaryBudget.Id);
+        Assert.Equal(123m, updatedBudget.LimitUsd);
+        Assert.True(updatedBudget.ProductIds.SetEquals(primaryBudget.ProductIds));
+        Assert.True(updatedBudget.SkuIds.SetEquals(primaryBudget.SkuIds));
+        Assert.Equal(primaryBudget.EffectiveFrom, updatedBudget.EffectiveFrom);
+        Assert.Equal(primaryBudget.EffectiveTo, updatedBudget.EffectiveTo);
+        Assert.Equal(primaryBudget.TrackingStartedAt, updatedBudget.TrackingStartedAt);
+        Assert.Contains(updated.EconomicGuardrails.SpendingBudgets, budget => budget.Id == extraBudget.Id);
+        Assert.Contains(updated.EconomicGuardrails.IncludedUsageControls, control =>
+            control.Id == primaryControl.Id &&
+            control.EffectiveFrom == primaryControl.EffectiveFrom &&
+            control.EffectiveTo == primaryControl.EffectiveTo);
+        Assert.Contains(updated.EconomicGuardrails.IncludedUsageControls, control =>
+            control.Id == extraControl.Id);
+        Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget =>
+            budget.Id == primaryUlb.Id &&
+            budget.EffectiveFrom == primaryUlb.EffectiveFrom &&
+            budget.EffectiveTo == primaryUlb.EffectiveTo);
+        Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget => budget.Id == extraUlb.Id);
+        Assert.Contains(updated.ActionsGuardrails!.Budgets, budget => budget.Id == primaryActionsBudget.Id);
+        Assert.Contains(updated.ActionsGuardrails.Budgets, budget => budget.Id == extraActionsBudget.Id);
     }
 
     [Fact]

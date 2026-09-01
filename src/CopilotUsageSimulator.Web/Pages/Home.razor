@@ -779,6 +779,7 @@
                 RuntimeGuardrails = runtimeGuardrails
             };
             _scenarioJson = ScenarioJson.Serialize(scenario);
+            CapturePatchedIds(scenario);
             _error = null;
             _notice = "Guided overrides applied to the complete scenario.";
         }
@@ -798,70 +799,121 @@
             return null;
         }
 
-        var budgets = new List<SpendingBudget>();
-        AddBudget(_form.UseCostCenterBudget, "budget-cost-center", SpendingBudgetScope.CostCenter,
-            _form.CostCenterId, _form.CostCenterBudgetLimit, _form.CostCenterBudgetConsumed,
+        var budgets = PatchSpendingBudget(
+            economic.SpendingBudgets,
+            _form.CostCenterBudgetId,
+            _form.UseCostCenterBudget,
+            "budget-cost-center",
+            SpendingBudgetScope.CostCenter,
+            _form.CostCenterId,
+            _form.CostCenterBudgetLimit,
+            _form.CostCenterBudgetConsumed,
             _form.CostCenterBudgetEnforcement);
-        AddBudget(_form.UseOrganizationBudget, "budget-organization", SpendingBudgetScope.Organization,
-            _form.OrganizationId, _form.OrganizationBudgetLimit, _form.OrganizationBudgetConsumed,
+        budgets = PatchSpendingBudget(
+            budgets,
+            _form.OrganizationBudgetId,
+            _form.UseOrganizationBudget,
+            "budget-organization",
+            SpendingBudgetScope.Organization,
+            _form.OrganizationId,
+            _form.OrganizationBudgetLimit,
+            _form.OrganizationBudgetConsumed,
             _form.OrganizationBudgetEnforcement);
-        AddBudget(_form.UseEnterpriseBudget, "budget-enterprise", SpendingBudgetScope.Enterprise,
-            null, _form.EnterpriseBudgetLimit, _form.EnterpriseBudgetConsumed,
+        budgets = PatchSpendingBudget(
+            budgets,
+            _form.EnterpriseBudgetId,
+            _form.UseEnterpriseBudget,
+            "budget-enterprise",
+            SpendingBudgetScope.Enterprise,
+            null,
+            _form.EnterpriseBudgetLimit,
+            _form.EnterpriseBudgetConsumed,
             _form.EnterpriseBudgetEnforcement);
 
-        var ulbs = economic.UserLevelBudgets
-            .Where(ulb =>
-                ulb.Kind != UserLevelBudgetKind.Universal &&
-                !(ulb.Kind == UserLevelBudgetKind.CostCenter &&
-                  string.Equals(ulb.TargetId, _form.CostCenterId, StringComparison.OrdinalIgnoreCase)) &&
-                !(ulb.Kind == UserLevelBudgetKind.Individual &&
-                  string.Equals(ulb.TargetId, userId, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-        if (_form.UseUniversalUlb)
-        {
-            ulbs.Add(new UserLevelBudget
+        var ulbs = PatchById(
+            economic.UserLevelBudgets,
+            _form.UniversalUlbId,
+            _form.UseUniversalUlb,
+            "ulb-universal",
+            budget => budget.Id,
+            budget => budget with
             {
-                Id = "ulb-universal",
+                Kind = UserLevelBudgetKind.Universal,
+                TargetId = null,
+                LimitCredits = _form.UniversalUlbLimit,
+                ConsumedCredits = _form.UniversalUlbConsumed
+            },
+            id => new UserLevelBudget
+            {
+                Id = id,
                 Kind = UserLevelBudgetKind.Universal,
                 LimitCredits = _form.UniversalUlbLimit,
                 ConsumedCredits = _form.UniversalUlbConsumed
             });
-        }
-        if (_form.UseCostCenterUlb && !string.IsNullOrWhiteSpace(_form.CostCenterId))
-        {
-            ulbs.Add(new UserLevelBudget
+        ulbs = PatchById(
+            ulbs,
+            _form.CostCenterUlbId,
+            _form.UseCostCenterUlb && !string.IsNullOrWhiteSpace(_form.CostCenterId),
+            "ulb-cost-center",
+            budget => budget.Id,
+            budget => budget with
             {
-                Id = "ulb-cost-center",
+                Kind = UserLevelBudgetKind.CostCenter,
+                TargetId = _form.CostCenterId,
+                LimitCredits = _form.CostCenterUlbLimit,
+                ConsumedCredits = _form.CostCenterUlbConsumed
+            },
+            id => new UserLevelBudget
+            {
+                Id = id,
                 Kind = UserLevelBudgetKind.CostCenter,
                 TargetId = _form.CostCenterId,
                 LimitCredits = _form.CostCenterUlbLimit,
                 ConsumedCredits = _form.CostCenterUlbConsumed
             });
-        }
-        if (_form.UseIndividualUlb)
-        {
-            ulbs.Add(new UserLevelBudget
+        ulbs = PatchById(
+            ulbs,
+            _form.IndividualUlbId,
+            _form.UseIndividualUlb,
+            "ulb-individual",
+            budget => budget.Id,
+            budget => budget with
             {
-                Id = "ulb-individual",
+                Kind = UserLevelBudgetKind.Individual,
+                TargetId = userId,
+                LimitCredits = _form.UlbLimit,
+                ConsumedCredits = _form.UlbConsumed
+            },
+            id => new UserLevelBudget
+            {
+                Id = id,
                 Kind = UserLevelBudgetKind.Individual,
                 TargetId = userId,
                 LimitCredits = _form.UlbLimit,
                 ConsumedCredits = _form.UlbConsumed
             });
-        }
 
-        var includedControls = _form.UseIncludedControl && !string.IsNullOrWhiteSpace(_form.CostCenterId)
-            ? new CostCenterIncludedUsageControl[]
+        var useIncludedControl =
+            _form.UseIncludedControl && !string.IsNullOrWhiteSpace(_form.CostCenterId);
+        var includedControls = PatchById(
+            economic.IncludedUsageControls,
+            _form.IncludedControlId,
+            useIncludedControl,
+            "included-cost-center",
+            control => control.Id,
+            control => control with
             {
-                new()
-                {
-                    Id = "included-cost-center",
-                    CostCenterId = _form.CostCenterId,
-                    ConsumedCredits = _form.IncludedControlConsumed,
-                    OverflowBehavior = _form.IncludedOverflow
-                }
-            }
-            : [];
+                CostCenterId = _form.CostCenterId,
+                ConsumedCredits = _form.IncludedControlConsumed,
+                OverflowBehavior = _form.IncludedOverflow
+            },
+            id => new CostCenterIncludedUsageControl
+            {
+                Id = id,
+                CostCenterId = _form.CostCenterId,
+                ConsumedCredits = _form.IncludedControlConsumed,
+                OverflowBehavior = _form.IncludedOverflow
+            });
         return economic with
         {
             EnterprisePoolConsumedCredits = _form.PoolConsumed,
@@ -870,29 +922,6 @@
             UserLevelBudgets = ulbs,
             IncludedUsageControls = includedControls
         };
-
-        void AddBudget(
-            bool enabled,
-            string id,
-            SpendingBudgetScope scope,
-            string? scopeId,
-            decimal limit,
-            decimal consumed,
-            GuardrailEnforcement enforcement)
-        {
-            if (enabled)
-            {
-                budgets.Add(new SpendingBudget
-                {
-                    Id = id,
-                    Scope = scope,
-                    ScopeId = scopeId,
-                    LimitUsd = limit,
-                    ConsumedUsd = consumed,
-                    Enforcement = enforcement
-                });
-            }
-        }
     }
 
     private ActionsGuardrailSnapshot? UpdateActionsGuardrails(ActionsGuardrailSnapshot? snapshot)
@@ -904,16 +933,174 @@
 
         return snapshot with
         {
-            Budgets = _form.UseActionsBudget
-                ? [new ActionsSpendingBudget
+            Budgets = PatchById(
+                snapshot.Budgets,
+                _form.ActionsBudgetId,
+                _form.UseActionsBudget,
+                "actions-budget",
+                budget => budget.Id,
+                budget => budget with
                 {
-                    Id = "actions-budget",
                     LimitUsd = _form.ActionsBudgetLimit,
                     ConsumedUsd = _form.ActionsBudgetConsumed,
                     Enforcement = _form.ActionsBudgetEnforcement
-                }]
-                : []
+                },
+                id => new ActionsSpendingBudget
+                {
+                    Id = id,
+                    LimitUsd = _form.ActionsBudgetLimit,
+                    ConsumedUsd = _form.ActionsBudgetConsumed,
+                    Enforcement = _form.ActionsBudgetEnforcement
+                })
         };
+    }
+
+    private static IReadOnlyList<SpendingBudget> PatchSpendingBudget(
+        IReadOnlyList<SpendingBudget> budgets,
+        string? selectedId,
+        bool enabled,
+        string defaultId,
+        SpendingBudgetScope scope,
+        string? scopeId,
+        decimal limit,
+        decimal consumed,
+        GuardrailEnforcement enforcement) =>
+        PatchById(
+            budgets,
+            selectedId,
+            enabled,
+            defaultId,
+            budget => budget.Id,
+            budget => budget with
+            {
+                Scope = scope,
+                ScopeId = scopeId,
+                LimitUsd = limit,
+                ConsumedUsd = consumed,
+                Enforcement = enforcement
+            },
+            id => new SpendingBudget
+            {
+                Id = id,
+                Scope = scope,
+                ScopeId = scopeId,
+                LimitUsd = limit,
+                ConsumedUsd = consumed,
+                Enforcement = enforcement
+            });
+
+    private static IReadOnlyList<T> PatchById<T>(
+        IReadOnlyList<T> values,
+        string? selectedId,
+        bool enabled,
+        string defaultId,
+        Func<T, string> idSelector,
+        Func<T, T> update,
+        Func<string, T> create)
+    {
+        var patched = values.ToList();
+        var index = string.IsNullOrWhiteSpace(selectedId)
+            ? -1
+            : patched.FindIndex(value =>
+                string.Equals(idSelector(value), selectedId, StringComparison.OrdinalIgnoreCase));
+
+        if (index >= 0)
+        {
+            if (enabled)
+            {
+                patched[index] = update(patched[index]);
+            }
+            else
+            {
+                patched.RemoveAt(index);
+            }
+        }
+        else if (enabled)
+        {
+            patched.Add(create(defaultId));
+        }
+
+        return patched;
+    }
+
+    private void CapturePatchedIds(SimulationScenario scenario)
+    {
+        var economic = scenario.EconomicGuardrails;
+        if (economic is not null)
+        {
+            _form.UniversalUlbId = ResolvePatchedId(
+                economic.UserLevelBudgets,
+                _form.UniversalUlbId,
+                _form.UseUniversalUlb,
+                "ulb-universal",
+                budget => budget.Id);
+            _form.CostCenterUlbId = ResolvePatchedId(
+                economic.UserLevelBudgets,
+                _form.CostCenterUlbId,
+                _form.UseCostCenterUlb,
+                "ulb-cost-center",
+                budget => budget.Id);
+            _form.IndividualUlbId = ResolvePatchedId(
+                economic.UserLevelBudgets,
+                _form.IndividualUlbId,
+                _form.UseIndividualUlb,
+                "ulb-individual",
+                budget => budget.Id);
+            _form.IncludedControlId = ResolvePatchedId(
+                economic.IncludedUsageControls,
+                _form.IncludedControlId,
+                _form.UseIncludedControl,
+                "included-cost-center",
+                control => control.Id);
+            _form.CostCenterBudgetId = ResolvePatchedId(
+                economic.SpendingBudgets,
+                _form.CostCenterBudgetId,
+                _form.UseCostCenterBudget,
+                "budget-cost-center",
+                budget => budget.Id);
+            _form.OrganizationBudgetId = ResolvePatchedId(
+                economic.SpendingBudgets,
+                _form.OrganizationBudgetId,
+                _form.UseOrganizationBudget,
+                "budget-organization",
+                budget => budget.Id);
+            _form.EnterpriseBudgetId = ResolvePatchedId(
+                economic.SpendingBudgets,
+                _form.EnterpriseBudgetId,
+                _form.UseEnterpriseBudget,
+                "budget-enterprise",
+                budget => budget.Id);
+        }
+
+        if (scenario.ActionsGuardrails is not null)
+        {
+            _form.ActionsBudgetId = ResolvePatchedId(
+                scenario.ActionsGuardrails.Budgets,
+                _form.ActionsBudgetId,
+                _form.UseActionsBudget,
+                "actions-budget",
+                budget => budget.Id);
+        }
+    }
+
+    private static string? ResolvePatchedId<T>(
+        IReadOnlyList<T> values,
+        string? selectedId,
+        bool enabled,
+        string defaultId,
+        Func<T, string> idSelector)
+    {
+        if (!enabled)
+        {
+            return null;
+        }
+
+        return values
+            .Select(idSelector)
+            .FirstOrDefault(id => string.Equals(id, selectedId, StringComparison.OrdinalIgnoreCase))
+            ?? values
+                .Select(idSelector)
+                .FirstOrDefault(id => string.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase));
     }
 
     private RuntimeGuardrailSnapshot? UpdateRuntimeGuardrails(RuntimeGuardrailSnapshot? snapshot)
@@ -1128,32 +1315,40 @@
             OrganizationId = scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault() ?? "",
             PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
             UseUniversalUlb = universalUlb is not null,
+            UniversalUlbId = universalUlb?.Id,
             UniversalUlbLimit = universalUlb?.LimitCredits ?? 0,
             UniversalUlbConsumed = universalUlb?.ConsumedCredits ?? 0,
             UseCostCenterUlb = costCenterUlb is not null,
+            CostCenterUlbId = costCenterUlb?.Id,
             CostCenterUlbLimit = costCenterUlb?.LimitCredits ?? 0,
             CostCenterUlbConsumed = costCenterUlb?.ConsumedCredits ?? 0,
             UseIndividualUlb = individualUlb is not null,
+            IndividualUlbId = individualUlb?.Id,
             UlbLimit = individualUlb?.LimitCredits ?? 0,
             UlbConsumed = individualUlb?.ConsumedCredits ?? 0,
             UseIncludedControl = includedControl is not null,
+            IncludedControlId = includedControl?.Id,
             IncludedControlConsumed = includedControl?.ConsumedCredits ?? 0,
             IncludedOverflow = includedControl?.OverflowBehavior ?? IncludedOverflowBehavior.PaidUsage,
             PaidUsage = scenario.EconomicGuardrails?.PaidUsage.State ?? GuardrailValue.Unknown,
             UseCostCenterBudget = costCenterBudget is not null,
+            CostCenterBudgetId = costCenterBudget?.Id,
             CostCenterBudgetLimit = costCenterBudget?.LimitUsd ?? 0,
             CostCenterBudgetConsumed = costCenterBudget?.ConsumedUsd ?? 0,
             CostCenterBudgetEnforcement = costCenterBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
             UseOrganizationBudget = organizationBudget is not null,
+            OrganizationBudgetId = organizationBudget?.Id,
             OrganizationBudgetLimit = organizationBudget?.LimitUsd ?? 0,
             OrganizationBudgetConsumed = organizationBudget?.ConsumedUsd ?? 0,
             OrganizationBudgetEnforcement = organizationBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
             UseEnterpriseBudget = enterpriseBudget is not null,
+            EnterpriseBudgetId = enterpriseBudget?.Id,
             EnterpriseBudgetLimit = enterpriseBudget?.LimitUsd ?? 0,
             EnterpriseBudgetConsumed = enterpriseBudget?.ConsumedUsd ?? 0,
             EnterpriseBudgetEnforcement = enterpriseBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
             ActionsMinutes = scenario.ActionsUsage?.Minutes ?? 0,
             UseActionsBudget = actionsBudget is not null,
+            ActionsBudgetId = actionsBudget?.Id,
             ActionsBudgetLimit = actionsBudget?.LimitUsd ?? 0,
             ActionsBudgetConsumed = actionsBudget?.ConsumedUsd ?? 0,
             ActionsBudgetEnforcement = actionsBudget?.Enforcement ?? GuardrailEnforcement.HardStop,
@@ -1379,32 +1574,40 @@
         public string OrganizationId { get; set; } = "";
         public decimal PoolConsumed { get; set; }
         public bool UseUniversalUlb { get; set; }
+        public string? UniversalUlbId { get; set; }
         public decimal UniversalUlbLimit { get; set; }
         public decimal UniversalUlbConsumed { get; set; }
         public bool UseCostCenterUlb { get; set; }
+        public string? CostCenterUlbId { get; set; }
         public decimal CostCenterUlbLimit { get; set; }
         public decimal CostCenterUlbConsumed { get; set; }
         public bool UseIndividualUlb { get; set; }
+        public string? IndividualUlbId { get; set; }
         public decimal UlbLimit { get; set; }
         public decimal UlbConsumed { get; set; }
         public bool UseIncludedControl { get; set; }
+        public string? IncludedControlId { get; set; }
         public decimal IncludedControlConsumed { get; set; }
         public IncludedOverflowBehavior IncludedOverflow { get; set; }
         public GuardrailValue PaidUsage { get; set; }
         public bool UseCostCenterBudget { get; set; }
+        public string? CostCenterBudgetId { get; set; }
         public decimal CostCenterBudgetLimit { get; set; }
         public decimal CostCenterBudgetConsumed { get; set; }
         public GuardrailEnforcement CostCenterBudgetEnforcement { get; set; }
         public bool UseOrganizationBudget { get; set; }
+        public string? OrganizationBudgetId { get; set; }
         public decimal OrganizationBudgetLimit { get; set; }
         public decimal OrganizationBudgetConsumed { get; set; }
         public GuardrailEnforcement OrganizationBudgetEnforcement { get; set; }
         public bool UseEnterpriseBudget { get; set; }
+        public string? EnterpriseBudgetId { get; set; }
         public decimal EnterpriseBudgetLimit { get; set; }
         public decimal EnterpriseBudgetConsumed { get; set; }
         public GuardrailEnforcement EnterpriseBudgetEnforcement { get; set; }
         public decimal ActionsMinutes { get; set; }
         public bool UseActionsBudget { get; set; }
+        public string? ActionsBudgetId { get; set; }
         public decimal ActionsBudgetLimit { get; set; }
         public decimal ActionsBudgetConsumed { get; set; }
         public GuardrailEnforcement ActionsBudgetEnforcement { get; set; }

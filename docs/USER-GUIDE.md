@@ -55,7 +55,9 @@ request, and projected remainder. Later checks may not appear because evaluation
 at the first blocking guardrail.
 
 Guided sections marked **Scenario JSON** update the corresponding values in the complete
-scenario document. After a run stops, the responsible control is outlined in red and marked
+scenario document. Guided changes patch the displayed guardrail by its ID; additional
+guardrails and advanced properties such as applicability filters and effective dates are
+preserved. After a run stops, the responsible control is outlined in red and marked
 **Stopped here**. Use **Review highlighted setting** to jump to it. If that setting has no
 guided control, the complete scenario JSON opens and is highlighted instead.
 
