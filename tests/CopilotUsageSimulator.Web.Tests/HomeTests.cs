@@ -22,8 +22,12 @@ public sealed class HomeTests : BunitContext
             new CopilotUsageSimulationEngine(configuration));
         Services.AddSingleton<SimulationSessionRunner>();
         Services.AddSingleton<ScenarioJson>();
-        Services.AddSingleton<ScenarioEditorMapper>();
-        Services.AddSingleton<ScenarioEditorPatcher>();
+        Services.AddSingleton<WorkloadEditorAdapter>();
+        Services.AddSingleton<AttributionEditorAdapter>();
+        Services.AddSingleton<EconomicEditorAdapter>();
+        Services.AddSingleton<RuntimeEditorAdapter>();
+        Services.AddSingleton<ActionsEditorAdapter>();
+        Services.AddSingleton<ScenarioEditorAdapter>();
         Services.AddScoped<BrowserScenarioPersistence>();
         Services.AddScoped<HomePageModel>();
     }

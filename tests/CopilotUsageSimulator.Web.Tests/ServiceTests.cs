@@ -205,7 +205,7 @@ public sealed class ServiceTests
     }
 
     [Fact]
-    public void ScenarioEditorMapperResolvesEffectiveScenarioValues()
+    public void ScenarioEditorAdapterResolvesEffectiveScenarioValues()
     {
         var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent") with
         {
@@ -216,18 +216,18 @@ public sealed class ServiceTests
             }
         };
 
-        var state = new ScenarioEditorMapper().MapFromScenario(scenario, _configuration);
+        var state = CreateScenarioEditorAdapter().MapFromScenario(scenario, _configuration);
 
-        Assert.Equal("Map this scenario", state.Task);
-        Assert.Equal(7, state.RepeatCount);
-        Assert.Equal(scenario.OperationId, state.OperationId);
+        Assert.Equal("Map this scenario", state.Workload.Task);
+        Assert.Equal(7, state.Workload.RepeatCount);
+        Assert.Equal(scenario.OperationId, state.Workload.OperationId);
         Assert.Equal(scenario.Attribution?.UserId, scenario.BillingContext?.SeatAssignments[0].UserId);
-        Assert.NotNull(state.DirectAssignmentIndex);
-        Assert.NotEmpty(state.CostCenterId);
+        Assert.NotNull(state.Attribution.DirectAssignmentIndex);
+        Assert.NotEmpty(state.Attribution.CostCenterId);
     }
 
     [Fact]
-    public void ScenarioEditorPatcherPreservesUnselectedAdvancedRecords()
+    public void ScenarioEditorAdapterPreservesUnselectedAdvancedRecords()
     {
         var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent");
         var historicalBudget = new SpendingBudget
@@ -246,19 +246,132 @@ public sealed class ServiceTests
                 SpendingBudgets = [.. scenario.EconomicGuardrails.SpendingBudgets, historicalBudget]
             }
         };
-        var mapper = new ScenarioEditorMapper();
-        var state = mapper.MapFromScenario(scenario, _configuration);
-        state.Task = "Updated task";
-        state.PoolConsumed = 321m;
+        var adapter = CreateScenarioEditorAdapter();
+        var state = adapter.MapFromScenario(scenario, _configuration);
+        state.Workload.Task = "Updated task";
+        state.Economic.PoolConsumed = 321m;
 
-        var patched = new ScenarioEditorPatcher(mapper)
-            .ApplyToScenario(scenario, state, _configuration);
+        var patched = adapter.ApplyToScenario(scenario, state, _configuration);
 
         Assert.Equal("Updated task", patched.Metadata["task"]);
         Assert.Equal(321m, patched.EconomicGuardrails!.EnterprisePoolConsumedCredits);
         Assert.Contains(patched.EconomicGuardrails.SpendingBudgets, budget =>
             budget == historicalBudget);
     }
+
+    [Fact]
+    public void ScenarioEditorAdapterAppliesSectionsInDependentOrder()
+    {
+        var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent");
+        var adapter = CreateScenarioEditorAdapter();
+        var state = adapter.MapFromScenario(scenario, _configuration);
+        state.Workload.Task = "Exercise every editor section";
+        state.Workload.PlanId = "enterprise";
+        state.Attribution.CostCenterId = "cost-center-updated";
+        state.Attribution.OrganizationId = "organization-updated";
+        state.Economic.PoolConsumed = 432m;
+        state.Economic.UseOrganizationBudget = true;
+        state.Economic.OrganizationBudgetId = "budget-organization";
+        state.Actions.Minutes = 27m;
+        state.Runtime.Enabled = true;
+        state.Runtime.MaximumModelCalls = 12;
+
+        var patched = adapter.ApplyToScenario(scenario, state, _configuration);
+
+        Assert.Equal("Exercise every editor section", patched.Metadata["task"]);
+        Assert.Equal("enterprise", patched.PlanId);
+        Assert.Equal(
+            "enterprise",
+            Assert.Single(patched.BillingContext!.SeatAssignments, seat =>
+                seat.UserId == patched.Attribution!.UserId).PlanId);
+        Assert.Equal(
+            "cost-center-updated",
+            patched.Attribution!.DirectAssignments[state.Attribution.DirectAssignmentIndex!.Value].CostCenterId);
+        Assert.Equal("organization-updated", patched.Attribution.LicensingOrganizationIds[
+            state.Attribution.LicensingOrganizationIndex!.Value]);
+        Assert.Equal(432m, patched.EconomicGuardrails!.EnterprisePoolConsumedCredits);
+        Assert.Equal(
+            "cost-center-updated",
+            Assert.Single(patched.EconomicGuardrails.SpendingBudgets, budget =>
+                budget.Id == state.Economic.CostCenterBudgetId).ScopeId);
+        Assert.Equal(
+            "organization-updated",
+            Assert.Single(patched.EconomicGuardrails.SpendingBudgets, budget =>
+                budget.Id == state.Economic.OrganizationBudgetId).ScopeId);
+        Assert.Equal(27m, patched.ActionsUsage!.Minutes);
+        Assert.Equal(12, patched.RuntimeGuardrails!.MaximumModelCalls);
+    }
+
+    [Fact]
+    public void SectionAdaptersPreserveUnownedScenarioContracts()
+    {
+        var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent");
+
+        var workload = new WorkloadEditorAdapter();
+        var workloadState = workload.MapFromScenario(scenario, _configuration);
+        workloadState.Task = "Updated workload";
+        var workloadPatched = workload.ApplyToScenario(scenario, workloadState);
+        Assert.Same(scenario.Attribution, workloadPatched.Attribution);
+        Assert.Same(scenario.EconomicGuardrails, workloadPatched.EconomicGuardrails);
+        Assert.Same(scenario.ActionsUsage, workloadPatched.ActionsUsage);
+        Assert.Same(scenario.ActionsGuardrails, workloadPatched.ActionsGuardrails);
+        Assert.Same(scenario.RuntimeGuardrails, workloadPatched.RuntimeGuardrails);
+
+        var attribution = new AttributionEditorAdapter();
+        var attributionState = attribution.MapFromScenario(scenario);
+        attributionState.CostCenterId = "cost-center-updated";
+        var attributionPatched = attribution.ApplyToScenario(scenario, attributionState);
+        Assert.Same(scenario.Calls, attributionPatched.Calls);
+        Assert.Same(scenario.Metadata, attributionPatched.Metadata);
+        Assert.Same(scenario.EconomicGuardrails, attributionPatched.EconomicGuardrails);
+        Assert.Same(scenario.ActionsUsage, attributionPatched.ActionsUsage);
+        Assert.Same(scenario.ActionsGuardrails, attributionPatched.ActionsGuardrails);
+        Assert.Same(scenario.RuntimeGuardrails, attributionPatched.RuntimeGuardrails);
+
+        var economic = new EconomicEditorAdapter();
+        var economicState = economic.MapFromScenario(scenario);
+        economicState.PoolConsumed = 321m;
+        var economicPatched = economic.ApplyToScenario(scenario, economicState);
+        Assert.Same(scenario.Calls, economicPatched.Calls);
+        Assert.Same(scenario.Metadata, economicPatched.Metadata);
+        Assert.Same(scenario.BillingContext, economicPatched.BillingContext);
+        Assert.Same(scenario.Attribution, economicPatched.Attribution);
+        Assert.Same(scenario.ActionsUsage, economicPatched.ActionsUsage);
+        Assert.Same(scenario.ActionsGuardrails, economicPatched.ActionsGuardrails);
+        Assert.Same(scenario.RuntimeGuardrails, economicPatched.RuntimeGuardrails);
+
+        var actions = new ActionsEditorAdapter();
+        var actionsState = actions.MapFromScenario(scenario);
+        actionsState.Minutes = 27m;
+        var actionsPatched = actions.ApplyToScenario(scenario, actionsState, _configuration);
+        Assert.Same(scenario.Calls, actionsPatched.Calls);
+        Assert.Same(scenario.Metadata, actionsPatched.Metadata);
+        Assert.Same(scenario.BillingContext, actionsPatched.BillingContext);
+        Assert.Same(scenario.Attribution, actionsPatched.Attribution);
+        Assert.Same(scenario.EconomicGuardrails, actionsPatched.EconomicGuardrails);
+        Assert.Same(scenario.RuntimeGuardrails, actionsPatched.RuntimeGuardrails);
+
+        var runtime = new RuntimeEditorAdapter();
+        var runtimeState = runtime.MapFromScenario(scenario);
+        runtimeState.Enabled = true;
+        runtimeState.MaximumModelCalls = 12;
+        var runtimePatched = runtime.ApplyToScenario(scenario, runtimeState);
+        Assert.Same(scenario.Calls, runtimePatched.Calls);
+        Assert.Same(scenario.Metadata, runtimePatched.Metadata);
+        Assert.Same(scenario.BillingContext, runtimePatched.BillingContext);
+        Assert.Same(scenario.Attribution, runtimePatched.Attribution);
+        Assert.Same(scenario.EconomicGuardrails, runtimePatched.EconomicGuardrails);
+        Assert.Same(scenario.ActionsUsage, runtimePatched.ActionsUsage);
+        Assert.Same(scenario.ActionsGuardrails, runtimePatched.ActionsGuardrails);
+    }
+
+    private static ScenarioEditorAdapter CreateScenarioEditorAdapter() =>
+        new(
+            new WorkloadEditorAdapter(),
+            new AttributionEditorAdapter(),
+            new EconomicEditorAdapter(),
+            new RuntimeEditorAdapter(),
+            new ActionsEditorAdapter());
 
     [Fact]
     public void SimulationResultsStateClearsResultAndRunHistory()

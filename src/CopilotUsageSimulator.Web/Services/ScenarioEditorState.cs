@@ -6,6 +6,15 @@ namespace CopilotUsageSimulator.Web.Services;
 
 public sealed class ScenarioEditorState
 {
+    public WorkloadEditorState Workload { get; init; } = new();
+    public AttributionEditorState Attribution { get; init; } = new();
+    public EconomicEditorState Economic { get; init; } = new();
+    public RuntimeEditorState Runtime { get; init; } = new();
+    public ActionsEditorState Actions { get; init; } = new();
+}
+
+public sealed class WorkloadEditorState
+{
     public string Task { get; set; } = "";
     public string OperationId { get; set; } = "cloud-agent";
     public string PlanId { get; set; } = "business";
@@ -17,10 +26,19 @@ public sealed class ScenarioEditorState
     public long CachedInputTokens { get; set; }
     public long CacheWriteTokens { get; set; }
     public long OutputTokens { get; set; }
+    public int RepeatCount { get; set; } = 1;
+}
+
+public sealed class AttributionEditorState
+{
     public string CostCenterId { get; set; } = "";
     public int? DirectAssignmentIndex { get; set; }
     public string OrganizationId { get; set; } = "";
     public int? LicensingOrganizationIndex { get; set; }
+}
+
+public sealed class EconomicEditorState
+{
     public decimal PoolConsumed { get; set; }
     public bool UseUniversalUlb { get; set; }
     public string? UniversalUlbId { get; set; }
@@ -54,13 +72,11 @@ public sealed class ScenarioEditorState
     public decimal EnterpriseBudgetLimit { get; set; }
     public decimal EnterpriseBudgetConsumed { get; set; }
     public GuardrailEnforcement EnterpriseBudgetEnforcement { get; set; }
-    public decimal ActionsMinutes { get; set; }
-    public bool UseActionsBudget { get; set; }
-    public string? ActionsBudgetId { get; set; }
-    public decimal ActionsBudgetLimit { get; set; }
-    public decimal ActionsBudgetConsumed { get; set; }
-    public GuardrailEnforcement ActionsBudgetEnforcement { get; set; }
-    public bool UseRuntimeGuardrails { get; set; }
+}
+
+public sealed class RuntimeEditorState
+{
+    public bool Enabled { get; set; }
     public int? MaximumModelCalls { get; set; }
     public int ModelCallsConsumed { get; set; }
     public int? MaximumSubagentDepth { get; set; }
@@ -70,5 +86,14 @@ public sealed class ScenarioEditorState
     public decimal RequestedDurationMinutes { get; set; }
     public decimal? CliSoftCreditLimit { get; set; }
     public decimal CliCreditsConsumed { get; set; }
-    public int RepeatCount { get; set; } = 1;
+}
+
+public sealed class ActionsEditorState
+{
+    public decimal Minutes { get; set; }
+    public bool UseBudget { get; set; }
+    public string? BudgetId { get; set; }
+    public decimal BudgetLimit { get; set; }
+    public decimal BudgetConsumed { get; set; }
+    public GuardrailEnforcement BudgetEnforcement { get; set; }
 }

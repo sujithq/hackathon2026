@@ -11,8 +11,7 @@ public sealed class HomePageModel
     private readonly ICopilotUsageSimulationEngine defaultEngine;
     private readonly EngineConfiguration defaultConfiguration;
     private readonly ScenarioJson scenarioJson;
-    private readonly ScenarioEditorMapper editorMapper;
-    private readonly ScenarioEditorPatcher editorPatcher;
+    private readonly ScenarioEditorAdapter editorAdapter;
     private readonly SimulationSessionRunner sessionRunner;
     private readonly BrowserScenarioPersistence browserPersistence;
     private EngineConfiguration activeConfiguration;
@@ -22,16 +21,14 @@ public sealed class HomePageModel
         ICopilotUsageSimulationEngine defaultEngine,
         EngineConfiguration defaultConfiguration,
         ScenarioJson scenarioJson,
-        ScenarioEditorMapper editorMapper,
-        ScenarioEditorPatcher editorPatcher,
+        ScenarioEditorAdapter editorAdapter,
         SimulationSessionRunner sessionRunner,
         BrowserScenarioPersistence browserPersistence)
     {
         this.defaultEngine = defaultEngine;
         this.defaultConfiguration = defaultConfiguration;
         this.scenarioJson = scenarioJson;
-        this.editorMapper = editorMapper;
-        this.editorPatcher = editorPatcher;
+        this.editorAdapter = editorAdapter;
         this.sessionRunner = sessionRunner;
         this.browserPersistence = browserPersistence;
         activeEngine = defaultEngine;
@@ -46,7 +43,7 @@ public sealed class HomePageModel
     public string? Notice { get; private set; }
     public EngineConfiguration ActiveConfiguration => activeConfiguration;
     public OperationDefinition? SelectedOperation => ActiveConfiguration.Operations.FirstOrDefault(
-        operation => string.Equals(operation.Id, Form.OperationId, StringComparison.OrdinalIgnoreCase));
+        operation => string.Equals(operation.Id, Form.Workload.OperationId, StringComparison.OrdinalIgnoreCase));
     public IEnumerable<OperationDefinition> ExampleOperations =>
         ActiveConfiguration.Operations.Where(operation => !string.IsNullOrWhiteSpace(operation.ExampleLabel));
     public bool OperationConsumesAiCredits => SelectedOperation?.IsBilled == true;
@@ -85,7 +82,7 @@ public sealed class HomePageModel
     {
         try
         {
-            var scenario = editorPatcher.ApplyToScenario(
+            var scenario = editorAdapter.ApplyToScenario(
                 scenarioJson.Deserialize(ScenarioJsonText),
                 Form,
                 ActiveConfiguration);
@@ -248,7 +245,7 @@ public sealed class HomePageModel
 
     private void RunScenario(SimulationScenario scenario, bool advanceWorkingState)
     {
-        var session = sessionRunner.Run(activeEngine, scenario, Form.RepeatCount);
+        var session = sessionRunner.Run(activeEngine, scenario, Form.Workload.RepeatCount);
         Results.SetRuns(session.Runs);
         if (advanceWorkingState)
         {
@@ -264,6 +261,6 @@ public sealed class HomePageModel
 
     private void LoadForm(SimulationScenario scenario)
     {
-        Form = editorMapper.MapFromScenario(scenario, ActiveConfiguration);
+        Form = editorAdapter.MapFromScenario(scenario, ActiveConfiguration);
     }
 }

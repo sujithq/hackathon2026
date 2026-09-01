@@ -17,8 +17,12 @@ builder.Services.AddSingleton<ICopilotUsageSimulationEngine>(
     new CopilotUsageSimulationEngine(configuration));
 builder.Services.AddSingleton<SimulationSessionRunner>();
 builder.Services.AddSingleton<ScenarioJson>();
-builder.Services.AddSingleton<ScenarioEditorMapper>();
-builder.Services.AddSingleton<ScenarioEditorPatcher>();
+builder.Services.AddSingleton<WorkloadEditorAdapter>();
+builder.Services.AddSingleton<AttributionEditorAdapter>();
+builder.Services.AddSingleton<EconomicEditorAdapter>();
+builder.Services.AddSingleton<RuntimeEditorAdapter>();
+builder.Services.AddSingleton<ActionsEditorAdapter>();
+builder.Services.AddSingleton<ScenarioEditorAdapter>();
 builder.Services.AddScoped<BrowserScenarioPersistence>();
 builder.Services.AddScoped<HomePageModel>();
 

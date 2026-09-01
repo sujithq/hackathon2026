@@ -50,7 +50,7 @@
 
         <section class="setting-card scope-card">
             <label class="setting-toggle">
-                <input type="checkbox" @bind="_form.CostChecksOnly" />
+                <input type="checkbox" @bind="_form.Workload.CostChecksOnly" />
                 <span>
                     <strong>Cost-related checks only <span class="default-badge">Default</span></strong>
                     <small>Show and evaluate billing attribution, ULBs, included credits, paid usage, and spending budgets. Turn off to include access, policy, runtime, and approval checks.</small>
@@ -60,7 +60,7 @@
 
         <div class="field full">
             <label for="task">Task for the agent <span class="json-sync-badge">Scenario JSON</span></label>
-            <textarea id="task" rows="4" @bind="_form.Task"></textarea>
+            <textarea id="task" rows="4" @bind="_form.Workload.Task"></textarea>
             <small>The task is descriptive. Token and runtime values below define the estimate.</small>
         </div>
 
@@ -70,7 +70,7 @@
                     <label for="operation">Operation <span class="cost-related-badge">Cost related</span></label>
                     <DocsLink Url="@GitHubDocumentationLinks.CopilotBilling" Topic="billable Copilot features" />
                 </div>
-                <select id="operation" @bind="_form.OperationId">
+                <select id="operation" @bind="_form.Workload.OperationId">
                     @foreach (var operation in ActiveConfiguration.Operations)
                     {
                         <option value="@operation.Id">@operation.Id</option>
@@ -82,7 +82,7 @@
                     <label for="plan">Plan <span class="cost-related-badge">Cost related</span></label>
                     <DocsLink Url="@GitHubDocumentationLinks.UsageBasedBilling" Topic="Copilot plan billing" />
                 </div>
-                <select id="plan" @bind="_form.PlanId">
+                <select id="plan" @bind="_form.Workload.PlanId">
                     @foreach (var plan in ActiveConfiguration.Plans)
                     {
                         <option value="@plan.Id">@plan.Id</option>
@@ -93,7 +93,7 @@
             {
                 <div class="field">
                     <label for="visibility">Repository <span class="cost-related-badge">Cost related</span></label>
-                    <select id="visibility" @bind="_form.RepositoryVisibility">
+                    <select id="visibility" @bind="_form.Workload.RepositoryVisibility">
                         @foreach (var value in Enum.GetValues<RepositoryVisibility>())
                         {
                             <option value="@value">@value</option>
@@ -108,7 +108,7 @@
                         <label for="model">Model <span class="cost-related-badge">Cost related</span></label>
                         <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="Copilot models and pricing" />
                     </div>
-                    <select id="model" @bind="_form.ModelId">
+                    <select id="model" @bind="_form.Workload.ModelId">
                         @foreach (var model in ActiveConfiguration.Models)
                         {
                             <option value="@model.Id">@model.Id</option>
@@ -119,7 +119,7 @@
         </div>
 
         <div class="operation-context">
-            <strong>@_form.OperationId</strong>
+            <strong>@_form.Workload.OperationId</strong>
             <span>@OperationContext</span>
         </div>
 
@@ -132,11 +132,11 @@
                 <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="token pricing" />
             </h3>
             <div class="form-grid compact">
-                <NumberField Label="Context tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="context-tier pricing" @bind-Value="_form.ContextTokens" />
-                <NumberField Label="Fresh input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="input-token pricing" @bind-Value="_form.FreshInputTokens" />
-                <NumberField Label="Cached input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cached-input pricing" @bind-Value="_form.CachedInputTokens" />
-                <NumberField Label="Cache write" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cache-write pricing" @bind-Value="_form.CacheWriteTokens" />
-                <NumberField Label="Output tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="output-token pricing" @bind-Value="_form.OutputTokens" />
+                <NumberField Label="Context tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="context-tier pricing" @bind-Value="_form.Workload.ContextTokens" />
+                <NumberField Label="Fresh input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="input-token pricing" @bind-Value="_form.Workload.FreshInputTokens" />
+                <NumberField Label="Cached input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cached-input pricing" @bind-Value="_form.Workload.CachedInputTokens" />
+                <NumberField Label="Cache write" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cache-write pricing" @bind-Value="_form.Workload.CacheWriteTokens" />
+                <NumberField Label="Output tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="output-token pricing" @bind-Value="_form.Workload.OutputTokens" />
             </div>
         }
 
@@ -149,12 +149,12 @@
             @if (OperationUsesActions)
             {
                 <div id="actions-minutes-settings">
-                    <DecimalField Label="Actions minutes" DocsUrl="@GitHubDocumentationLinks.ActionsSpending" DocsTopic="GitHub Actions spending" @bind-Value="_form.ActionsMinutes" />
+                    <DecimalField Label="Actions minutes" DocsUrl="@GitHubDocumentationLinks.ActionsSpending" DocsTopic="GitHub Actions spending" @bind-Value="_form.Actions.Minutes" />
                 </div>
             }
             <div class="field">
                 <label>Repeat task</label>
-                <input type="number" min="1" max="1000" @bind="_form.RepeatCount" />
+                <input type="number" min="1" max="1000" @bind="_form.Workload.RepeatCount" />
                 <small>Runs sequentially and carries balances forward.</small>
             </div>
         </div>
@@ -173,24 +173,24 @@
                         <label>Cost center</label>
                         <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
                     </div>
-                    <input @bind="_form.CostCenterId" />
+                    <input @bind="_form.Attribution.CostCenterId" />
                 </div>
                 <div class="field">
                     <div class="field-label">
                         <label>Licensing organization</label>
                         <DocsLink Url="@GitHubDocumentationLinks.CostCenterAllocation" Topic="Copilot cost attribution" />
                     </div>
-                    <input @bind="_form.OrganizationId" />
+                    <input @bind="_form.Attribution.OrganizationId" />
                 </div>
                 <div id="pool-settings" class="@ImpactClass(GuardrailCategories.IncludedPool)">
-                    <DecimalField Label="Pool consumed" DocsUrl="@Metadata(GuardrailMetadataKeys.IncludedPool).DocumentationUrl" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
+                    <DecimalField Label="Pool consumed" DocsUrl="@Metadata(GuardrailMetadataKeys.IncludedPool).DocumentationUrl" DocsTopic="pooled AI credits" @bind-Value="_form.Economic.PoolConsumed" />
                 </div>
                 <div id="paid-usage-settings" class="field @ImpactClass(GuardrailCategories.PaidUsageAuthorization)">
                     <div class="field-label">
                         <label>Paid usage</label>
                         <DocsLink Url="@Metadata(GuardrailMetadataKeys.PaidUsage).DocumentationUrl" Topic="paid Copilot usage" />
                     </div>
-                    <select @bind="_form.PaidUsage">
+                    <select @bind="_form.Economic.PaidUsage">
                         @foreach (var value in Enum.GetValues<GuardrailValue>())
                         {
                             <option value="@value">@value</option>
@@ -201,58 +201,59 @@
 
         }
 
-        <EconomicGuardrailEditor Editor="_form"
+        <EconomicGuardrailEditor Economic="_form.Economic"
+                                 Actions="_form.Actions"
                                  Results="_results"
                                  OperationConsumesAiCredits="OperationConsumesAiCredits"
                                  OperationUsesActions="OperationUsesActions" />
 
-        @if (!_form.CostChecksOnly && OperationConsumesAiCredits)
+        @if (!_form.Workload.CostChecksOnly && OperationConsumesAiCredits)
         {
             <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
             <section id="runtime-settings" class="setting-card @ImpactClass(GuardrailCategories.Runtime)">
                 <label class="setting-toggle">
-                    <input type="checkbox" @bind="_form.UseRuntimeGuardrails" />
+                    <input type="checkbox" @bind="_form.Runtime.Enabled" />
                     <span>
                         <strong>Agent runtime limits</strong>
                         <small>Operational limits for cumulative calls, duration, depth, and CLI credits.</small>
                     </span>
                 </label>
-                @if (_form.UseRuntimeGuardrails)
+                @if (_form.Runtime.Enabled)
                 {
                     <div class="form-grid">
                         <div class="field">
                             <label>Maximum model calls</label>
-                            <input type="number" min="0" @bind="_form.MaximumModelCalls" />
+                            <input type="number" min="0" @bind="_form.Runtime.MaximumModelCalls" />
                         </div>
                         <div class="field">
                             <label>Model calls already used</label>
-                            <input type="number" min="0" @bind="_form.ModelCallsConsumed" />
+                            <input type="number" min="0" @bind="_form.Runtime.ModelCallsConsumed" />
                         </div>
                         <div class="field">
                             <label>Maximum duration (minutes)</label>
-                            <input type="number" min="0" step="0.1" @bind="_form.MaximumDurationMinutes" />
+                            <input type="number" min="0" step="0.1" @bind="_form.Runtime.MaximumDurationMinutes" />
                         </div>
                         <div class="field">
                             <label>Duration already used (minutes)</label>
-                            <input type="number" min="0" step="0.1" @bind="_form.ElapsedDurationMinutes" />
+                            <input type="number" min="0" step="0.1" @bind="_form.Runtime.ElapsedDurationMinutes" />
                         </div>
                         <div class="field">
                             <label>Duration needed per run (minutes)</label>
-                            <input type="number" min="0" step="0.1" @bind="_form.RequestedDurationMinutes" />
+                            <input type="number" min="0" step="0.1" @bind="_form.Runtime.RequestedDurationMinutes" />
                         </div>
                         <div class="field">
                             <label>Maximum subagent depth</label>
-                            <input type="number" min="0" @bind="_form.MaximumSubagentDepth" />
+                            <input type="number" min="0" @bind="_form.Runtime.MaximumSubagentDepth" />
                         </div>
                         <div class="field">
                             <label>Requested subagent depth</label>
-                            <input type="number" min="0" @bind="_form.RequestedSubagentDepth" />
+                            <input type="number" min="0" @bind="_form.Runtime.RequestedSubagentDepth" />
                         </div>
                         <div class="field">
                             <label>CLI session credit limit</label>
-                            <input type="number" min="0" step="0.01" @bind="_form.CliSoftCreditLimit" />
+                            <input type="number" min="0" step="0.01" @bind="_form.Runtime.CliSoftCreditLimit" />
                         </div>
-                        <DecimalField Label="CLI credits already used" @bind-Value="_form.CliCreditsConsumed" />
+                        <DecimalField Label="CLI credits already used" @bind-Value="_form.Runtime.CliCreditsConsumed" />
                     </div>
                 }
             </section>
@@ -293,7 +294,7 @@
         </details>
     </section>
 
-    <SimulationResults State="_results" RepeatCount="_form.RepeatCount" />
+    <SimulationResults State="_results" RepeatCount="_form.Workload.RepeatCount" />
 </div>
 
 @code {
