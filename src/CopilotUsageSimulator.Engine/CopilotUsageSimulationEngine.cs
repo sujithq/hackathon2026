@@ -29,9 +29,10 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         var operation = Find(_configuration.Operations, scenario.OperationId, x => x.Id, "operation");
         var plan = Find(_configuration.Plans, scenario.PlanId, x => x.Id, "plan");
         var costChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly;
-        var richGuardrails = scenario.BillingContext is not null ||
+        var hasRichGuardrails = scenario.BillingContext is not null ||
             scenario.Attribution is not null ||
             scenario.EconomicGuardrails is not null;
+        var richGuardrails = operation.IsBilled && hasRichGuardrails;
         AttributionResult? attribution = null;
 
         if (richGuardrails)
@@ -60,7 +61,7 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         }
 
         var runtimeEvaluator = new RuntimeGuardrailEvaluator();
-        if (!costChecksOnly)
+        if (!costChecksOnly && operation.IsBilled)
         {
             var runtimePreflight = runtimeEvaluator.EvaluateBeforeCalls(scenario);
             appliedGuardrails.AddRange(runtimePreflight.AppliedGuardrails);

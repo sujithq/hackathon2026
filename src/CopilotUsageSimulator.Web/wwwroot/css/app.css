@@ -112,6 +112,9 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .docs-link:hover, .docs-link:focus-visible { color: #c7d2fe; text-decoration: underline; }
 .field small { line-height: 1.4; }
 .section-help { color: var(--muted); font-size: .8rem; margin: -.3rem 0 .8rem; }
+.operation-context { display: grid; gap: .2rem; margin-top: .85rem; padding: .7rem .8rem; border-left: 3px solid var(--accent); border-radius: 7px; background: rgba(124,92,255,.08); }
+.operation-context strong { color: #ddd6fe; font-size: .78rem; }
+.operation-context span { color: var(--muted); font-size: .76rem; line-height: 1.4; }
 .guardrail-editor { display: grid; gap: .7rem; }
 .budget-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
 .setting-card { border: 1px solid var(--border); border-radius: 11px; padding: .85rem; background: rgba(9,14,27,.55); }

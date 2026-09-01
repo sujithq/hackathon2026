@@ -106,7 +106,7 @@ public sealed class HomeTests : BunitContext
     }
 
     [Fact]
-    public void ChatTemplateRemovesActionsSpecificInputs()
+    public void ChatTemplateHidesActionsSpecificInputs()
     {
         var cut = Render<Home>();
 
@@ -114,7 +114,45 @@ public sealed class HomeTests : BunitContext
 
         Assert.Equal("chat", cut.Find("#operation").GetAttribute("value"));
         Assert.Contains("Allowed", cut.Find(".decision-banner").TextContent);
+        Assert.Empty(cut.FindAll("#visibility"));
+        Assert.Empty(cut.FindAll("#actions-minutes-settings"));
+        Assert.DoesNotContain("Actions budget", cut.Markup);
         Assert.DoesNotContain("actions-budget", cut.Find(".check-list").TextContent);
+    }
+
+    public static IEnumerable<object[]> OperationCapabilities()
+    {
+        var configuration = EngineConfigurationLoader.LoadDefault();
+        return configuration.Operations.Select(operation => new object[]
+        {
+            operation.Id,
+            operation.IsBilled,
+            operation.ActionsMetering != ActionsMeteringMode.None,
+            operation.ActionsMetering == ActionsMeteringMode.PrivateRepositories
+        });
+    }
+
+    [Theory]
+    [MemberData(nameof(OperationCapabilities))]
+    public void OperationSelectionShowsOnlyApplicableFields(
+        string operationId,
+        bool isBilled,
+        bool usesActions,
+        bool usesRepositoryVisibility)
+    {
+        var cut = Render<Home>();
+
+        cut.Find("#operation").Change(operationId);
+
+        Assert.Equal(isBilled, cut.FindAll("#model").Count == 1);
+        Assert.Equal(isBilled, cut.FindAll("#individual-ulb-settings").Count == 1);
+        Assert.Equal(isBilled, cut.Markup.Contains("Cost-center budget", StringComparison.Ordinal));
+        Assert.Equal(usesActions, cut.FindAll("#actions-minutes-settings").Count == 1);
+        Assert.Equal(usesActions, cut.Markup.Contains("Actions budget", StringComparison.Ordinal));
+        Assert.Equal(usesRepositoryVisibility, cut.FindAll("#visibility").Count == 1);
+
+        cut.Find(".scope-card input[type=checkbox]").Change(false);
+        Assert.Equal(isBilled, cut.FindAll("#runtime-settings").Count == 1);
     }
 
     private static IElement FindInputByLabel(

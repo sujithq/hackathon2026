@@ -90,78 +90,64 @@
                     }
                 </select>
             </div>
-            <div class="field">
-                <label for="visibility">Repository</label>
-                <select id="visibility" @bind="_form.RepositoryVisibility">
-                    @foreach (var value in Enum.GetValues<RepositoryVisibility>())
-                    {
-                        <option value="@value">@value</option>
-                    }
-                </select>
-            </div>
-            <div class="field">
-                <div class="field-label">
-                    <label for="model">Model</label>
-                    <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="Copilot models and pricing" />
+            @if (OperationUsesRepositoryVisibility)
+            {
+                <div class="field">
+                    <label for="visibility">Repository</label>
+                    <select id="visibility" @bind="_form.RepositoryVisibility">
+                        @foreach (var value in Enum.GetValues<RepositoryVisibility>())
+                        {
+                            <option value="@value">@value</option>
+                        }
+                    </select>
                 </div>
-                <select id="model" @bind="_form.ModelId">
-                    @foreach (var model in ActiveConfiguration.Models)
-                    {
-                        <option value="@model.Id">@model.Id</option>
-                    }
-                </select>
-            </div>
+            }
+            @if (OperationConsumesAiCredits)
+            {
+                <div class="field">
+                    <div class="field-label">
+                        <label for="model">Model</label>
+                        <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="Copilot models and pricing" />
+                    </div>
+                    <select id="model" @bind="_form.ModelId">
+                        @foreach (var model in ActiveConfiguration.Models)
+                        {
+                            <option value="@model.Id">@model.Id</option>
+                        }
+                    </select>
+                </div>
+            }
         </div>
 
-        <h3 class="synced-heading">
-            Expected model call
-            <span class="json-sync-badge">Scenario JSON</span>
-            <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="token pricing" />
-        </h3>
-        <div class="form-grid compact">
-            <NumberField Label="Context tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="context-tier pricing" @bind-Value="_form.ContextTokens" />
-            <NumberField Label="Fresh input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="input-token pricing" @bind-Value="_form.FreshInputTokens" />
-            <NumberField Label="Cached input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cached-input pricing" @bind-Value="_form.CachedInputTokens" />
-            <NumberField Label="Cache write" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cache-write pricing" @bind-Value="_form.CacheWriteTokens" />
-            <NumberField Label="Output tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="output-token pricing" @bind-Value="_form.OutputTokens" />
+        <div class="operation-context">
+            <strong>@_form.OperationId</strong>
+            <span>@OperationContext</span>
         </div>
 
-        <h3 class="synced-heading">
-            Enterprise overrides
-            <span class="json-sync-badge">Scenario JSON</span>
-            <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
-        </h3>
+        @if (OperationConsumesAiCredits)
+        {
+            <h3 class="synced-heading">
+                Expected model call
+                <span class="json-sync-badge">Scenario JSON</span>
+                <DocsLink Url="@GitHubDocumentationLinks.ModelsAndPricing" Topic="token pricing" />
+            </h3>
+            <div class="form-grid compact">
+                <NumberField Label="Context tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="context-tier pricing" @bind-Value="_form.ContextTokens" />
+                <NumberField Label="Fresh input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="input-token pricing" @bind-Value="_form.FreshInputTokens" />
+                <NumberField Label="Cached input" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cached-input pricing" @bind-Value="_form.CachedInputTokens" />
+                <NumberField Label="Cache write" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="cache-write pricing" @bind-Value="_form.CacheWriteTokens" />
+                <NumberField Label="Output tokens" DocsUrl="@GitHubDocumentationLinks.ModelsAndPricing" DocsTopic="output-token pricing" @bind-Value="_form.OutputTokens" />
+            </div>
+        }
+
+        <h3 class="synced-heading">Simulation run <span class="json-sync-badge">Scenario JSON</span></h3>
         <div class="form-grid compact">
-            <div class="field">
-                <div class="field-label">
-                    <label>Cost center</label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
+            @if (OperationUsesActions)
+            {
+                <div id="actions-minutes-settings">
+                    <DecimalField Label="Actions minutes" DocsUrl="@GitHubDocumentationLinks.ActionsSpending" DocsTopic="GitHub Actions spending" @bind-Value="_form.ActionsMinutes" />
                 </div>
-                <input @bind="_form.CostCenterId" />
-            </div>
-            <div class="field">
-                <div class="field-label">
-                    <label>Licensing organization</label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CostCenterAllocation" Topic="Copilot cost attribution" />
-                </div>
-                <input @bind="_form.OrganizationId" />
-            </div>
-            <div id="pool-settings" class="@ImpactClass("included-pool")">
-                <DecimalField Label="Pool consumed" DocsUrl="@GitHubDocumentationLinks.UsageBasedBilling" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
-            </div>
-            <div id="paid-usage-settings" class="field @ImpactClass("paid-usage-authorization")">
-                <div class="field-label">
-                    <label>Paid usage</label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="paid Copilot usage" />
-                </div>
-                <select @bind="_form.PaidUsage">
-                    @foreach (var value in Enum.GetValues<GuardrailValue>())
-                    {
-                        <option value="@value">@value</option>
-                    }
-                </select>
-            </div>
-            <DecimalField Label="Actions minutes" DocsUrl="@GitHubDocumentationLinks.ActionsSpending" DocsTopic="GitHub Actions spending" @bind-Value="_form.ActionsMinutes" />
+            }
             <div class="field">
                 <label>Repeat task</label>
                 <input type="number" min="1" max="1000" @bind="_form.RepeatCount" />
@@ -169,9 +155,48 @@
             </div>
         </div>
 
-        <h3 class="synced-heading">Optional guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
-        <p class="section-help">ULB precedence: Individual exception → Cost center → Universal default. Only the most specific applicable ULB is enforced.</p>
-        <div class="guardrail-editor">
+        @if (OperationConsumesAiCredits)
+        {
+            <h3 class="synced-heading">
+                Billing and attribution
+                <span class="json-sync-badge">Scenario JSON</span>
+                <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
+            </h3>
+            <div class="form-grid compact">
+                <div class="field">
+                    <div class="field-label">
+                        <label>Cost center</label>
+                        <DocsLink Url="@GitHubDocumentationLinks.CostCenters" Topic="cost centers" />
+                    </div>
+                    <input @bind="_form.CostCenterId" />
+                </div>
+                <div class="field">
+                    <div class="field-label">
+                        <label>Licensing organization</label>
+                        <DocsLink Url="@GitHubDocumentationLinks.CostCenterAllocation" Topic="Copilot cost attribution" />
+                    </div>
+                    <input @bind="_form.OrganizationId" />
+                </div>
+                <div id="pool-settings" class="@ImpactClass("included-pool")">
+                    <DecimalField Label="Pool consumed" DocsUrl="@GitHubDocumentationLinks.UsageBasedBilling" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
+                </div>
+                <div id="paid-usage-settings" class="field @ImpactClass("paid-usage-authorization")">
+                    <div class="field-label">
+                        <label>Paid usage</label>
+                        <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="paid Copilot usage" />
+                    </div>
+                    <select @bind="_form.PaidUsage">
+                        @foreach (var value in Enum.GetValues<GuardrailValue>())
+                        {
+                            <option value="@value">@value</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <h3 class="synced-heading">Optional guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
+            <p class="section-help">ULB precedence: Individual exception → Cost center → Universal default. Only the most specific applicable ULB is enforced.</p>
+            <div class="guardrail-editor">
             <section id="universal-ulb-settings" class="setting-card @UlbImpactClass(UserLevelBudgetKind.Universal)">
                 <div class="setting-header">
                     <label class="setting-toggle">
@@ -259,9 +284,10 @@
                     </div>
                 }
             </section>
-        </div>
+            </div>
+        }
 
-        @if (!_form.CostChecksOnly)
+        @if (!_form.CostChecksOnly && OperationConsumesAiCredits)
         {
             <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
             <section id="runtime-settings" class="setting-card @ImpactClass("runtime")">
@@ -313,46 +339,55 @@
             </section>
         }
 
-        <h3 class="synced-heading">Spending budgets <span class="json-sync-badge">Scenario JSON</span></h3>
-        <p class="section-help">Enable only the budget scopes you want to test. Disabled budgets are not evaluated.</p>
-        <div class="budget-grid">
-            <BudgetCard Title="Cost-center budget"
-                        Id="cost-center-budget-settings"
-                        Highlighted="@IsBlockingGate("budget-cost-center")"
-                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
-                        Help="Applies to metered usage attributed to this cost center."
-                        @bind-Enabled="_form.UseCostCenterBudget"
-                        @bind-Limit="_form.CostCenterBudgetLimit"
-                        @bind-Consumed="_form.CostCenterBudgetConsumed"
-                        @bind-Enforcement="_form.CostCenterBudgetEnforcement" />
-            <BudgetCard Title="Organization budget"
-                        Id="organization-budget-settings"
-                        Highlighted="@IsBlockingGate("budget-organization")"
-                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
-                        Help="Used when organization-level metered spending is constrained."
-                        @bind-Enabled="_form.UseOrganizationBudget"
-                        @bind-Limit="_form.OrganizationBudgetLimit"
-                        @bind-Consumed="_form.OrganizationBudgetConsumed"
-                        @bind-Enforcement="_form.OrganizationBudgetEnforcement" />
-            <BudgetCard Title="Enterprise budget"
-                        Id="enterprise-budget-settings"
-                        Highlighted="@IsBlockingGate("budget-enterprise")"
-                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
-                        Help="Applies across the enterprise unless the cost center is excluded."
-                        @bind-Enabled="_form.UseEnterpriseBudget"
-                        @bind-Limit="_form.EnterpriseBudgetLimit"
-                        @bind-Consumed="_form.EnterpriseBudgetConsumed"
-                        @bind-Enforcement="_form.EnterpriseBudgetEnforcement" />
-            <BudgetCard Title="Actions budget"
-                        Id="actions-budget-settings"
-                        Highlighted="@IsBlockingCategory("actions-budget")"
-                        DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
-                        Help="Controls additional GitHub Actions runner charges."
-                        @bind-Enabled="_form.UseActionsBudget"
-                        @bind-Limit="_form.ActionsBudgetLimit"
-                        @bind-Consumed="_form.ActionsBudgetConsumed"
-                        @bind-Enforcement="_form.ActionsBudgetEnforcement" />
-        </div>
+        @if (OperationConsumesAiCredits || OperationUsesActions)
+        {
+            <h3 class="synced-heading">Spending budgets <span class="json-sync-badge">Scenario JSON</span></h3>
+            <p class="section-help">Only budget types used by this operation are shown. Disabled budgets are not evaluated.</p>
+            <div class="budget-grid">
+                @if (OperationConsumesAiCredits)
+                {
+                    <BudgetCard Title="Cost-center budget"
+                                Id="cost-center-budget-settings"
+                                Highlighted="@IsBlockingGate("budget-cost-center")"
+                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                Help="Applies to metered usage attributed to this cost center."
+                                @bind-Enabled="_form.UseCostCenterBudget"
+                                @bind-Limit="_form.CostCenterBudgetLimit"
+                                @bind-Consumed="_form.CostCenterBudgetConsumed"
+                                @bind-Enforcement="_form.CostCenterBudgetEnforcement" />
+                    <BudgetCard Title="Organization budget"
+                                Id="organization-budget-settings"
+                                Highlighted="@IsBlockingGate("budget-organization")"
+                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                Help="Used when organization-level metered spending is constrained."
+                                @bind-Enabled="_form.UseOrganizationBudget"
+                                @bind-Limit="_form.OrganizationBudgetLimit"
+                                @bind-Consumed="_form.OrganizationBudgetConsumed"
+                                @bind-Enforcement="_form.OrganizationBudgetEnforcement" />
+                    <BudgetCard Title="Enterprise budget"
+                                Id="enterprise-budget-settings"
+                                Highlighted="@IsBlockingGate("budget-enterprise")"
+                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                Help="Applies across the enterprise unless the cost center is excluded."
+                                @bind-Enabled="_form.UseEnterpriseBudget"
+                                @bind-Limit="_form.EnterpriseBudgetLimit"
+                                @bind-Consumed="_form.EnterpriseBudgetConsumed"
+                                @bind-Enforcement="_form.EnterpriseBudgetEnforcement" />
+                }
+                @if (OperationUsesActions)
+                {
+                    <BudgetCard Title="Actions budget"
+                                Id="actions-budget-settings"
+                                Highlighted="@IsBlockingCategory("actions-budget")"
+                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                Help="Controls additional GitHub Actions runner charges."
+                                @bind-Enabled="_form.UseActionsBudget"
+                                @bind-Limit="_form.ActionsBudgetLimit"
+                                @bind-Consumed="_form.ActionsBudgetConsumed"
+                                @bind-Enforcement="_form.ActionsBudgetEnforcement" />
+                }
+            </div>
+        }
 
         <div class="primary-actions">
             <button class="button primary" @onclick="ApplyAndRun">Apply overrides and simulate</button>
@@ -589,6 +624,24 @@
 
     private EngineConfiguration ActiveConfiguration => _activeConfiguration ?? DefaultConfiguration;
     private ICopilotUsageSimulationEngine ActiveEngine => _activeEngine ?? DefaultEngine;
+    private OperationDefinition? SelectedOperation => ActiveConfiguration.Operations.FirstOrDefault(
+        operation => string.Equals(operation.Id, _form.OperationId, StringComparison.OrdinalIgnoreCase));
+    private bool OperationConsumesAiCredits => SelectedOperation?.IsBilled == true;
+    private bool OperationUsesActions => SelectedOperation?.ActionsMetering != ActionsMeteringMode.None;
+    private bool OperationUsesRepositoryVisibility =>
+        SelectedOperation?.ActionsMetering == ActionsMeteringMode.PrivateRepositories;
+    private string OperationContext => SelectedOperation switch
+    {
+        null => "This operation is not present in the active catalog.",
+        { IsBilled: false } =>
+            "This operation does not consume AI credits. Token, billing, runtime, and spending controls are hidden and not evaluated.",
+        { ActionsMetering: ActionsMeteringMode.Always } =>
+            "This operation consumes AI credits and always uses GitHub Actions. Repository visibility does not change runner metering.",
+        { ActionsMetering: ActionsMeteringMode.PrivateRepositories } =>
+            "This operation consumes AI credits. GitHub Actions charges apply to private and internal repositories, so repository visibility is required.",
+        _ =>
+            "This operation consumes AI credits but does not use GitHub Actions. Runner and repository controls are hidden and not evaluated."
+    };
     private IEnumerable<AppliedGuardrail> VisibleGuardrails =>
         _result?.AppliedGuardrails.Where(ShouldShow) ?? [];
     private AppliedGuardrail? BlockingGuardrail =>
@@ -679,10 +732,15 @@
                         .ToArray()
                 };
             var economic = UpdateEconomic(scenario.EconomicGuardrails, attribution?.UserId);
-            var actionsUsage = scenario.ActionsUsage is null
+            var operationDefaults = OperationUsesActions
+                ? ExampleScenarioFactory.Create(ActiveConfiguration, _form.OperationId)
+                : null;
+            var sourceActionsUsage = scenario.ActionsUsage ?? operationDefaults?.ActionsUsage;
+            var actionsUsage = sourceActionsUsage is null
                 ? null
-                : scenario.ActionsUsage with { Minutes = _form.ActionsMinutes };
-            var actionsGuardrails = UpdateActionsGuardrails(scenario.ActionsGuardrails);
+                : sourceActionsUsage with { Minutes = _form.ActionsMinutes };
+            var actionsGuardrails = UpdateActionsGuardrails(
+                scenario.ActionsGuardrails ?? operationDefaults?.ActionsGuardrails);
             var runtimeGuardrails = UpdateRuntimeGuardrails(scenario.RuntimeGuardrails);
 
             scenario = scenario with

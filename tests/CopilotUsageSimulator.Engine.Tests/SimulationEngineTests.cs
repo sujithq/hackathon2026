@@ -1,4 +1,5 @@
 using CopilotUsageSimulator.Engine.Configuration;
+using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 
 namespace CopilotUsageSimulator.Engine.Tests;
@@ -264,6 +265,48 @@ public sealed class SimulationEngineTests
         Assert.Equal(SimulationDecision.Allowed, result.Decision);
         Assert.Empty(result.Calls);
         Assert.Equal(0m, result.Allocation.TotalCredits);
+    }
+
+    [Fact]
+    public void UnbilledOperationIgnoresBillingAndRuntimeGuardrails()
+    {
+        var scenario = Scenario(operation: "code-completion") with
+        {
+            BillingContext = new BillingContext
+            {
+                BillingEntityId = "enterprise-1",
+                CycleStart = CatalogDate.AddDays(-1),
+                CycleEnd = CatalogDate.AddDays(1)
+            },
+            RuntimeGuardrails = new RuntimeGuardrailSnapshot
+            {
+                MaximumDuration = TimeSpan.Zero,
+                RequestedDuration = TimeSpan.FromMinutes(1)
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+        Assert.Null(result.FirstFailingGate);
+        Assert.Empty(result.AppliedGuardrails);
+    }
+
+    [Fact]
+    public void UnbilledOperationStillEnforcesAccessGatesInFullMode()
+    {
+        var scenario = Scenario(operation: "code-completion") with
+        {
+            AccessGates = new Dictionary<string, AccessGateState>
+            {
+                ["network"] = new() { Passed = false, Reason = "Network unavailable." }
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("network", result.FirstFailingGate);
     }
 
     [Fact]

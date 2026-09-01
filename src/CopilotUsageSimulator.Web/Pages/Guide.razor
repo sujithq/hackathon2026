@@ -27,7 +27,8 @@
             </li>
             <li>
                 <strong>Set the expected workload.</strong>
-                Select the operation, plan, repository visibility, model, and estimated token counts.
+                Select the operation first. The form then shows only the model, token, repository,
+                Actions, runtime, and budget fields that the operation can use.
             </li>
             <li>
                 <strong>Apply enterprise overrides.</strong>
@@ -43,6 +44,21 @@
                 or a guardrail stops the next one.
             </li>
         </ol>
+    </section>
+
+    <section>
+        <h2>Operation-aware fields</h2>
+        <p>
+            The selected operation controls which guided settings appear. Unbilled operations hide and
+            ignore token, billing, runtime, ULB, and spending controls. Billed operations without Actions
+            hide runner and repository controls. Code review shows repository visibility because Actions
+            metering applies only to private and internal repositories; cloud agent always uses Actions.
+        </p>
+        <p>
+            Hidden values remain in the complete scenario JSON so changing operations does not erase your
+            configuration, but the engine does not evaluate values that are irrelevant to the selected operation.
+            The explanation beneath the operation selector summarizes the active behavior.
+        </p>
     </section>
 
     <section>

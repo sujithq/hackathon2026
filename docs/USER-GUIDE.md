@@ -6,9 +6,9 @@ The web app estimates whether an agent task can run under a given GitHub Copilot
 
 1. Choose **Cloud agent**, **Code review**, or **Chat** as a starting template.
 2. Describe the task the agent is expected to perform.
-3. Select the operation, plan, repository visibility, and model.
-4. Enter expected context, fresh input, cached input, cache-write, and output tokens.
-5. Override the cost center, consumed pool, ULB, paid usage, enterprise budget, and Actions minutes.
+3. Select the operation first. The guided form shows only settings that operation can use.
+4. For billed operations, select the model and enter expected context, fresh input, cached input, cache-write, and output tokens.
+5. Override the visible billing, ULB, budget, repository, and Actions settings as needed.
 6. Select **Apply overrides and simulate**.
 7. Review the decision, first failing check, cost estimate, attribution, remaining balances, and ordered guardrail checks.
 
@@ -17,6 +17,14 @@ Set **Repeat task** above one to run the same workload sequentially. Successful 
 Successful clicks on **Apply overrides and simulate** also advance the current working balances. Clicking it again continues from the previous result. Choose a template or load a saved/imported scenario to reset the starting state. A blocked, waiting, soft-stopped, or indeterminate run does not consume balances.
 
 The task description records intent; it does not automatically predict tokens. For uncertainty, save separate low, expected, and high workload scenarios.
+
+The operation definition in the active catalog drives field visibility. Unbilled operations
+hide and ignore token, billing, runtime, ULB, and spending controls. Billed operations that
+do not use Actions hide runner and repository controls. Code review shows repository
+visibility because Actions metering applies only to private and internal repositories, while
+cloud agent always uses Actions. Hidden values remain in the complete scenario JSON so
+switching operations does not erase configuration, but irrelevant values are not evaluated.
+The explanation beneath the operation selector summarizes the active behavior.
 
 **Cost-related checks only** is enabled by default. It evaluates and displays attribution,
 ULBs, included-credit controls and pools, paid usage, spending budgets, and Actions cost.
