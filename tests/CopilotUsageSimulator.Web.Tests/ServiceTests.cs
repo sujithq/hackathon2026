@@ -227,6 +227,40 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public void ScenarioEditorPatcherPreservesUnselectedAdvancedRecords()
+    {
+        var scenario = ExampleScenarioFactory.Create(_configuration, "cloud-agent");
+        var historicalBudget = new SpendingBudget
+        {
+            Id = "historical-budget",
+            Scope = SpendingBudgetScope.CostCenter,
+            ScopeId = "historical-cost-center",
+            LimitUsd = 99m,
+            ConsumedUsd = 12m,
+            EffectiveTo = scenario.Timestamp
+        };
+        scenario = scenario with
+        {
+            EconomicGuardrails = scenario.EconomicGuardrails! with
+            {
+                SpendingBudgets = [.. scenario.EconomicGuardrails.SpendingBudgets, historicalBudget]
+            }
+        };
+        var mapper = new ScenarioEditorMapper();
+        var state = mapper.MapFromScenario(scenario, _configuration);
+        state.Task = "Updated task";
+        state.PoolConsumed = 321m;
+
+        var patched = new ScenarioEditorPatcher(mapper)
+            .ApplyToScenario(scenario, state, _configuration);
+
+        Assert.Equal("Updated task", patched.Metadata["task"]);
+        Assert.Equal(321m, patched.EconomicGuardrails!.EnterprisePoolConsumedCredits);
+        Assert.Contains(patched.EconomicGuardrails.SpendingBudgets, budget =>
+            budget == historicalBudget);
+    }
+
+    [Fact]
     public void SimulationResultsStateClearsResultAndRunHistory()
     {
         var engine = new CopilotUsageSimulationEngine(_configuration);

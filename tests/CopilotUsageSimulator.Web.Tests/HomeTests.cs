@@ -23,7 +23,9 @@ public sealed class HomeTests : BunitContext
         Services.AddSingleton<SimulationSessionRunner>();
         Services.AddSingleton<ScenarioJson>();
         Services.AddSingleton<ScenarioEditorMapper>();
+        Services.AddSingleton<ScenarioEditorPatcher>();
         Services.AddScoped<BrowserScenarioPersistence>();
+        Services.AddScoped<HomePageModel>();
     }
 
     [Fact]
