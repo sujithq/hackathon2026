@@ -7,6 +7,7 @@ namespace CopilotUsageSimulator.Engine.Guardrails;
 public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration)
 {
     private static readonly decimal[] AlertThresholds = [75m, 90m, 100m];
+    private readonly EconomicGuardrailApplicabilityResolver _applicability = new();
 
     public EconomicGuardrailEvaluation Evaluate(
         SimulationScenario scenario,
@@ -34,11 +35,11 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         var poolEntitlement = CalculatePoolEntitlement(billing, scenario.Timestamp);
         if (poolEntitlement is null)
         {
-            var inventoryControl = ResolveIncludedControl(
+            var inventoryControl = _applicability.ResolveIncludedUsageControl(
                 snapshot,
-                attribution.CostCenterId,
+                attribution,
                 scenario.Timestamp);
-            var failingGate = inventoryControl is { IsAmbiguous: false, Control: not null } &&
+            var failingGate = inventoryControl is { IsAmbiguous: false, Value: not null } &&
                 CalculateCostCenterEntitlement(
                     billing,
                     attribution.CostCenterId!,
@@ -58,8 +59,11 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
 
         var poolRemaining = Math.Max(0m, poolEntitlement.Value - snapshot.EnterprisePoolConsumedCredits);
         var unchangedRemaining = new RemainingState { IncludedPoolCredits = poolRemaining };
-        var ulbResolution = ResolveUlb(snapshot, attribution, scenario.Timestamp);
-        if (ulbResolution.Outcome == GuardrailOutcome.Indeterminate)
+        var ulbResolution = _applicability.ResolveEffectiveUserLevelBudget(
+            snapshot,
+            attribution,
+            scenario.Timestamp);
+        if (ulbResolution.IsAmbiguous)
         {
             return EconomicGuardrailEvaluation.Stop(
                 SimulationDecision.Indeterminate,
@@ -67,13 +71,13 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                 applied,
                 alerts,
                 unchangedRemaining,
-                message: ulbResolution.Message);
+                message: "Multiple effective ULBs of the same precedence apply.");
         }
 
         EffectiveUserLevelBudgetResult? effectiveUlb = null;
-        if (ulbResolution.Budget is not null)
+        if (ulbResolution.Value is not null)
         {
-            var budget = ulbResolution.Budget;
+            var budget = ulbResolution.Value;
             var remaining = budget.LimitCredits - budget.ConsumedCredits;
             var blocked = requestedCredits > remaining;
             applied.Add(new AppliedGuardrail
@@ -122,7 +126,10 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         }
 
         var includedAvailable = poolRemaining;
-        var includedControl = ResolveIncludedControl(snapshot, attribution.CostCenterId, scenario.Timestamp);
+        var includedControl = _applicability.ResolveIncludedUsageControl(
+            snapshot,
+            attribution,
+            scenario.Timestamp);
         if (includedControl.IsAmbiguous)
         {
             return EconomicGuardrailEvaluation.Stop(
@@ -132,11 +139,11 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                 alerts,
                 unchangedRemaining,
                 effectiveUlb,
-                includedControl.Message);
+                "Multiple included-usage controls apply.");
         }
 
         decimal? controlRemaining = null;
-        if (includedControl.Control is not null)
+        if (includedControl.Value is not null)
         {
             var costCenterEntitlement = CalculateCostCenterEntitlement(
                 billing,
@@ -154,23 +161,23 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                     "The cost-center seat inventory contains an unknown plan allowance.");
             }
 
-            controlRemaining = Math.Max(0m, costCenterEntitlement.Value - includedControl.Control.ConsumedCredits);
+            controlRemaining = Math.Max(0m, costCenterEntitlement.Value - includedControl.Value.ConsumedCredits);
             unchangedRemaining = unchangedRemaining with
             {
                 IncludedUsageControlCredits = controlRemaining
             };
             includedAvailable = Math.Min(includedAvailable, controlRemaining.Value);
             var controlBlocks = requestedCredits > controlRemaining &&
-                includedControl.Control.OverflowBehavior == IncludedOverflowBehavior.Block;
+                includedControl.Value.OverflowBehavior == IncludedOverflowBehavior.Block;
             applied.Add(new AppliedGuardrail
             {
-                Id = includedControl.Control.Id,
+                Id = includedControl.Value.Id,
                 MetadataKey = GuardrailMetadataKeys.IncludedUsageControl,
                 Category = GuardrailCategories.IncludedUsageControl,
                 Enforcement = controlBlocks ? GuardrailEnforcement.HardStop : GuardrailEnforcement.ObserveOnly,
                 Outcome = controlBlocks ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
                 Limit = costCenterEntitlement,
-                ConsumedBefore = includedControl.Control.ConsumedCredits,
+                ConsumedBefore = includedControl.Value.ConsumedCredits,
                 Requested = requestedCredits,
                 RemainingAfter = controlBlocks
                     ? controlRemaining
@@ -183,7 +190,7 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             {
                 return EconomicGuardrailEvaluation.Stop(
                     SimulationDecision.Blocked,
-                    includedControl.Control.Id,
+                    includedControl.Value.Id,
                     applied,
                     alerts,
                     unchangedRemaining,
@@ -214,8 +221,12 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
 
         if (meteredCredits > 0)
         {
-            if (!Matches(snapshot.PaidUsage.ProductIds, scenario.ProductId) ||
-                !Matches(snapshot.PaidUsage.SkuIds, scenario.SkuId))
+            if (!EconomicGuardrailApplicabilityResolver.Matches(
+                    snapshot.PaidUsage.ProductIds,
+                    scenario.ProductId) ||
+                !EconomicGuardrailApplicabilityResolver.Matches(
+                    snapshot.PaidUsage.SkuIds,
+                    scenario.SkuId))
             {
                 return EconomicGuardrailEvaluation.Stop(
                     SimulationDecision.Blocked,
@@ -256,7 +267,12 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
 
         var applicableBudgets = meteredCredits == 0
             ? []
-            : ResolveSpendingBudgets(snapshot, attribution, scenario).ToArray();
+            : _applicability.ResolveSpendingBudgets(
+                snapshot,
+                attribution,
+                scenario.ProductId,
+                scenario.SkuId,
+                scenario.Timestamp);
         var budgetAlerts = new List<ThresholdEvent>();
         var budgetRemaining = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         SpendingBudget? blockingBudget = null;
@@ -366,64 +382,13 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             };
     }
 
-    private UlbResolution ResolveUlb(
-        EconomicGuardrailSnapshot snapshot,
-        AttributionResult attribution,
-        DateTimeOffset timestamp)
-    {
-        var matching = snapshot.UserLevelBudgets
-            .Where(x => IsEffective(x.EffectiveFrom, x.EffectiveTo, timestamp))
-            .Where(x => x.Kind switch
-            {
-                UserLevelBudgetKind.Individual =>
-                    string.Equals(x.TargetId, attribution.UserId, StringComparison.OrdinalIgnoreCase),
-                UserLevelBudgetKind.CostCenter =>
-                    attribution.CostCenterId is not null &&
-                    string.Equals(x.TargetId, attribution.CostCenterId, StringComparison.OrdinalIgnoreCase),
-                UserLevelBudgetKind.Universal => x.TargetId is null,
-                _ => false
-            })
-            .GroupBy(x => x.Kind)
-            .OrderByDescending(x => x.Key)
-            .FirstOrDefault();
-
-        if (matching is null)
-        {
-            return new UlbResolution(null, GuardrailOutcome.NotApplicable, "No ULB applies.");
-        }
-
-        var budgets = matching.ToArray();
-        return budgets.Length == 1
-            ? new UlbResolution(budgets[0], GuardrailOutcome.Passed, "Resolved the effective ULB.")
-            : new UlbResolution(null, GuardrailOutcome.Indeterminate, $"Multiple {matching.Key} ULBs apply.");
-    }
-
-    private IncludedControlResolution ResolveIncludedControl(
-        EconomicGuardrailSnapshot snapshot,
-        string? costCenterId,
-        DateTimeOffset timestamp)
-    {
-        if (costCenterId is null)
-        {
-            return new IncludedControlResolution(null, false, "No cost center applies.");
-        }
-
-        var controls = snapshot.IncludedUsageControls
-            .Where(x =>
-                string.Equals(x.CostCenterId, costCenterId, StringComparison.OrdinalIgnoreCase) &&
-                IsEffective(x.EffectiveFrom, x.EffectiveTo, timestamp))
-            .ToArray();
-        return controls.Length switch
-        {
-            0 => new IncludedControlResolution(null, false, "No included-usage control applies."),
-            1 => new IncludedControlResolution(controls[0], false, "Resolved included-usage control."),
-            _ => new IncludedControlResolution(null, true, "Multiple included-usage controls apply.")
-        };
-    }
-
     private decimal? CalculatePoolEntitlement(BillingContext billing, DateTimeOffset timestamp) =>
         SumSeatEntitlements(
-            billing.SeatAssignments.Where(x => IsEffective(x.EffectiveFrom, x.EffectiveTo, timestamp)));
+            billing.SeatAssignments.Where(x =>
+                EconomicGuardrailApplicabilityResolver.IsEffective(
+                    x.EffectiveFrom,
+                    x.EffectiveTo,
+                    timestamp)));
 
     private decimal? CalculateCostCenterEntitlement(
         BillingContext billing,
@@ -432,7 +397,10 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         SumSeatEntitlements(
             billing.SeatAssignments.Where(x =>
                 string.Equals(x.CostCenterId, costCenterId, StringComparison.OrdinalIgnoreCase) &&
-                IsEffective(x.EffectiveFrom, x.EffectiveTo, timestamp)));
+                EconomicGuardrailApplicabilityResolver.IsEffective(
+                    x.EffectiveFrom,
+                    x.EffectiveTo,
+                    timestamp)));
 
     private decimal? SumSeatEntitlements(IEnumerable<EffectiveSeatAssignment> seats)
     {
@@ -462,60 +430,6 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         return total;
     }
 
-    private IEnumerable<SpendingBudget> ResolveSpendingBudgets(
-        EconomicGuardrailSnapshot snapshot,
-        AttributionResult attribution,
-        SimulationScenario scenario)
-    {
-        var effective = snapshot.SpendingBudgets.Where(x =>
-            IsEffective(x.EffectiveFrom, x.EffectiveTo, scenario.Timestamp) &&
-            Matches(x.ProductIds, scenario.ProductId) &&
-            Matches(x.SkuIds, scenario.SkuId));
-
-        var narrowBudgets = Array.Empty<SpendingBudget>();
-        if (attribution.CostCenterId is not null)
-        {
-            narrowBudgets = effective.Where(x =>
-                x.Scope == SpendingBudgetScope.CostCenter &&
-                string.Equals(x.ScopeId, attribution.CostCenterId, StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-        }
-
-        if (narrowBudgets.Length == 0 && attribution.LicensingOrganizationId is not null)
-        {
-            narrowBudgets = effective.Where(x =>
-                x.Scope == SpendingBudgetScope.Organization &&
-                string.Equals(x.ScopeId, attribution.LicensingOrganizationId, StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-        }
-
-        foreach (var budget in narrowBudgets)
-        {
-            yield return budget;
-        }
-
-        var excluded = attribution.CostCenterId is not null &&
-            snapshot.EnterpriseBudgetExcludedCostCenterIds.Contains(
-                attribution.CostCenterId,
-                StringComparer.OrdinalIgnoreCase);
-        if (!excluded)
-        {
-            foreach (var budget in effective.Where(x => x.Scope == SpendingBudgetScope.Enterprise))
-            {
-                yield return budget;
-            }
-        }
-    }
-
-    private static bool Matches(IReadOnlySet<string> configured, string value) =>
-        configured.Count == 0 || configured.Contains(value, StringComparer.OrdinalIgnoreCase);
-
-    private static bool IsEffective(
-        DateTimeOffset from,
-        DateTimeOffset? to,
-        DateTimeOffset timestamp) =>
-        timestamp >= from && (to is null || timestamp < to);
-
     private static void AddAlerts(
         ICollection<ThresholdEvent> alerts,
         string id,
@@ -542,15 +456,6 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         }
     }
 
-    private sealed record UlbResolution(
-        UserLevelBudget? Budget,
-        GuardrailOutcome Outcome,
-        string Message);
-
-    private sealed record IncludedControlResolution(
-        CostCenterIncludedUsageControl? Control,
-        bool IsAmbiguous,
-        string Message);
 }
 
 public sealed record EconomicGuardrailEvaluation(

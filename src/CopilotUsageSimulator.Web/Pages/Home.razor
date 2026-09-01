@@ -1388,24 +1388,66 @@
         var costCenterId = directAssignmentIndex is null
             ? null
             : directAssignments[directAssignmentIndex.Value].CostCenterId;
-        var universalUlb = scenario.EconomicGuardrails?.UserLevelBudgets
-            .FirstOrDefault(x => x.Kind == UserLevelBudgetKind.Universal);
-        var costCenterUlb = scenario.EconomicGuardrails?.UserLevelBudgets
-            .FirstOrDefault(x =>
-                x.Kind == UserLevelBudgetKind.CostCenter &&
-                string.Equals(x.TargetId, costCenterId, StringComparison.OrdinalIgnoreCase));
-        var individualUlb = scenario.EconomicGuardrails?.UserLevelBudgets
-            .FirstOrDefault(x =>
-                x.Kind == UserLevelBudgetKind.Individual &&
-                string.Equals(x.TargetId, userId, StringComparison.OrdinalIgnoreCase));
-        var enterpriseBudget = scenario.EconomicGuardrails?.SpendingBudgets
-            .FirstOrDefault(x => x.Scope == SpendingBudgetScope.Enterprise);
-        var costCenterBudget = scenario.EconomicGuardrails?.SpendingBudgets
-            .FirstOrDefault(x => x.Scope == SpendingBudgetScope.CostCenter);
-        var organizationBudget = scenario.EconomicGuardrails?.SpendingBudgets
-            .FirstOrDefault(x => x.Scope == SpendingBudgetScope.Organization);
-        var includedControl = scenario.EconomicGuardrails?.IncludedUsageControls.FirstOrDefault();
+        var resolvedAttribution = scenario.Attribution is null
+            ? null
+            : new AttributionResolver().Resolve(scenario.Attribution, scenario.Timestamp);
+        costCenterId = resolvedAttribution?.Outcome == GuardrailOutcome.Passed
+            ? resolvedAttribution.CostCenterId
+            : costCenterId;
+        var applicability = new EconomicGuardrailApplicabilityResolver();
+        var economic = scenario.EconomicGuardrails;
+        var universalUlb = economic is null || resolvedAttribution is null
+            ? null
+            : applicability.ResolveUserLevelBudget(
+                economic,
+                resolvedAttribution,
+                UserLevelBudgetKind.Universal,
+                scenario.Timestamp).Value;
+        var costCenterUlb = economic is null || resolvedAttribution is null
+            ? null
+            : applicability.ResolveUserLevelBudget(
+                economic,
+                resolvedAttribution,
+                UserLevelBudgetKind.CostCenter,
+                scenario.Timestamp).Value;
+        var individualUlb = economic is null || resolvedAttribution is null
+            ? null
+            : applicability.ResolveUserLevelBudget(
+                economic,
+                resolvedAttribution,
+                UserLevelBudgetKind.Individual,
+                scenario.Timestamp).Value;
+        var includedControl = economic is null || resolvedAttribution is null
+            ? null
+            : applicability.ResolveIncludedUsageControl(
+                economic,
+                resolvedAttribution,
+                scenario.Timestamp).Value;
+        var spendingBudgets = economic is null || resolvedAttribution is null
+            ? []
+            : applicability.ResolveSpendingBudgets(
+                economic,
+                resolvedAttribution,
+                scenario.ProductId,
+                scenario.SkuId,
+                scenario.Timestamp);
+        var enterpriseBudget = EconomicGuardrailApplicabilityResolver.Select(
+            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.Enterprise)).Value;
+        var costCenterBudget = EconomicGuardrailApplicabilityResolver.Select(
+            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.CostCenter)).Value;
+        var organizationBudget = EconomicGuardrailApplicabilityResolver.Select(
+            spendingBudgets.Where(budget => budget.Scope == SpendingBudgetScope.Organization)).Value;
         var actionsBudget = scenario.ActionsGuardrails?.Budgets.FirstOrDefault();
+        var organizationId = resolvedAttribution?.LicensingOrganizationId ??
+            scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault();
+        var licensingOrganizationIndex = scenario.Attribution?.LicensingOrganizationIds
+            .Select((id, index) => new { id, index })
+            .Where(item => string.Equals(
+                item.id,
+                organizationId,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(item => (int?)item.index)
+            .FirstOrDefault();
         _form = new GuidedForm
         {
             Task = scenario.Metadata.GetValueOrDefault("task", ""),
@@ -1421,9 +1463,8 @@
             OutputTokens = call?.OutputTokens ?? 0,
             CostCenterId = costCenterId ?? "",
             DirectAssignmentIndex = directAssignmentIndex,
-            OrganizationId = scenario.Attribution?.LicensingOrganizationIds.FirstOrDefault() ?? "",
-            LicensingOrganizationIndex =
-                scenario.Attribution?.LicensingOrganizationIds.Count > 0 ? 0 : null,
+            OrganizationId = organizationId ?? "",
+            LicensingOrganizationIndex = licensingOrganizationIndex,
             PoolConsumed = scenario.EconomicGuardrails?.EnterprisePoolConsumedCredits ?? 0,
             UseUniversalUlb = universalUlb is not null,
             UniversalUlbId = universalUlb?.Id,

@@ -153,6 +153,19 @@ public sealed class HomeTests : BunitContext
             ProductIds = new HashSet<string> { "another-product" },
             EffectiveFrom = timestamp.AddDays(-20)
         };
+        var expiredBudget = primaryBudget with
+        {
+            Id = "expired-cost-center-budget",
+            LimitUsd = 10m,
+            EffectiveFrom = timestamp.AddDays(-20),
+            EffectiveTo = timestamp.AddDays(-10)
+        };
+        var mismatchedBudget = primaryBudget with
+        {
+            Id = "mismatched-cost-center-budget",
+            LimitUsd = 20m,
+            ProductIds = new HashSet<string> { "another-product" }
+        };
         var primaryControl = original.EconomicGuardrails.IncludedUsageControls.Single() with
         {
             Id = "custom-included-control",
@@ -165,6 +178,13 @@ public sealed class HomeTests : BunitContext
             CostCenterId = "cc-secondary",
             ConsumedCredits = 25m,
             EffectiveFrom = timestamp.AddDays(-20)
+        };
+        var expiredControl = primaryControl with
+        {
+            Id = "expired-included-control",
+            ConsumedCredits = 50m,
+            EffectiveFrom = timestamp.AddDays(-20),
+            EffectiveTo = timestamp.AddDays(-10)
         };
         var primaryUlb = original.EconomicGuardrails.UserLevelBudgets
             .Single(budget => budget.Kind == UserLevelBudgetKind.Individual) with
@@ -180,6 +200,13 @@ public sealed class HomeTests : BunitContext
             TargetId = "user-2",
             LimitCredits = 300m,
             EffectiveFrom = timestamp.AddDays(-20)
+        };
+        var expiredUlb = primaryUlb with
+        {
+            Id = "expired-individual-ulb",
+            LimitCredits = 50m,
+            EffectiveFrom = timestamp.AddDays(-20),
+            EffectiveTo = timestamp.AddDays(-10)
         };
         var primaryActionsBudget = original.ActionsGuardrails!.Budgets.Single() with
         {
@@ -197,6 +224,7 @@ public sealed class HomeTests : BunitContext
             Attribution = original.Attribution! with
             {
                 LicensingOrganizationIds = ["org-engineering", "org-secondary"],
+                CycleSelectedLicensingOrganizationId = "org-engineering",
                 DirectAssignments = [historicalAssignment, currentAssignment]
             },
             BillingContext = original.BillingContext with
@@ -212,16 +240,19 @@ public sealed class HomeTests : BunitContext
             {
                 SpendingBudgets =
                 [
+                    expiredBudget,
+                    mismatchedBudget,
                     primaryBudget,
                     extraBudget,
                     .. original.EconomicGuardrails.SpendingBudgets
                         .Where(budget => budget.Scope != SpendingBudgetScope.CostCenter)
                 ],
-                IncludedUsageControls = [primaryControl, extraControl],
+                IncludedUsageControls = [expiredControl, primaryControl, extraControl],
                 UserLevelBudgets =
                 [
                     .. original.EconomicGuardrails.UserLevelBudgets
                         .Where(budget => budget.Kind != UserLevelBudgetKind.Individual),
+                    expiredUlb,
                     primaryUlb,
                     extraUlb
                 ]
@@ -253,17 +284,26 @@ public sealed class HomeTests : BunitContext
         Assert.Equal(primaryBudget.EffectiveTo, updatedBudget.EffectiveTo);
         Assert.Equal(primaryBudget.TrackingStartedAt, updatedBudget.TrackingStartedAt);
         Assert.Contains(updated.EconomicGuardrails.SpendingBudgets, budget => budget.Id == extraBudget.Id);
+        Assert.Contains(updated.EconomicGuardrails.SpendingBudgets, budget =>
+            budget.Id == expiredBudget.Id && budget.LimitUsd == expiredBudget.LimitUsd);
+        Assert.Contains(updated.EconomicGuardrails.SpendingBudgets, budget =>
+            budget.Id == mismatchedBudget.Id && budget.LimitUsd == mismatchedBudget.LimitUsd);
         Assert.Contains(updated.EconomicGuardrails.IncludedUsageControls, control =>
             control.Id == primaryControl.Id &&
             control.EffectiveFrom == primaryControl.EffectiveFrom &&
             control.EffectiveTo == primaryControl.EffectiveTo);
         Assert.Contains(updated.EconomicGuardrails.IncludedUsageControls, control =>
             control.Id == extraControl.Id);
+        Assert.Contains(updated.EconomicGuardrails.IncludedUsageControls, control =>
+            control.Id == expiredControl.Id &&
+            control.ConsumedCredits == expiredControl.ConsumedCredits);
         Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget =>
             budget.Id == primaryUlb.Id &&
             budget.EffectiveFrom == primaryUlb.EffectiveFrom &&
             budget.EffectiveTo == primaryUlb.EffectiveTo);
         Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget => budget.Id == extraUlb.Id);
+        Assert.Contains(updated.EconomicGuardrails.UserLevelBudgets, budget =>
+            budget.Id == expiredUlb.Id && budget.LimitCredits == expiredUlb.LimitCredits);
         Assert.Contains(updated.ActionsGuardrails!.Budgets, budget => budget.Id == primaryActionsBudget.Id);
         Assert.Contains(updated.ActionsGuardrails.Budgets, budget => budget.Id == extraActionsBudget.Id);
         Assert.Equal(2, updated.Calls.Count);
