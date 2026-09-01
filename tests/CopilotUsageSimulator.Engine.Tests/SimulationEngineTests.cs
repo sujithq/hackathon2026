@@ -90,6 +90,73 @@ public sealed class SimulationEngineTests
     }
 
     [Fact]
+    public void UnknownActiveSeatPlanIsIndeterminateBeforeAnAccessFailure()
+    {
+        var scenario = Scenario(Call()) with
+        {
+            BillingContext = Scenario().BillingContext! with
+            {
+                SeatAssignments =
+                [
+                    new EffectiveSeatAssignment
+                    {
+                        UserId = "user-1",
+                        PlanId = "unknown-plan",
+                        CostCenterId = "cc-1"
+                    }
+                ]
+            },
+            AccessGates = new Dictionary<string, AccessGateState>
+            {
+                ["network"] = new() { Passed = false }
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
+        Assert.Equal("pool.seat-inventory", result.FirstFailingGate);
+        Assert.Empty(result.Calls);
+        Assert.Equal(0m, result.Remaining.IncludedPoolCredits);
+        Assert.Null(result.Remaining.ActionsIncludedMinutes);
+        Assert.Contains(
+            result.Explanation,
+            entry => entry.Code == "pool.seat-inventory");
+    }
+
+    [Fact]
+    public void OutOfCycleAccessFailureRetainsKnownPooledSeatBalanceWhenAnotherPlanIsUnknown()
+    {
+        var scenario = Scenario(Call()) with
+        {
+            Timestamp = CatalogDate.AddMonths(1),
+            BillingContext = Scenario().BillingContext! with
+            {
+                SeatAssignments =
+                [
+                    .. Scenario().BillingContext!.SeatAssignments,
+                    new EffectiveSeatAssignment
+                    {
+                        UserId = "user-2",
+                        PlanId = "unknown-plan",
+                        CostCenterId = "cc-1"
+                    }
+                ]
+            },
+            AccessGates = new Dictionary<string, AccessGateState>
+            {
+                ["network"] = new() { Passed = false }
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("network", result.FirstFailingGate);
+        Assert.Equal(1_900m, result.Remaining.IncludedPoolCredits);
+    }
+
+    [Fact]
     public void UsesCanonicalGateIdWhenStrictGateIsUnspecified()
     {
         var configuration = EngineConfigurationLoader.LoadDefault();

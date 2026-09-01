@@ -1,3 +1,5 @@
+using CopilotUsageSimulator.Engine.Guardrails;
+
 namespace CopilotUsageSimulator.Engine.Simulation;
 
 public sealed class SimulationSessionRunner
@@ -17,6 +19,7 @@ public sealed class SimulationSessionRunner
 
         var runs = new List<SimulationResult>();
         var current = scenario;
+        var balances = new EconomicBalanceCalculator(engine.Configuration);
         for (var iteration = 0; iteration < repeatCount; iteration++)
         {
             var result = engine.Simulate(current);
@@ -26,7 +29,7 @@ public sealed class SimulationSessionRunner
                 break;
             }
 
-            current = AdvanceScenario(current, result);
+            current = AdvanceScenario(current, result, balances);
         }
 
         return new SimulationSessionResult(runs, current);
@@ -34,41 +37,12 @@ public sealed class SimulationSessionRunner
 
     private static SimulationScenario AdvanceScenario(
         SimulationScenario scenario,
-        SimulationResult result)
+        SimulationResult result,
+        EconomicBalanceCalculator balances)
     {
-        var economic = scenario.EconomicGuardrails;
-        if (economic is not null)
-        {
-            economic = economic with
-            {
-                EnterprisePoolConsumedCredits =
-                    economic.EnterprisePoolConsumedCredits + result.Allocation.IncludedCredits,
-                UserLevelBudgets = economic.UserLevelBudgets
-                    .Select(budget => IdEquals(budget.Id, result.EffectiveUlb?.Id)
-                        ? budget with
-                        {
-                            ConsumedCredits = budget.ConsumedCredits + result.Allocation.TotalCredits
-                        }
-                        : budget)
-                    .ToArray(),
-                IncludedUsageControls = economic.IncludedUsageControls
-                    .Select(control => IdEquals(control.Id, result.Allocation.IncludedUsageControlId)
-                        ? control with
-                        {
-                            ConsumedCredits = control.ConsumedCredits + result.Allocation.IncludedCredits
-                        }
-                        : control)
-                    .ToArray(),
-                SpendingBudgets = economic.SpendingBudgets
-                    .Select(budget => ContainsId(result.Allocation.MeteredBudgetRemainingUsd, budget.Id)
-                        ? budget with
-                        {
-                            ConsumedUsd = budget.ConsumedUsd + result.Allocation.MeteredUsd
-                        }
-                        : budget)
-                    .ToArray()
-            };
-        }
+        var economic = scenario.EconomicGuardrails is null
+            ? null
+            : balances.ApplyAllocation(scenario.EconomicGuardrails, result);
 
         var runtime = scenario.RuntimeGuardrails;
         if (runtime is not null && scenario.CheckScope == SimulationCheckScope.All)
@@ -105,14 +79,6 @@ public sealed class SimulationSessionRunner
         };
     }
 
-    private static bool IdEquals(string? left, string? right) =>
-        left is not null && right is not null &&
-        string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-
-    private static bool ContainsId(
-        IReadOnlyDictionary<string, decimal> values,
-        string id) =>
-        values.Keys.Any(key => IdEquals(key, id));
 }
 
 public sealed record SimulationSessionResult(

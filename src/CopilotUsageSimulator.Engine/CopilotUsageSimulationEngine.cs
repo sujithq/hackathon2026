@@ -8,11 +8,15 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
 {
     private const decimal Million = 1_000_000m;
     private readonly EngineConfiguration _configuration;
+    private readonly EconomicBalanceCalculator _balances;
+    private readonly EconomicGuardrailEvaluator _economicEvaluator;
 
     public CopilotUsageSimulationEngine(EngineConfiguration configuration)
     {
         EngineConfigurationValidator.Validate(configuration);
         _configuration = configuration;
+        _balances = new EconomicBalanceCalculator(configuration);
+        _economicEvaluator = new EconomicGuardrailEvaluator(configuration, _balances);
     }
 
     public EngineConfiguration Configuration => _configuration;
@@ -22,14 +26,11 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         ArgumentNullException.ThrowIfNull(scenario);
         SimulationScenarioValidator.Validate(scenario);
 
-        var explanation = new List<ExplanationEntry>();
-        var assumptions = new List<string>();
-        var appliedGuardrails = new List<AppliedGuardrail>();
-        var alerts = new List<ThresholdEvent>();
+        var context = new SimulationPipelineContext(scenario, _balances);
+        var explanation = context.Explanation;
         var operation = Find(_configuration.Operations, scenario.OperationId, x => x.Id, "operation");
         _ = Find(_configuration.Plans, scenario.PlanId, x => x.Id, "plan");
         var costChecksOnly = scenario.CheckScope == SimulationCheckScope.CostRelatedOnly;
-        AttributionResult? attribution = null;
 
         if (operation.IsBilled)
         {
@@ -41,18 +42,35 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
                     "economic-context-required");
             }
 
-            attribution = new AttributionResolver().Resolve(scenario.Attribution, scenario.Timestamp);
-            explanation.Add(Entry("attribution", attribution.Rule.ToString(), attribution.Explanation));
-            if (attribution.Outcome == GuardrailOutcome.Indeterminate)
+            context.Attribution = new AttributionResolver().Resolve(
+                scenario.Attribution,
+                scenario.Timestamp);
+            explanation.Add(Entry(
+                "attribution",
+                context.Attribution.Rule.ToString(),
+                context.Attribution.Explanation));
+            if (context.Attribution.Outcome == GuardrailOutcome.Indeterminate)
             {
-                return new SimulationResult
+                return context.Complete(SimulationDecision.Indeterminate, "attribution");
+            }
+
+            if (scenario.Timestamp >= scenario.BillingContext.CycleStart &&
+                scenario.Timestamp < scenario.BillingContext.CycleEnd)
+            {
+                var inventoryFailure = _balances.FindSeatInventoryFailure(
+                    scenario,
+                    context.Attribution);
+                if (inventoryFailure is not null)
                 {
-                    Decision = SimulationDecision.Indeterminate,
-                    FirstFailingGate = "attribution",
-                    Attribution = attribution,
-                    Remaining = CreateUnchangedRemaining(scenario),
-                    Explanation = explanation
-                };
+                    context.Remaining = new RemainingState();
+                    explanation.Add(Entry(
+                        "guardrail",
+                        inventoryFailure.Value.GuardrailId,
+                        inventoryFailure.Value.Message));
+                    return context.Complete(
+                        SimulationDecision.Indeterminate,
+                        inventoryFailure.Value.GuardrailId);
+                }
             }
         }
 
@@ -60,18 +78,12 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         if (!costChecksOnly && operation.IsBilled)
         {
             var runtimePreflight = runtimeEvaluator.EvaluateBeforeCalls(scenario);
-            appliedGuardrails.AddRange(runtimePreflight.AppliedGuardrails);
+            context.AppliedGuardrails.AddRange(runtimePreflight.AppliedGuardrails);
             if (runtimePreflight.Decision != SimulationDecision.Allowed)
             {
-                return new SimulationResult
-                {
-                    Decision = runtimePreflight.Decision,
-                    FirstFailingGate = runtimePreflight.FailingGuardrailId,
-                    Attribution = attribution,
-                    AppliedGuardrails = appliedGuardrails,
-                    Remaining = CreateUnchangedRemaining(scenario),
-                    Explanation = explanation
-                };
+                return context.Complete(
+                    runtimePreflight.Decision,
+                    runtimePreflight.FailingGuardrailId);
             }
         }
 
@@ -80,115 +92,80 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         if (!costChecksOnly && requiresActions && scenario.ActionsGuardrails is not null)
         {
             var actionsAccess = actionsEvaluator.EvaluateAccess(scenario.ActionsGuardrails);
-            appliedGuardrails.AddRange(actionsAccess.AppliedGuardrails);
+            context.AppliedGuardrails.AddRange(actionsAccess.AppliedGuardrails);
             if (actionsAccess.Decision != SimulationDecision.Allowed)
             {
-                return new SimulationResult
-                {
-                    Decision = actionsAccess.Decision,
-                    FirstFailingGate = actionsAccess.FailingGuardrailId,
-                    Attribution = attribution,
-                    AppliedGuardrails = appliedGuardrails,
-                    Alerts = actionsAccess.Alerts,
-                    Remaining = CreateUnchangedRemaining(scenario),
-                    Explanation = explanation
-                };
+                context.Alerts.AddRange(actionsAccess.Alerts);
+                return context.Complete(
+                    actionsAccess.Decision,
+                    actionsAccess.FailingGuardrailId);
             }
         }
 
         var gateFailure = costChecksOnly ? null : EvaluateGates(operation, scenario, explanation);
         if (gateFailure is not null)
         {
-            return Blocked(
-                gateFailure.Value.GateId,
-                scenario,
-                explanation,
-                attribution,
-                appliedGuardrails);
+            return context.Complete(
+                SimulationDecision.Blocked,
+                gateFailure.Value.GateId);
         }
 
         if (!operation.IsBilled)
         {
             explanation.Add(Entry("usage", "unbilled-operation", $"Operation '{operation.Id}' does not consume AI credits."));
-            return new SimulationResult
-            {
-                Decision = SimulationDecision.Allowed,
-                Attribution = attribution,
-                AppliedGuardrails = appliedGuardrails,
-                Remaining = CreateUnchangedRemaining(scenario),
-                Explanation = explanation
-            };
+            return context.Complete(SimulationDecision.Allowed);
         }
 
         if (scenario.Calls.Count == 0)
         {
-            assumptions.Add("No model calls were supplied, so token cost could not be calculated.");
+            context.Assumptions.Add("No model calls were supplied, so token cost could not be calculated.");
             explanation.Add(Entry("usage", "missing-calls", "The billed operation has no model-call inputs."));
-            return new SimulationResult
-            {
-                Decision = SimulationDecision.PartiallySimulated,
-                Attribution = attribution,
-                AppliedGuardrails = appliedGuardrails,
-                Remaining = CreateUnchangedRemaining(scenario),
-                Assumptions = assumptions,
-                Explanation = explanation
-            };
+            return context.Complete(SimulationDecision.PartiallySimulated);
         }
 
-        var calls = scenario.Calls
+        context.Calls = scenario.Calls
             .Select((call, index) => CalculateCall(operation, scenario.Timestamp, call, index + 1, explanation))
             .ToArray();
-        var totalCredits = calls.Sum(x => x.Credits);
+        var totalCredits = context.Calls.Sum(x => x.Credits);
 
-        assumptions.Add("Fractional AI credits are retained because GitHub does not document billing rounding.");
+        context.Assumptions.Add("Fractional AI credits are retained because GitHub does not document billing rounding.");
         if (!costChecksOnly)
         {
             var runtimeCredits = runtimeEvaluator.EvaluateCredits(scenario.RuntimeGuardrails, totalCredits);
-            appliedGuardrails.AddRange(runtimeCredits.AppliedGuardrails);
+            context.AppliedGuardrails.AddRange(runtimeCredits.AppliedGuardrails);
             if (runtimeCredits.Decision == SimulationDecision.SoftStopped)
             {
-                return new SimulationResult
-                {
-                    Decision = SimulationDecision.SoftStopped,
-                    FirstFailingGate = runtimeCredits.FailingGuardrailId,
-                    Calls = calls,
-                    Attribution = attribution,
-                    AppliedGuardrails = appliedGuardrails,
-                    Remaining = CreateUnchangedRemaining(scenario),
-                    Assumptions = assumptions,
-                    Explanation = explanation
-                };
+                return context.Complete(
+                    SimulationDecision.SoftStopped,
+                    runtimeCredits.FailingGuardrailId);
             }
         }
 
-        var actionsUsage = CalculateActions(operation, scenario, explanation);
-        if (actionsUsage is not null && scenario.ActionsGuardrails is not null)
+        context.ActionsUsage = CalculateActions(operation, scenario, explanation);
+        if (context.ActionsUsage is not null && scenario.ActionsGuardrails is not null)
         {
-            var actionsBudget = actionsEvaluator.EvaluateBudgets(scenario.ActionsGuardrails, actionsUsage);
-            appliedGuardrails.AddRange(actionsBudget.AppliedGuardrails);
-            alerts.AddRange(actionsBudget.Alerts);
+            var actionsBudget = actionsEvaluator.EvaluateBudgets(
+                scenario.ActionsGuardrails,
+                context.ActionsUsage);
+            context.AppliedGuardrails.AddRange(actionsBudget.AppliedGuardrails);
+            context.Alerts.AddRange(actionsBudget.Alerts);
             if (actionsBudget.Decision != SimulationDecision.Allowed)
             {
-                return new SimulationResult
-                {
-                    Decision = actionsBudget.Decision,
-                    FirstFailingGate = actionsBudget.FailingGuardrailId,
-                    Calls = calls,
-                    ActionsUsage = actionsUsage,
-                    Attribution = attribution,
-                    AppliedGuardrails = appliedGuardrails,
-                    Alerts = alerts,
-                    Remaining = CreateUnchangedRemaining(scenario),
-                    Assumptions = assumptions,
-                    Explanation = explanation
-                };
+                return context.Complete(
+                    actionsBudget.Decision,
+                    actionsBudget.FailingGuardrailId);
             }
         }
 
-        var economicResult = new EconomicGuardrailEvaluator(_configuration)
-            .Evaluate(scenario, attribution!, totalCredits);
-        appliedGuardrails.AddRange(economicResult.AppliedGuardrails);
-        alerts.AddRange(economicResult.Alerts);
+        var economicResult = _economicEvaluator.Evaluate(
+            scenario,
+            context.Attribution!,
+            totalCredits);
+        context.AppliedGuardrails.AddRange(economicResult.AppliedGuardrails);
+        context.Alerts.AddRange(economicResult.Alerts);
+        context.Allocation = economicResult.Allocation;
+        context.EffectiveUlb = economicResult.EffectiveUlb;
+        context.Remaining = economicResult.Remaining;
         if (economicResult.Message is not null)
         {
             explanation.Add(Entry("guardrail", economicResult.FailingGuardrailId ?? "indeterminate", economicResult.Message));
@@ -196,50 +173,18 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
 
         if (economicResult.Decision != SimulationDecision.Allowed)
         {
-            return new SimulationResult
-            {
-                Decision = economicResult.Decision,
-                FirstFailingGate = economicResult.FailingGuardrailId,
-                Calls = calls,
-                Allocation = economicResult.Allocation,
-                Attribution = attribution,
-                EffectiveUlb = economicResult.EffectiveUlb,
-                AppliedGuardrails = appliedGuardrails,
-                Alerts = alerts,
-                Remaining = economicResult.Remaining,
-                Assumptions = assumptions,
-                Explanation = explanation
-            };
+            return context.Complete(
+                economicResult.Decision,
+                economicResult.FailingGuardrailId);
         }
 
-        var remaining = economicResult.Remaining with
-        {
-            ActionsIncludedMinutes = actionsUsage is null
-                ? null
-                : Math.Max(
-                    0m,
-                    (scenario.ActionsGuardrails is null
-                        ? scenario.ActionsUsage!.IncludedMinutesRemaining
-                        : scenario.ActionsGuardrails.IncludedMinutes -
-                          scenario.ActionsGuardrails.ConsumedIncludedMinutes) -
-                    actionsUsage.IncludedMinutes)
-        };
+        context.Remaining = _balances.ApplyActionsUsage(
+            economicResult.Remaining,
+            scenario,
+            context.ActionsUsage);
 
         explanation.Add(Entry("result", "allowed", "All access and budget checks passed."));
-        return new SimulationResult
-        {
-            Decision = SimulationDecision.Allowed,
-            Calls = calls,
-            Allocation = economicResult.Allocation,
-            ActionsUsage = actionsUsage,
-            Attribution = attribution,
-            EffectiveUlb = economicResult.EffectiveUlb,
-            AppliedGuardrails = appliedGuardrails,
-            Alerts = alerts,
-            Remaining = remaining,
-            Assumptions = assumptions,
-            Explanation = explanation
-        };
+        return context.Complete(SimulationDecision.Allowed);
     }
 
     private GateFailure? EvaluateGates(
@@ -384,55 +329,6 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
 
     private static bool Applies(IReadOnlySet<string> configuredIds, string actualId) =>
         configuredIds.Count == 0 || configuredIds.Contains(actualId, StringComparer.OrdinalIgnoreCase);
-
-    private SimulationResult Blocked(
-        string failingGate,
-        SimulationScenario scenario,
-        IReadOnlyList<ExplanationEntry> explanation,
-        AttributionResult? attribution = null,
-        IReadOnlyList<AppliedGuardrail>? appliedGuardrails = null)
-    {
-        return new SimulationResult
-        {
-            Decision = SimulationDecision.Blocked,
-            FirstFailingGate = failingGate,
-            Attribution = attribution,
-            AppliedGuardrails = appliedGuardrails ?? [],
-            Remaining = CreateUnchangedRemaining(scenario),
-            Explanation = explanation
-        };
-    }
-
-    private RemainingState CreateUnchangedRemaining(SimulationScenario scenario)
-    {
-        if (scenario.BillingContext is not null && scenario.EconomicGuardrails is not null)
-        {
-            var entitlement = scenario.BillingContext.SeatAssignments
-                .Where(x => scenario.Timestamp >= x.EffectiveFrom &&
-                    (x.EffectiveTo is null || scenario.Timestamp < x.EffectiveTo))
-                .Select(x => _configuration.Plans.SingleOrDefault(
-                    plan => string.Equals(plan.Id, x.PlanId, StringComparison.OrdinalIgnoreCase)))
-                .Where(plan => plan?.IsPooled == true)
-                .Sum(plan => plan!.IncludedCreditsPerUser ?? 0m);
-            return new RemainingState
-            {
-                IncludedPoolCredits = Math.Max(
-                    0m,
-                    entitlement - scenario.EconomicGuardrails.EnterprisePoolConsumedCredits),
-                ActionsIncludedMinutes = scenario.ActionsGuardrails is null
-                    ? scenario.ActionsUsage?.IncludedMinutesRemaining
-                    : Math.Max(
-                        0m,
-                        scenario.ActionsGuardrails.IncludedMinutes -
-                        scenario.ActionsGuardrails.ConsumedIncludedMinutes)
-            };
-        }
-
-        return new RemainingState
-        {
-            ActionsIncludedMinutes = scenario.ActionsUsage?.IncludedMinutesRemaining
-        };
-    }
 
     private static T Find<T>(
         IEnumerable<T> values,

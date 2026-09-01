@@ -4,7 +4,9 @@ using CopilotUsageSimulator.Engine.Simulation;
 
 namespace CopilotUsageSimulator.Engine.Guardrails;
 
-public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration)
+public sealed class EconomicGuardrailEvaluator(
+    EngineConfiguration configuration,
+    EconomicBalanceCalculator balances)
 {
     private static readonly decimal[] AlertThresholds = [75m, 90m, 100m];
     private readonly EconomicGuardrailApplicabilityResolver _applicability = new();
@@ -32,32 +34,22 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                 message: "The simulation timestamp is outside the supplied billing cycle.");
         }
 
-        var poolEntitlement = CalculatePoolEntitlement(billing, scenario.Timestamp);
-        if (poolEntitlement is null)
+        var poolEntitlement = balances.CalculatePoolEntitlement(billing, scenario.Timestamp);
+        if (!poolEntitlement.IsKnown)
         {
-            var inventoryControl = _applicability.ResolveIncludedUsageControl(
-                snapshot,
-                attribution,
-                scenario.Timestamp);
-            var failingGate = inventoryControl is { IsAmbiguous: false, Value: not null } &&
-                CalculateCostCenterEntitlement(
-                    billing,
-                    attribution.CostCenterId!,
-                    scenario.Timestamp) is null
-                    ? "included-control.seat-inventory"
-                    : "pool.seat-inventory";
+            var failure = balances.FindSeatInventoryFailure(scenario, attribution)!.Value;
             return EconomicGuardrailEvaluation.Stop(
                 SimulationDecision.Indeterminate,
-                failingGate,
+                failure.GuardrailId,
                 applied,
                 alerts,
                 new RemainingState(),
-                message: failingGate == "included-control.seat-inventory"
-                    ? "The cost-center seat inventory contains an unknown plan allowance."
-                    : "An active pooled seat references a plan with an unknown included-credit allowance.");
+                message: failure.Message);
         }
 
-        var poolRemaining = Math.Max(0m, poolEntitlement.Value - snapshot.EnterprisePoolConsumedCredits);
+        var poolRemaining = EconomicBalanceCalculator.Available(
+            poolEntitlement.Credits,
+            snapshot.EnterprisePoolConsumedCredits);
         var unchangedRemaining = new RemainingState { IncludedPoolCredits = poolRemaining };
         var ulbResolution = _applicability.ResolveEffectiveUserLevelBudget(
             snapshot,
@@ -78,7 +70,9 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         if (ulbResolution.Value is not null)
         {
             var budget = ulbResolution.Value;
-            var remaining = budget.LimitCredits - budget.ConsumedCredits;
+            var remaining = EconomicBalanceCalculator.Headroom(
+                budget.LimitCredits,
+                budget.ConsumedCredits);
             var blocked = requestedCredits > remaining;
             applied.Add(new AppliedGuardrail
             {
@@ -145,11 +139,11 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         decimal? controlRemaining = null;
         if (includedControl.Value is not null)
         {
-            var costCenterEntitlement = CalculateCostCenterEntitlement(
+            var costCenterEntitlement = balances.CalculateCostCenterEntitlement(
                 billing,
                 attribution.CostCenterId!,
                 scenario.Timestamp);
-            if (costCenterEntitlement is null)
+            if (!costCenterEntitlement.IsKnown)
             {
                 return EconomicGuardrailEvaluation.Stop(
                     SimulationDecision.Indeterminate,
@@ -161,7 +155,9 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                     "The cost-center seat inventory contains an unknown plan allowance.");
             }
 
-            controlRemaining = Math.Max(0m, costCenterEntitlement.Value - includedControl.Value.ConsumedCredits);
+            controlRemaining = EconomicBalanceCalculator.Available(
+                costCenterEntitlement.Credits,
+                includedControl.Value.ConsumedCredits);
             unchangedRemaining = unchangedRemaining with
             {
                 IncludedUsageControlCredits = controlRemaining
@@ -176,7 +172,7 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                 Category = GuardrailCategories.IncludedUsageControl,
                 Enforcement = controlBlocks ? GuardrailEnforcement.HardStop : GuardrailEnforcement.ObserveOnly,
                 Outcome = controlBlocks ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
-                Limit = costCenterEntitlement,
+                Limit = costCenterEntitlement.Credits,
                 ConsumedBefore = includedControl.Value.ConsumedCredits,
                 Requested = requestedCredits,
                 RemainingAfter = controlBlocks
@@ -212,7 +208,7 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             Category = GuardrailCategories.IncludedPool,
             Enforcement = GuardrailEnforcement.ObserveOnly,
             Outcome = GuardrailOutcome.Passed,
-            Limit = poolEntitlement,
+            Limit = poolEntitlement.Credits,
             ConsumedBefore = snapshot.EnterprisePoolConsumedCredits,
             Requested = includedCredits,
             RemainingAfter = poolRemaining - includedCredits,
@@ -280,7 +276,9 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
 
         foreach (var budget in applicableBudgets)
         {
-            var headroom = budget.LimitUsd - budget.ConsumedUsd;
+            var headroom = EconomicBalanceCalculator.Headroom(
+                budget.LimitUsd,
+                budget.ConsumedUsd);
             var remainingAfter = headroom - meteredUsd;
             var blocks = budget.Enforcement == GuardrailEnforcement.HardStop && meteredUsd > headroom;
             var outcome = blocks ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed;
@@ -381,54 +379,6 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
                     ? "Paid usage is authorized."
                     : "Paid usage is disabled."
             };
-    }
-
-    private decimal? CalculatePoolEntitlement(BillingContext billing, DateTimeOffset timestamp) =>
-        SumSeatEntitlements(
-            billing.SeatAssignments.Where(x =>
-                EconomicGuardrailApplicabilityResolver.IsEffective(
-                    x.EffectiveFrom,
-                    x.EffectiveTo,
-                    timestamp)));
-
-    private decimal? CalculateCostCenterEntitlement(
-        BillingContext billing,
-        string costCenterId,
-        DateTimeOffset timestamp) =>
-        SumSeatEntitlements(
-            billing.SeatAssignments.Where(x =>
-                string.Equals(x.CostCenterId, costCenterId, StringComparison.OrdinalIgnoreCase) &&
-                EconomicGuardrailApplicabilityResolver.IsEffective(
-                    x.EffectiveFrom,
-                    x.EffectiveTo,
-                    timestamp)));
-
-    private decimal? SumSeatEntitlements(IEnumerable<EffectiveSeatAssignment> seats)
-    {
-        var total = 0m;
-        foreach (var seat in seats)
-        {
-            var plan = configuration.Plans.SingleOrDefault(x =>
-                string.Equals(x.Id, seat.PlanId, StringComparison.OrdinalIgnoreCase));
-            if (plan is null)
-            {
-                return null;
-            }
-
-            if (!plan.IsPooled)
-            {
-                continue;
-            }
-
-            if (plan.IncludedCreditsPerUser is null)
-            {
-                return null;
-            }
-
-            total += plan.IncludedCreditsPerUser.Value;
-        }
-
-        return total;
     }
 
     private static void AddAlerts(
