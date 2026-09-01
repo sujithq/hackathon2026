@@ -126,6 +126,20 @@ public sealed class HomeTests : BunitContext
     }
 
     [Fact]
+    public void GuardrailRowsUseSharedCostClassification()
+    {
+        var cut = Render<Home>();
+        var rows = cut.FindAll(".check-list article");
+
+        Assert.Contains(rows, row =>
+            row.TextContent.Contains("included-pool", StringComparison.Ordinal) &&
+            row.TextContent.Contains("Cost related", StringComparison.Ordinal));
+        Assert.DoesNotContain(rows, row =>
+            row.TextContent.Contains("runtime", StringComparison.Ordinal) &&
+            row.TextContent.Contains("Cost related", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ChatTemplateHidesActionsSpecificInputs()
     {
         var cut = Render<Home>();

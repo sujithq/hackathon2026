@@ -1,4 +1,4 @@
-namespace CopilotUsageSimulator.Web.Services;
+namespace CopilotUsageSimulator.Common.Documentation;
 
 public static class GitHubDocumentationLinks
 {

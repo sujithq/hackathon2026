@@ -1,3 +1,4 @@
+using CopilotUsageSimulator.Common.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 
 namespace CopilotUsageSimulator.Engine.Guardrails;
@@ -33,7 +34,7 @@ public sealed class ActionsGuardrailEvaluator
         var alerts = new List<ThresholdEvent>();
 
         var stateResult = EvaluateState(
-            "actions.enabled",
+            GuardrailMetadataKeys.ActionsEnabled,
             "GitHub Actions",
             snapshot.ActionsEnabled,
             disabledDecision: SimulationDecision.Blocked);
@@ -44,7 +45,7 @@ public sealed class ActionsGuardrailEvaluator
         }
 
         stateResult = EvaluateState(
-            "actions.runner-available",
+            GuardrailMetadataKeys.ActionsRunnerAvailable,
             "Actions runner",
             snapshot.RunnerAvailable,
             disabledDecision: SimulationDecision.Blocked);
@@ -55,7 +56,7 @@ public sealed class ActionsGuardrailEvaluator
         }
 
         stateResult = EvaluateState(
-            "actions.workflow-approval",
+            GuardrailMetadataKeys.ActionsWorkflowApproval,
             "Workflow approval",
             snapshot.WorkflowApproved,
             disabledDecision: SimulationDecision.Waiting);
@@ -66,7 +67,7 @@ public sealed class ActionsGuardrailEvaluator
         }
 
         stateResult = EvaluateState(
-            "actions.repository-rules",
+            GuardrailMetadataKeys.ActionsRepositoryRules,
             "Repository rules",
             snapshot.RepositoryRulesPermitRun,
             disabledDecision: SimulationDecision.Blocked);
@@ -98,7 +99,8 @@ public sealed class ActionsGuardrailEvaluator
             applied.Add(new AppliedGuardrail
             {
                 Id = budget.Id,
-                Category = "actions-budget",
+                MetadataKey = GuardrailMetadataKeys.ActionsBudget,
+                Category = GuardrailCategories.ActionsBudget,
                 Enforcement = budget.Enforcement,
                 Outcome = blocks ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
                 Limit = budget.LimitUsd,
@@ -154,7 +156,8 @@ public sealed class ActionsGuardrailEvaluator
             new AppliedGuardrail
             {
                 Id = id,
-                Category = "actions-access",
+                MetadataKey = id,
+                Category = GuardrailCategories.ActionsAccess,
                 Enforcement = GuardrailEnforcement.HardStop,
                 Outcome = outcome,
                 Message = $"{label} is {value.ToString().ToLowerInvariant()}."

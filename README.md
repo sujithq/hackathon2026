@@ -8,8 +8,10 @@ The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Toke
 
 | Project | Purpose |
 |---|---|
+| `src/CopilotUsageSimulator.Common` | Shared guardrail metadata, stable identifiers, cost classification, and GitHub documentation links |
 | `src/CopilotUsageSimulator.Engine` | Pure simulation domain and JSON configuration loader |
 | `src/CopilotUsageSimulator.Web` | Standalone Blazor WebAssembly simulator for GitHub Pages |
+| `tests/CopilotUsageSimulator.Common.Tests` | Shared metadata contract and documentation-link tests |
 | `tests/CopilotUsageSimulator.Engine.Tests` | Contract and calculation tests |
 | `tests/CopilotUsageSimulator.Web.Tests` | bUnit component, guided-workflow, and serialization tests |
 
@@ -50,7 +52,7 @@ var result = engine.Simulate(new SimulationScenario
 Console.WriteLine($"{result.Decision}: {result.Allocation.TotalCredits} credits");
 ```
 
-`SimulationResult.Explanation` contains an ordered decision and calculation trace suitable for direct presentation. `FirstFailingGate` is a stable machine-readable identifier.
+`SimulationResult.Explanation` contains an ordered decision and calculation trace suitable for direct presentation. `FirstFailingGate` is a stable machine-readable identifier. Each applied guardrail carries a shared `MetadataKey`; hosts can resolve it through `GuardrailMetadataCatalog` for a consistent label, category, settings anchor, documentation link, unit, and cost classification.
 
 ## Configuration
 

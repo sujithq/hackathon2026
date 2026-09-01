@@ -1,3 +1,4 @@
+using CopilotUsageSimulator.Common.Guardrails;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Simulation;
 
@@ -78,7 +79,13 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             applied.Add(new AppliedGuardrail
             {
                 Id = budget.Id,
-                Category = "user-level-budget",
+                MetadataKey = budget.Kind switch
+                {
+                    UserLevelBudgetKind.Individual => GuardrailMetadataKeys.UlbIndividual,
+                    UserLevelBudgetKind.CostCenter => GuardrailMetadataKeys.UlbCostCenter,
+                    _ => GuardrailMetadataKeys.UlbUniversal
+                },
+                Category = GuardrailCategories.UserLevelBudget,
                 Enforcement = GuardrailEnforcement.HardStop,
                 Outcome = blocked ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
                 Limit = budget.LimitCredits,
@@ -158,7 +165,8 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             applied.Add(new AppliedGuardrail
             {
                 Id = includedControl.Control.Id,
-                Category = "included-usage-control",
+                MetadataKey = GuardrailMetadataKeys.IncludedUsageControl,
+                Category = GuardrailCategories.IncludedUsageControl,
                 Enforcement = controlBlocks ? GuardrailEnforcement.HardStop : GuardrailEnforcement.ObserveOnly,
                 Outcome = controlBlocks ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
                 Limit = costCenterEntitlement,
@@ -193,7 +201,8 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
         applied.Add(new AppliedGuardrail
         {
             Id = "enterprise-shared-pool",
-            Category = "included-pool",
+            MetadataKey = GuardrailMetadataKeys.IncludedPool,
+            Category = GuardrailCategories.IncludedPool,
             Enforcement = GuardrailEnforcement.ObserveOnly,
             Outcome = GuardrailOutcome.Passed,
             Limit = poolEntitlement,
@@ -262,7 +271,13 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             applied.Add(new AppliedGuardrail
             {
                 Id = budget.Id,
-                Category = "metered-spending-budget",
+                MetadataKey = budget.Scope switch
+                {
+                    SpendingBudgetScope.CostCenter => GuardrailMetadataKeys.MeteredBudgetCostCenter,
+                    SpendingBudgetScope.Organization => GuardrailMetadataKeys.MeteredBudgetOrganization,
+                    _ => GuardrailMetadataKeys.MeteredBudgetEnterprise
+                },
+                Category = GuardrailCategories.MeteredSpendingBudget,
                 Enforcement = budget.Enforcement,
                 Outcome = outcome,
                 Limit = budget.LimitUsd,
@@ -340,7 +355,8 @@ public sealed class EconomicGuardrailEvaluator(EngineConfiguration configuration
             new()
             {
                 Id = "paid-usage",
-                Category = "paid-usage-authorization",
+                MetadataKey = GuardrailMetadataKeys.PaidUsage,
+                Category = GuardrailCategories.PaidUsageAuthorization,
                 Enforcement = GuardrailEnforcement.HardStop,
                 Outcome = outcome,
                 Requested = meteredCredits,

@@ -183,13 +183,13 @@
                     </div>
                     <input @bind="_form.OrganizationId" />
                 </div>
-                <div id="pool-settings" class="@ImpactClass("included-pool")">
-                    <DecimalField Label="Pool consumed" DocsUrl="@GitHubDocumentationLinks.UsageBasedBilling" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
+                <div id="pool-settings" class="@ImpactClass(GuardrailCategories.IncludedPool)">
+                    <DecimalField Label="Pool consumed" DocsUrl="@Metadata(GuardrailMetadataKeys.IncludedPool).DocumentationUrl" DocsTopic="pooled AI credits" @bind-Value="_form.PoolConsumed" />
                 </div>
-                <div id="paid-usage-settings" class="field @ImpactClass("paid-usage-authorization")">
+                <div id="paid-usage-settings" class="field @ImpactClass(GuardrailCategories.PaidUsageAuthorization)">
                     <div class="field-label">
                         <label>Paid usage</label>
-                        <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="paid Copilot usage" />
+                        <DocsLink Url="@Metadata(GuardrailMetadataKeys.PaidUsage).DocumentationUrl" Topic="paid Copilot usage" />
                     </div>
                     <select @bind="_form.PaidUsage">
                         @foreach (var value in Enum.GetValues<GuardrailValue>())
@@ -212,11 +212,11 @@
                     <label class="setting-toggle">
                         <input type="checkbox" @bind="_form.UseUniversalUlb" />
                         <span>
-                            <strong>Universal ULB</strong>
+                            <strong>@Metadata(GuardrailMetadataKeys.UlbUniversal).Label</strong>
                             <small>Default per-user limit for every Copilot-licensed user.</small>
                         </span>
                     </label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="universal user-level budgets" />
+                    <DocsLink Url="@Metadata(GuardrailMetadataKeys.UlbUniversal).DocumentationUrl" Topic="universal user-level budgets" />
                 </div>
                 @if (_form.UseUniversalUlb)
                 {
@@ -232,11 +232,11 @@
                     <label class="setting-toggle">
                         <input type="checkbox" @bind="_form.UseCostCenterUlb" />
                         <span>
-                            <strong>Cost-center ULB</strong>
+                            <strong>@Metadata(GuardrailMetadataKeys.UlbCostCenter).Label</strong>
                             <small>Per-user default for the selected cost center; overrides the universal ULB.</small>
                         </span>
                     </label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="cost-center user-level budgets" />
+                    <DocsLink Url="@Metadata(GuardrailMetadataKeys.UlbCostCenter).DocumentationUrl" Topic="cost-center user-level budgets" />
                 </div>
                 @if (_form.UseCostCenterUlb)
                 {
@@ -252,11 +252,11 @@
                     <label class="setting-toggle">
                         <input type="checkbox" @bind="_form.UseIndividualUlb" />
                         <span>
-                            <strong>Individual ULB exception</strong>
+                            <strong>@Metadata(GuardrailMetadataKeys.UlbIndividual).Label exception</strong>
                             <small>Specific limit for the attributed user; overrides cost-center and universal ULBs.</small>
                         </span>
                     </label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="individual user-level budgets" />
+                    <DocsLink Url="@Metadata(GuardrailMetadataKeys.UlbIndividual).DocumentationUrl" Topic="individual user-level budgets" />
                 </div>
                 @if (_form.UseIndividualUlb)
                 {
@@ -267,16 +267,16 @@
                 }
             </section>
 
-            <section id="included-control-settings" class="setting-card @ImpactClass("included-usage-control")">
+            <section id="included-control-settings" class="setting-card @ImpactClass(GuardrailCategories.IncludedUsageControl)">
                 <div class="setting-header">
                     <label class="setting-toggle">
                         <input type="checkbox" @bind="_form.UseIncludedControl" />
                         <span>
-                            <strong>Cost-center included-usage control</strong>
+                            <strong>@Metadata(GuardrailMetadataKeys.IncludedUsageControl).Label</strong>
                             <small>Limit how the attributed cost center uses included credits.</small>
                         </span>
                     </label>
-                    <DocsLink Url="@GitHubDocumentationLinks.CopilotBudgets" Topic="included usage controls" />
+                    <DocsLink Url="@Metadata(GuardrailMetadataKeys.IncludedUsageControl).DocumentationUrl" Topic="included usage controls" />
                 </div>
                 @if (_form.UseIncludedControl)
                 {
@@ -300,7 +300,7 @@
         @if (!_form.CostChecksOnly && OperationConsumesAiCredits)
         {
             <h3 class="synced-heading">Runtime guardrails <span class="json-sync-badge">Scenario JSON</span></h3>
-            <section id="runtime-settings" class="setting-card @ImpactClass("runtime")">
+            <section id="runtime-settings" class="setting-card @ImpactClass(GuardrailCategories.Runtime)">
                 <label class="setting-toggle">
                     <input type="checkbox" @bind="_form.UseRuntimeGuardrails" />
                     <span>
@@ -360,28 +360,28 @@
             <div class="budget-grid">
                 @if (OperationConsumesAiCredits)
                 {
-                    <BudgetCard Title="Cost-center budget"
+                    <BudgetCard Title="@Metadata(GuardrailMetadataKeys.MeteredBudgetCostCenter).Label"
                                 Id="cost-center-budget-settings"
                                 Highlighted="@IsBlockingGate("budget-cost-center")"
-                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                DocsUrl="@Metadata(GuardrailMetadataKeys.MeteredBudgetCostCenter).DocumentationUrl"
                                 Help="Applies to metered usage attributed to this cost center."
                                 @bind-Enabled="_form.UseCostCenterBudget"
                                 @bind-Limit="_form.CostCenterBudgetLimit"
                                 @bind-Consumed="_form.CostCenterBudgetConsumed"
                                 @bind-Enforcement="_form.CostCenterBudgetEnforcement" />
-                    <BudgetCard Title="Organization budget"
+                    <BudgetCard Title="@Metadata(GuardrailMetadataKeys.MeteredBudgetOrganization).Label"
                                 Id="organization-budget-settings"
                                 Highlighted="@IsBlockingGate("budget-organization")"
-                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                DocsUrl="@Metadata(GuardrailMetadataKeys.MeteredBudgetOrganization).DocumentationUrl"
                                 Help="Used when organization-level metered spending is constrained."
                                 @bind-Enabled="_form.UseOrganizationBudget"
                                 @bind-Limit="_form.OrganizationBudgetLimit"
                                 @bind-Consumed="_form.OrganizationBudgetConsumed"
                                 @bind-Enforcement="_form.OrganizationBudgetEnforcement" />
-                    <BudgetCard Title="Enterprise budget"
+                    <BudgetCard Title="@Metadata(GuardrailMetadataKeys.MeteredBudgetEnterprise).Label"
                                 Id="enterprise-budget-settings"
                                 Highlighted="@IsBlockingGate("budget-enterprise")"
-                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                DocsUrl="@Metadata(GuardrailMetadataKeys.MeteredBudgetEnterprise).DocumentationUrl"
                                 Help="Applies across the enterprise unless the cost center is excluded."
                                 @bind-Enabled="_form.UseEnterpriseBudget"
                                 @bind-Limit="_form.EnterpriseBudgetLimit"
@@ -390,10 +390,10 @@
                 }
                 @if (OperationUsesActions)
                 {
-                    <BudgetCard Title="Actions budget"
+                    <BudgetCard Title="@Metadata(GuardrailMetadataKeys.ActionsBudget).Label"
                                 Id="actions-budget-settings"
-                                Highlighted="@IsBlockingCategory("actions-budget")"
-                                DocsUrl="@GitHubDocumentationLinks.MeteredBudgets"
+                                Highlighted="@IsBlockingCategory(GuardrailCategories.ActionsBudget)"
+                                DocsUrl="@Metadata(GuardrailMetadataKeys.ActionsBudget).DocumentationUrl"
                                 Help="Controls additional GitHub Actions runner charges."
                                 @bind-Enabled="_form.UseActionsBudget"
                                 @bind-Limit="_form.ActionsBudgetLimit"
@@ -412,7 +412,7 @@
         </p>
 
         <details id="scenario-json"
-                 class="advanced @ImpactClass("scenario-json")"
+                 class="advanced @ImpactClass(GuardrailMetadataCatalog.ScenarioJsonAnchor)"
                  open="@IsBlockingAdvancedSetting">
             <summary>
                 <span>Developer options: complete scenario JSON</span>
@@ -583,6 +583,10 @@
                             <div class="check-title">
                                 <strong>@guardrail.Id</strong>
                                 <span>@guardrail.Category</span>
+                                @if (ResolveMetadata(guardrail).IsCostRelated)
+                                {
+                                    <span class="cost-related-badge">Cost related</span>
+                                }
                                 <span class="outcome @StatusClass(guardrail.Outcome.ToString())">@guardrail.Outcome</span>
                             </div>
                             <p>@guardrail.Message</p>
@@ -1312,52 +1316,12 @@
     };
     private static string Format(decimal value) => value.ToString("0.####");
     private static string FormatNullable(decimal? value) => value?.ToString("0.####") ?? "—";
-    private string BlockingSourceLabel(AppliedGuardrail? guardrail) => guardrail?.Category switch
-    {
-        "runtime" => guardrail.Id switch
-        {
-            "runtime.duration" => "Agent runtime duration limit",
-            "runtime.model-calls" => "Agent model-call limit",
-            "runtime.subagent-depth" => "Agent subagent-depth limit",
-            "runtime.cli-soft-credits" => "CLI session credit limit",
-            _ => "Agent runtime limit"
-        },
-        "user-level-budget" => _result?.EffectiveUlb?.Kind switch
-        {
-            UserLevelBudgetKind.Individual => "Individual ULB",
-            UserLevelBudgetKind.CostCenter => "Cost-center ULB",
-            UserLevelBudgetKind.Universal => "Universal ULB",
-            _ => "User-level budget (ULB)"
-        },
-        "included-usage-control" => "Cost-center included-usage control",
-        "included-pool" => "Enterprise included-credit pool",
-        "metered-spending-budget" => "Metered spending budget",
-        "paid-usage-authorization" => "Paid-usage authorization",
-        "actions-budget" => "GitHub Actions spending budget",
-        "actions-access" => "GitHub Actions access policy",
-        _ => FriendlyGuardrailId(_result?.FirstFailingGate)
-    };
-    private static string BlockingScopeExplanation(AppliedGuardrail? guardrail) => guardrail?.Category switch
-    {
-        "runtime" => "This is an agent runtime guardrail, not a cost-center, ULB, or spending-budget block. Later economic checks were not reached.",
-        "user-level-budget" => "The effective ULB for this user stopped the run. Cost-center controls and spending budgets are separate, later checks.",
-        "included-usage-control" => "The attributed cost center stopped included-credit overflow. This is not an individual ULB.",
-        "included-pool" => "The enterprise shared included-credit pool could not cover the allocation.",
-        "metered-spending-budget" => "A hard-stop spending budget could not cover the metered charge. The check ID identifies the configured budget.",
-        "paid-usage-authorization" => "Included credits were insufficient and paid usage was unavailable or not authorized.",
-        "actions-budget" => "The GitHub Actions budget stopped the runner charge; Copilot AI-credit budgets are separate.",
-        "actions-access" => "A GitHub Actions access or approval policy stopped the run before economic guardrails.",
-        _ => "The first failing check below is the guardrail that stopped the simulation."
-    };
-    private static string BlockingUnit(AppliedGuardrail guardrail) => guardrail.Id switch
-    {
-        "runtime.duration" => "min",
-        "runtime.model-calls" => "calls",
-        "runtime.subagent-depth" => "levels",
-        _ when guardrail.Category is "metered-spending-budget" or "actions-budget" => "USD",
-        _ when guardrail.Category is "user-level-budget" or "included-usage-control" or "included-pool" => "credits",
-        _ => ""
-    };
+    private string BlockingSourceLabel(AppliedGuardrail? guardrail) =>
+        ResolveMetadata(guardrail).Label;
+    private string BlockingScopeExplanation(AppliedGuardrail? guardrail) =>
+        ResolveMetadata(guardrail).BlockingExplanation;
+    private string BlockingUnit(AppliedGuardrail guardrail) =>
+        ResolveMetadata(guardrail).Unit;
     private static string BlockingProjectionLabel(AppliedGuardrail guardrail) =>
         guardrail.RemainingAfter < 0 ? "Shortfall" : "Projected remaining";
     private static string FormatBlockingProjection(AppliedGuardrail guardrail) =>
@@ -1367,44 +1331,27 @@
     private bool IsBlockingGate(string gateId) =>
         string.Equals(_result?.FirstFailingGate, gateId, StringComparison.OrdinalIgnoreCase);
     private string UlbImpactClass(UserLevelBudgetKind kind) =>
-        IsBlockingCategory("user-level-budget") && _result?.EffectiveUlb?.Kind == kind
+        IsBlockingCategory(GuardrailCategories.UserLevelBudget) && _result?.EffectiveUlb?.Kind == kind
             ? "impacted-setting"
             : "";
     private string ImpactClass(string category) =>
         _result?.FirstFailingGate is null
             ? ""
-            : category == "scenario-json"
-                ? BlockingSettingsAnchor(BlockingGuardrail) == "scenario-json" ? "impacted-setting" : ""
+            : category == GuardrailMetadataCatalog.ScenarioJsonAnchor
+                ? BlockingSettingsAnchor(BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor ? "impacted-setting" : ""
                 : IsBlockingCategory(category) ? "impacted-setting" : "";
     private bool IsBlockingAdvancedSetting =>
         _result?.FirstFailingGate is not null &&
-        BlockingSettingsAnchor(BlockingGuardrail) == "scenario-json";
-    private string BlockingSettingsAnchor(AppliedGuardrail? guardrail) => guardrail?.Category switch
-    {
-        "runtime" => "runtime-settings",
-        "user-level-budget" => _result?.EffectiveUlb?.Kind switch
-        {
-            UserLevelBudgetKind.Individual => "individual-ulb-settings",
-            UserLevelBudgetKind.CostCenter => "cost-center-ulb-settings",
-            UserLevelBudgetKind.Universal => "universal-ulb-settings",
-            _ => "scenario-json"
-        },
-        "included-usage-control" => "included-control-settings",
-        "included-pool" => "pool-settings",
-        "paid-usage-authorization" => "paid-usage-settings",
-        "metered-spending-budget" when IsBlockingGate("budget-cost-center") =>
-            "cost-center-budget-settings",
-        "metered-spending-budget" when IsBlockingGate("budget-organization") =>
-            "organization-budget-settings",
-        "metered-spending-budget" when IsBlockingGate("budget-enterprise") =>
-            "enterprise-budget-settings",
-        "actions-budget" => "actions-budget-settings",
-        _ => "scenario-json"
-    };
-    private static string FriendlyGuardrailId(string? id) =>
-        string.IsNullOrWhiteSpace(id)
-            ? "Policy guardrail"
-            : id.Replace(".", " ").Replace("-", " ");
+        BlockingSettingsAnchor(BlockingGuardrail) == GuardrailMetadataCatalog.ScenarioJsonAnchor;
+    private string BlockingSettingsAnchor(AppliedGuardrail? guardrail) =>
+        ResolveMetadata(guardrail).SettingsAnchor;
+    private static GuardrailMetadata Metadata(string key) =>
+        GuardrailMetadataCatalog.Resolve(key);
+    private GuardrailMetadata ResolveMetadata(AppliedGuardrail? guardrail) =>
+        GuardrailMetadataCatalog.Resolve(
+            guardrail?.MetadataKey,
+            guardrail?.Id ?? _result?.FirstFailingGate,
+            guardrail?.Category);
     private static string Friendly(string value) =>
         string.Concat(value.Select((character, index) =>
             index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()));

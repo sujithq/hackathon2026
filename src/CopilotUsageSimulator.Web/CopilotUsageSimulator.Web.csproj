@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CopilotUsageSimulator.Common\CopilotUsageSimulator.Common.csproj" />
     <ProjectReference Include="..\CopilotUsageSimulator.Engine\CopilotUsageSimulator.Engine.csproj" />
   </ItemGroup>
 

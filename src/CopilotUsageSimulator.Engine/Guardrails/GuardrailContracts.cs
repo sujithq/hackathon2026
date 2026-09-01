@@ -1,3 +1,5 @@
+using CopilotUsageSimulator.Common.Guardrails;
+
 namespace CopilotUsageSimulator.Engine.Guardrails;
 
 public enum GuardrailValue
@@ -28,6 +30,7 @@ public enum GuardrailOutcome
 public sealed record AppliedGuardrail
 {
     public required string Id { get; init; }
+    public string MetadataKey { get; init; } = GuardrailMetadataKeys.Unknown;
     public required string Category { get; init; }
     public GuardrailEnforcement Enforcement { get; init; }
     public GuardrailOutcome Outcome { get; init; }

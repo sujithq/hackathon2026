@@ -1,3 +1,4 @@
+using CopilotUsageSimulator.Common.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 
 namespace CopilotUsageSimulator.Engine.Guardrails;
@@ -19,7 +20,7 @@ public sealed class RuntimeGuardrailEvaluator
             var remaining = snapshot.MaximumModelCalls.Value - snapshot.ModelCallsConsumed;
             var blocked = requestedCalls > remaining;
             applied.Add(Create(
-                "runtime.model-calls",
+                GuardrailMetadataKeys.RuntimeModelCalls,
                 blocked,
                 snapshot.MaximumModelCalls,
                 snapshot.ModelCallsConsumed,
@@ -28,7 +29,7 @@ public sealed class RuntimeGuardrailEvaluator
                 "model calls"));
             if (blocked)
             {
-                return RuntimeGuardrailEvaluation.Blocked("runtime.model-calls", applied);
+                return RuntimeGuardrailEvaluation.Blocked(GuardrailMetadataKeys.RuntimeModelCalls, applied);
             }
         }
 
@@ -36,7 +37,7 @@ public sealed class RuntimeGuardrailEvaluator
         {
             var blocked = snapshot.RequestedSubagentDepth > snapshot.MaximumSubagentDepth;
             applied.Add(Create(
-                "runtime.subagent-depth",
+                GuardrailMetadataKeys.RuntimeSubagentDepth,
                 blocked,
                 snapshot.MaximumSubagentDepth,
                 0,
@@ -45,7 +46,7 @@ public sealed class RuntimeGuardrailEvaluator
                 "subagent depth"));
             if (blocked)
             {
-                return RuntimeGuardrailEvaluation.Blocked("runtime.subagent-depth", applied);
+                return RuntimeGuardrailEvaluation.Blocked(GuardrailMetadataKeys.RuntimeSubagentDepth, applied);
             }
         }
 
@@ -56,7 +57,7 @@ public sealed class RuntimeGuardrailEvaluator
             var requested = (decimal)snapshot.RequestedDuration.TotalMinutes;
             var blocked = consumed + requested > limit;
             applied.Add(Create(
-                "runtime.duration",
+                GuardrailMetadataKeys.RuntimeDuration,
                 blocked,
                 limit,
                 consumed,
@@ -65,7 +66,7 @@ public sealed class RuntimeGuardrailEvaluator
                 "runtime duration"));
             if (blocked)
             {
-                return RuntimeGuardrailEvaluation.Blocked("runtime.duration", applied);
+                return RuntimeGuardrailEvaluation.Blocked(GuardrailMetadataKeys.RuntimeDuration, applied);
             }
         }
 
@@ -85,8 +86,9 @@ public sealed class RuntimeGuardrailEvaluator
         var stopped = requestedCredits > remaining;
         var guardrail = new AppliedGuardrail
         {
-            Id = "runtime.cli-soft-credits",
-            Category = "runtime",
+            Id = GuardrailMetadataKeys.RuntimeCliCredits,
+            MetadataKey = GuardrailMetadataKeys.RuntimeCliCredits,
+            Category = GuardrailCategories.Runtime,
             Enforcement = GuardrailEnforcement.SoftStop,
             Outcome = stopped ? GuardrailOutcome.SoftStopped : GuardrailOutcome.Passed,
             Limit = snapshot.CliSoftCreditLimit,
@@ -114,7 +116,8 @@ public sealed class RuntimeGuardrailEvaluator
         new()
         {
             Id = id,
-            Category = "runtime",
+            MetadataKey = id,
+            Category = GuardrailCategories.Runtime,
             Enforcement = GuardrailEnforcement.HardStop,
             Outcome = blocked ? GuardrailOutcome.Blocked : GuardrailOutcome.Passed,
             Limit = limit,
