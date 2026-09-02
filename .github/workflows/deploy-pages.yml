@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 11.0.100-preview.7.26381.103
+      - name: Test
+        run: dotnet test CopilotUsageSimulator.slnx --configuration Release
       - name: Configure repository base path
         id: pages-config
         shell: bash

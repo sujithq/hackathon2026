@@ -93,10 +93,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Low
 - Effort: Small
-- Evidence: [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) publishes the Web project without first running the solution tests.
+- Status: Resolved 2026-09-02
+- Original evidence: [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) published the Web project without first running the solution tests.
 - Impact: Engine, Common, or Web regressions can reach GitHub Pages whenever publish itself succeeds.
-- Recommended direction: Run the Release solution test suite before publish.
-- Planning acceptance: The deployment job must depend on a successful Release test step.
+- Resolution: The Pages build job now runs the Release solution test suite before configuring or publishing the Web project.
+- Verification: The workflow's test command passes all solution tests, and publish remains downstream in the same fail-fast job.
 
 ### F-10: Gap-analysis documentation presents superseded behavior as current
 
@@ -111,8 +112,7 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-09 | Add Release tests to Pages deployment | Low | Small |
-| 2 | F-10 | Mark or update stale gap matrices | Low | Small |
+| 1 | F-10 | Mark or update stale gap matrices | Low | Small |
 
 ## Planning Dependencies
 
