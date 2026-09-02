@@ -6,7 +6,10 @@ namespace CopilotUsageSimulator.Web.Services;
 
 public static class ExampleScenarioFactory
 {
-    public static SimulationScenario Create(EngineConfiguration configuration, string operationId)
+    public static SimulationScenario Create(
+        EngineConfiguration configuration,
+        string operationId,
+        ExampleScenarioVariant variant = ExampleScenarioVariant.Standard)
     {
         var timestamp = DateTimeOffset.UtcNow;
         var operation = configuration.Operations.SingleOrDefault(candidate =>
@@ -22,7 +25,7 @@ public static class ExampleScenarioFactory
             : ResolveRunner(configuration);
         var defaults = configuration.ExampleScenario;
 
-        return new SimulationScenario
+        var scenario = new SimulationScenario
         {
             OperationId = operation.Id,
             PlanId = plan.Id,
@@ -195,6 +198,118 @@ public static class ExampleScenarioFactory
                 }
                 : null
         };
+
+        if (variant == ExampleScenarioVariant.Standard)
+        {
+            return scenario;
+        }
+
+        if (!operation.IsBilled)
+        {
+            throw new ConfigurationException(
+                $"Unbilled example operation '{operation.Id}' cannot use a cost-blocked variant.");
+        }
+
+        var poolEntitlement = ResolveIncludedCredits(plan, timestamp) +
+            ResolveIncludedCredits(secondaryPlan, timestamp);
+        var meteredScenario = scenario with
+        {
+            EconomicGuardrails = scenario.EconomicGuardrails! with
+            {
+                EnterprisePoolConsumedCredits = poolEntitlement,
+                IncludedUsageControls = scenario.EconomicGuardrails.IncludedUsageControls
+                    .Select(control => control with
+                    {
+                        ConsumedCredits = poolEntitlement,
+                        OverflowBehavior = IncludedOverflowBehavior.PaidUsage
+                    })
+                    .ToArray()
+            }
+        };
+
+        return variant switch
+        {
+            ExampleScenarioVariant.UserLevelBudgetExceeded => scenario with
+            {
+                EconomicGuardrails = scenario.EconomicGuardrails! with
+                {
+                    UserLevelBudgets = scenario.EconomicGuardrails.UserLevelBudgets
+                        .Select(budget => budget.Kind == UserLevelBudgetKind.Individual &&
+                            string.Equals(budget.TargetId, "user-1", StringComparison.OrdinalIgnoreCase)
+                                ? budget with { ConsumedCredits = budget.LimitCredits }
+                                : budget)
+                        .ToArray()
+                }
+            },
+            ExampleScenarioVariant.IncludedUseOverflowProhibited => scenario with
+            {
+                EconomicGuardrails = scenario.EconomicGuardrails! with
+                {
+                    IncludedUsageControls = scenario.EconomicGuardrails.IncludedUsageControls
+                        .Select(control => control with
+                        {
+                            ConsumedCredits = poolEntitlement,
+                            OverflowBehavior = IncludedOverflowBehavior.Block
+                        })
+                        .ToArray()
+                }
+            },
+            ExampleScenarioVariant.PaidUsageNotApplicable => meteredScenario with
+            {
+                EconomicGuardrails = meteredScenario.EconomicGuardrails! with
+                {
+                    PaidUsage = meteredScenario.EconomicGuardrails.PaidUsage with
+                    {
+                        ProductIds = new HashSet<string> { "not-applicable-product" }
+                    }
+                }
+            },
+            ExampleScenarioVariant.PaidUsageDisabled => meteredScenario with
+            {
+                EconomicGuardrails = meteredScenario.EconomicGuardrails! with
+                {
+                    PaidUsage = meteredScenario.EconomicGuardrails.PaidUsage with
+                    {
+                        State = GuardrailValue.Disabled
+                    }
+                }
+            },
+            ExampleScenarioVariant.AiSpendingBudgetExceeded => meteredScenario with
+            {
+                EconomicGuardrails = meteredScenario.EconomicGuardrails! with
+                {
+                    SpendingBudgets = meteredScenario.EconomicGuardrails.SpendingBudgets
+                        .Select(budget => budget.Scope == SpendingBudgetScope.CostCenter
+                            ? budget with
+                            {
+                                ConsumedUsd = budget.LimitUsd,
+                                Enforcement = GuardrailEnforcement.HardStop
+                            }
+                            : budget)
+                        .ToArray()
+                }
+            },
+            ExampleScenarioVariant.ActionsSpendingBudgetExceeded when runner is not null && runner.UsdPerMinute > 0m =>
+                scenario with
+                {
+                    ActionsUsage = scenario.ActionsUsage! with { IncludedMinutesRemaining = 0m },
+                    ActionsGuardrails = scenario.ActionsGuardrails! with
+                    {
+                        IncludedMinutes = 0m,
+                        ConsumedIncludedMinutes = 0m,
+                        Budgets = scenario.ActionsGuardrails.Budgets
+                            .Select(budget => budget with
+                            {
+                                ConsumedUsd = budget.LimitUsd,
+                                Enforcement = GuardrailEnforcement.HardStop
+                            })
+                            .ToArray()
+                    }
+                },
+            ExampleScenarioVariant.ActionsSpendingBudgetExceeded => throw new ConfigurationException(
+                $"Example operation '{operation.Id}' cannot produce billable Actions usage."),
+            _ => throw new ArgumentOutOfRangeException(nameof(variant), variant, "Unknown example scenario variant.")
+        };
     }
 
     private static PlanDefinition ResolvePlan(
@@ -262,4 +377,22 @@ public static class ExampleScenarioFactory
             period.IncludedCreditsPerUser is not null &&
             period.EffectiveFrom <= timestamp &&
             (period.EffectiveTo is null || timestamp < period.EffectiveTo));
+
+    private static decimal ResolveIncludedCredits(PlanDefinition plan, DateTimeOffset timestamp) =>
+        plan.AllowancePeriods.Single(period =>
+            period.IncludedCreditsPerUser is not null &&
+            period.EffectiveFrom <= timestamp &&
+            (period.EffectiveTo is null || timestamp < period.EffectiveTo))
+            .IncludedCreditsPerUser!.Value;
+}
+
+public enum ExampleScenarioVariant
+{
+    Standard,
+    UserLevelBudgetExceeded,
+    IncludedUseOverflowProhibited,
+    PaidUsageNotApplicable,
+    PaidUsageDisabled,
+    AiSpendingBudgetExceeded,
+    ActionsSpendingBudgetExceeded
 }

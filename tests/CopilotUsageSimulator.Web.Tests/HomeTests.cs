@@ -427,6 +427,46 @@ public sealed class HomeTests : BunitContext
     }
 
     [Fact]
+    public void SixCostBlockedScenariosAreVisible()
+    {
+        var cut = Render<Home>();
+
+        var buttons = cut.FindAll(".cost-blocked-grid .template-cost-blocked");
+
+        Assert.Equal(6, buttons.Count);
+        Assert.Contains(buttons, button => button.TextContent.Contains("User-level budget exceeded"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("Included-use overflow prohibited"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("Paid usage not applicable"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("Paid usage disabled"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("AI spending budget exceeded"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("Actions spending budget exceeded"));
+    }
+
+    [Theory]
+    [InlineData(ExampleScenarioVariant.UserLevelBudgetExceeded, "ulb-user-1")]
+    [InlineData(ExampleScenarioVariant.IncludedUseOverflowProhibited, "included-cc-engineering")]
+    [InlineData(ExampleScenarioVariant.PaidUsageNotApplicable, "paid-usage.not-applicable")]
+    [InlineData(ExampleScenarioVariant.PaidUsageDisabled, "paid-usage")]
+    [InlineData(ExampleScenarioVariant.AiSpendingBudgetExceeded, "budget-cost-center")]
+    [InlineData(ExampleScenarioVariant.ActionsSpendingBudgetExceeded, "actions-enterprise")]
+    public void CostBlockedScenarioRemainsBlockedAfterApplyingOverrides(
+        ExampleScenarioVariant variant,
+        string expectedGate)
+    {
+        var cut = Render<Home>();
+
+        cut.Find($"button[data-cost-scenario='{variant}']").Click();
+
+        Assert.Contains("Blocked", cut.Find(".decision-banner").TextContent);
+        Assert.Contains(expectedGate, cut.Find(".decision-banner").TextContent);
+
+        FindButton(cut, "Apply overrides and simulate").Click();
+
+        Assert.Contains("Blocked", cut.Find(".decision-banner").TextContent);
+        Assert.Contains(expectedGate, cut.Find(".decision-banner").TextContent);
+    }
+
+    [Fact]
     public void ApplyingCatalogUsesCatalogDefinedPreferredTemplate()
     {
         var serializer = new ScenarioJson();
@@ -442,6 +482,7 @@ public sealed class HomeTests : BunitContext
                 new OperationDefinition
                 {
                     Id = "custom-operation",
+                    IsBilled = false,
                     ExampleLabel = "Custom operation",
                     ExampleTask = "Execute the custom operation."
                 }
@@ -455,6 +496,7 @@ public sealed class HomeTests : BunitContext
         FindButton(cut, "Apply catalog").Click();
 
         Assert.NotNull(FindButton(cut, "Custom operation"));
+        Assert.Empty(cut.FindAll(".cost-blocked-grid .template-cost-blocked"));
         Assert.Equal("custom-operation", cut.Find("#operation").GetAttribute("value"));
         Assert.Contains("Catalog", cut.Find(".message.success").TextContent);
     }

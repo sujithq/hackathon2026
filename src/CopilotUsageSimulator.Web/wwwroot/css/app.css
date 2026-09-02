@@ -81,9 +81,21 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .template-strip {
     display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
-    padding: .75rem 0 1.5rem; color: var(--muted); font-size: .85rem;
+    padding: .75rem 0; color: var(--muted); font-size: .85rem;
 }
 .template-strip button { padding: .4rem .7rem; font-size: .8rem; background: transparent; }
+.cost-blocked-templates { padding: .15rem 0 1.5rem; }
+.cost-blocked-heading { display: flex; align-items: center; gap: .55rem; margin-bottom: .6rem; color: var(--muted); font-size: .8rem; }
+.cost-blocked-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; max-width: 980px; }
+.cost-blocked-grid .template-cost-blocked {
+    min-height: 42px; padding: .5rem .7rem; color: #d8fbe3; font-size: .76rem; font-weight: 700;
+    text-align: left; border: 1px solid rgba(34,197,94,.52); border-radius: 8px; background: rgba(34,197,94,.08);
+}
+.cost-blocked-grid .template-cost-blocked:hover { border-color: #4ade80; background: rgba(34,197,94,.14); transform: translateY(-1px); }
+.template-cost-label {
+    color: #86efac; background: rgba(34,197,94,.13); border: 1px solid rgba(34,197,94,.35);
+    border-radius: 999px; padding: .08rem .35rem; font-size: .55rem; font-weight: 700; text-transform: uppercase;
+}
 
 .workspace { display: grid; grid-template-columns: minmax(460px, .88fr) minmax(560px, 1.12fr); gap: 1.25rem; align-items: start; }
 .panel {
@@ -257,6 +269,7 @@ textarea { resize: vertical; }
     .topnav a:first-child { display: none; }
     .guide-grid, .decision-reference { grid-template-columns: 1fr; }
     .budget-grid { grid-template-columns: 1fr; }
+    .cost-blocked-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 440px) {
     .form-grid, .form-grid.compact, .metrics, .summary-grid, .blocking-values { grid-template-columns: 1fr; }

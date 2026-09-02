@@ -46,6 +46,48 @@ public sealed class HomePageModel
         operation => string.Equals(operation.Id, Form.Workload.OperationId, StringComparison.OrdinalIgnoreCase));
     public IEnumerable<OperationDefinition> ExampleOperations =>
         ActiveConfiguration.Operations.Where(operation => !string.IsNullOrWhiteSpace(operation.ExampleLabel));
+    public IReadOnlyList<CostBlockedExample> CostBlockedExamples
+    {
+        get
+        {
+            var operation = ActiveConfiguration.Operations.FirstOrDefault(candidate =>
+                    candidate.IsBilled &&
+                    string.Equals(
+                        candidate.Id,
+                        ActiveConfiguration.ExampleScenario.PreferredOperationId,
+                        StringComparison.OrdinalIgnoreCase))
+                ?? ActiveConfiguration.Operations.FirstOrDefault(candidate =>
+                    candidate.IsBilled && !string.IsNullOrWhiteSpace(candidate.ExampleLabel));
+            if (operation is null)
+            {
+                return [];
+            }
+
+            var actionsOperation = operation.ActionsMetering != ActionsMeteringMode.None
+                ? operation
+                : ActiveConfiguration.Operations.FirstOrDefault(candidate =>
+                    candidate.IsBilled &&
+                    candidate.ActionsMetering != ActionsMeteringMode.None &&
+                    !string.IsNullOrWhiteSpace(candidate.ExampleLabel));
+            var examples = new List<CostBlockedExample>
+            {
+                new("User-level budget exceeded", operation.Id, ExampleScenarioVariant.UserLevelBudgetExceeded),
+                new("Included-use overflow prohibited", operation.Id, ExampleScenarioVariant.IncludedUseOverflowProhibited),
+                new("Paid usage not applicable", operation.Id, ExampleScenarioVariant.PaidUsageNotApplicable),
+                new("Paid usage disabled", operation.Id, ExampleScenarioVariant.PaidUsageDisabled),
+                new("AI spending budget exceeded", operation.Id, ExampleScenarioVariant.AiSpendingBudgetExceeded)
+            };
+            if (actionsOperation is not null)
+            {
+                examples.Add(new(
+                    "Actions spending budget exceeded",
+                    actionsOperation.Id,
+                    ExampleScenarioVariant.ActionsSpendingBudgetExceeded));
+            }
+
+            return examples;
+        }
+    }
     public bool OperationConsumesAiCredits => SelectedOperation?.IsBilled == true;
     public bool OperationUsesActions => SelectedOperation?.ActionsMetering != ActionsMeteringMode.None;
     public bool OperationUsesRepositoryVisibility =>
@@ -69,9 +111,11 @@ public sealed class HomePageModel
         LoadTemplate(InitialExampleOperationId);
     }
 
-    public void LoadTemplate(string template)
+    public void LoadTemplate(
+        string template,
+        ExampleScenarioVariant variant = ExampleScenarioVariant.Standard)
     {
-        var scenario = ExampleScenarioFactory.Create(ActiveConfiguration, template);
+        var scenario = ExampleScenarioFactory.Create(ActiveConfiguration, template, variant);
         ScenarioJsonText = scenarioJson.Serialize(scenario);
         LoadForm(scenario);
         RunScenario(scenario, advanceWorkingState: false);
@@ -333,3 +377,8 @@ public sealed class HomePageModel
         ScenarioEditorState Form,
         SimulationSessionResult Session);
 }
+
+public sealed record CostBlockedExample(
+    string Label,
+    string OperationId,
+    ExampleScenarioVariant Variant);

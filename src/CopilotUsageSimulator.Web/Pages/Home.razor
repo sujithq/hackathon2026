@@ -29,6 +29,28 @@
     }
 </section>
 
+@if (CostBlockedExamples.Count > 0)
+{
+    <section class="cost-blocked-templates" aria-label="Cost-blocked scenarios">
+        <div class="cost-blocked-heading">
+            <span>Cost-blocked scenarios</span>
+            <span class="template-cost-label">Cost related</span>
+        </div>
+        <div class="cost-blocked-grid">
+            @foreach (var example in CostBlockedExamples)
+            {
+                var operationId = example.OperationId;
+                var variant = example.Variant;
+                <button class="template-cost-blocked"
+                        data-cost-scenario="@variant"
+                        @onclick="@(() => LoadTemplate(operationId, variant))">
+                    @example.Label
+                </button>
+            }
+        </div>
+    </section>
+}
+
 @if (!string.IsNullOrWhiteSpace(_error))
 {
     <div class="message error"><strong>Simulation error</strong><span>@_error</span></div>
@@ -302,6 +324,7 @@
     private SimulationResultsState _results => PageModel.Results;
     private EngineConfiguration ActiveConfiguration => PageModel.ActiveConfiguration;
     private IEnumerable<OperationDefinition> ExampleOperations => PageModel.ExampleOperations;
+    private IReadOnlyList<CostBlockedExample> CostBlockedExamples => PageModel.CostBlockedExamples;
     private bool OperationConsumesAiCredits => PageModel.OperationConsumesAiCredits;
     private bool OperationUsesActions => PageModel.OperationUsesActions;
     private bool OperationUsesRepositoryVisibility => PageModel.OperationUsesRepositoryVisibility;
@@ -321,7 +344,10 @@
 
     protected override void OnInitialized() => PageModel.Initialize();
 
-    private void LoadTemplate(string template) => PageModel.LoadTemplate(template);
+    private void LoadTemplate(
+        string template,
+        ExampleScenarioVariant variant = ExampleScenarioVariant.Standard) =>
+        PageModel.LoadTemplate(template, variant);
     private void ApplyOverrides() => PageModel.ApplyOverrides();
     private void ApplyAndRun() => PageModel.ApplyAndRun();
     private void RunJson() => PageModel.RunJson();

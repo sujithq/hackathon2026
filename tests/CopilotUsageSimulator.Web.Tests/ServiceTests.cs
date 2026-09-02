@@ -34,6 +34,30 @@ public sealed class ServiceTests
         Assert.NotNull(scenario.EconomicGuardrails);
     }
 
+    [Theory]
+    [InlineData("chat", ExampleScenarioVariant.UserLevelBudgetExceeded, "ulb-user-1")]
+    [InlineData("chat", ExampleScenarioVariant.IncludedUseOverflowProhibited, "included-cc-engineering")]
+    [InlineData("chat", ExampleScenarioVariant.PaidUsageNotApplicable, "paid-usage.not-applicable")]
+    [InlineData("chat", ExampleScenarioVariant.PaidUsageDisabled, "paid-usage")]
+    [InlineData("chat", ExampleScenarioVariant.AiSpendingBudgetExceeded, "budget-cost-center")]
+    [InlineData("cloud-agent", ExampleScenarioVariant.ActionsSpendingBudgetExceeded, "actions-enterprise")]
+    public void CostBlockedTemplatesFailAtExpectedGate(
+        string template,
+        ExampleScenarioVariant variant,
+        string expectedGate)
+    {
+        var scenario = ExampleScenarioFactory.Create(
+            _configuration,
+            template,
+            variant);
+
+        var result = new CopilotUsageSimulationEngine(_configuration).Simulate(scenario);
+
+        Assert.Equal(SimulationCheckScope.CostRelatedOnly, scenario.CheckScope);
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal(expectedGate, result.FirstFailingGate);
+    }
+
     [Fact]
     public void CustomCatalogDerivesExampleReferencesWithoutKnownIds()
     {
@@ -112,6 +136,18 @@ public sealed class ServiceTests
         Assert.Equal("custom-runner", scenario.ActionsUsage?.RunnerId);
         Assert.Equal("Execute the custom operation.", scenario.Metadata["task"]);
         Assert.Equal(SimulationDecision.Allowed, result.Decision);
+
+        var unbilledConfiguration = configuration with
+        {
+            Operations =
+            [
+                configuration.Operations.Single() with { IsBilled = false }
+            ]
+        };
+        Assert.Throws<ConfigurationException>(() => ExampleScenarioFactory.Create(
+            unbilledConfiguration,
+            "custom-operation",
+            ExampleScenarioVariant.UserLevelBudgetExceeded));
     }
 
     [Fact]
