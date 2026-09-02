@@ -42,7 +42,7 @@ var result = engine.Simulate(new SimulationScenario
             FreshInputTokens = 10_000,
             CachedInputTokens = 15_000,
             OutputTokens = 2_000,
-            EnabledMultiplierIds = new HashSet<string> { "auto-model-selection" }
+            EnabledMultiplierIds = ["auto-model-selection"]
         }
     ],
     BillingContext = new BillingContext

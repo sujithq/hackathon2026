@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: Three findings open; ranked by severity below
+Status: Two findings open; ranked by severity below
 
 ## Review Principles
 
@@ -197,17 +197,15 @@ Status: Three findings open; ranked by severity below
 
 - Severity: Low
 - Effort: Small
-- Status: Open
-- Evidence: [`README.md`](../README.md) assigns `new HashSet<string>` to `ModelCallInput.EnabledMultiplierIds`, whose contract is `IReadOnlyList<string>`.
+- Status: Resolved 2026-09-02
+- Original evidence: [`README.md`](../README.md) assigned `new HashSet<string>` to `ModelCallInput.EnabledMultiplierIds`, whose contract is `IReadOnlyList<string>`.
 - Impact: Consumers copying the primary Engine sample receive a compile-time conversion error before they can evaluate the library.
-- Recommended direction: Use a collection expression or array in the sample and compile the documented snippet in a lightweight documentation test if samples continue to expand.
-- Planning acceptance: Update the sample and verify it compiles against the current public Engine contracts.
+- Resolution: The sample now uses an ordered collection expression compatible with `IReadOnlyList<string>`.
+- Verification: The complete README sample compiles against the current Engine project with zero warnings or errors.
 
 ## Low-Hanging Fruit
 
-| Rank | Finding | Severity | Effort | Why now |
-|---:|---|---|---|---|
-| 1 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
+No open findings currently qualify as low-hanging fruit.
 
 ## Planning Dependencies
 
@@ -217,8 +215,7 @@ Status: Three findings open; ranked by severity below
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
 - Resolve F-14 before relying on imported seat histories for historical entitlement or repeated-session state.
 - F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
-- F-19 is an independent low-risk change.
-- F-01 through F-13 and F-16 through F-18 are resolved.
+- F-01 through F-13 and F-16 through F-19 are resolved.
 
 ## Verification Baseline
 
