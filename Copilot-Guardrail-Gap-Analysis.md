@@ -1,7 +1,9 @@
 # GitHub Copilot Usage Simulator - Guardrail Gap Analysis
 
 **Analysis date:** 31 August 2026  
-**Status:** Pre-implementation review. No engine changes are authorized by this document.
+**Status:** Historical pre-implementation snapshot. No engine changes are authorized by this document.
+
+> This document records the engine state analyzed on 31 August 2026. Its capability statements and gap matrix are not the current implementation status. See [docs/MAINTAINABILITY-REVIEW.md](docs/MAINTAINABILITY-REVIEW.md) for current reviewed findings.
 
 This analysis compares:
 
@@ -210,9 +212,9 @@ The result should emit threshold events with evidence and confidence rather than
 | Individual additional-usage cap | Unpublished | Unknown value, not infinity |
 | IDE/enterprise BYOK AI-credit treatment | Unverified | Separate configured mode or indeterminate |
 
-## 5. Current engine gap matrix
+## 5. Engine gap matrix at analysis date
 
-| Capability | Current state | Gap |
+| Capability | State on 31 August 2026 | Gap identified on 31 August 2026 |
 |---|---|---|
 | Token pricing | Effective-dated models and context tiers | Add unknown/unpublished tier outcomes rather than only exceptions |
 | ULB precedence | Enum ordering chooses one supplied entry | No target identity, effective date, configured amount, consumption, or attribution binding |

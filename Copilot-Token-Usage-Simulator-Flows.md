@@ -467,11 +467,11 @@ flowchart LR
 13. Keep AI-credit and Actions budgets as separate meters even when one feature consumes both.
 14. Record the selected assumption for undocumented split allocation, rounding, and attribution behavior.
 
-## 9. Pre-implementation gap analysis
+## 9. Historical pre-implementation gap analysis
 
-This section is the implementation checkpoint. The engine should not be extended until these gaps are represented in its domain contract.
+> This section is a snapshot of the implementation checkpoint from 31 August 2026. It does not describe the current engine. See [docs/MAINTAINABILITY-REVIEW.md](docs/MAINTAINABILITY-REVIEW.md) for current reviewed findings.
 
-| Area | Current engine | Required adjustment |
+| Area | Engine state on 31 August 2026 | Adjustment identified on 31 August 2026 |
 |---|---|---|
 | ULB identity | Supports three enum values and one remaining-credit value | Add budget ID, user/cost-center target, configured limit, consumed amount, effective dates, cycle, and canonical precedence trace |
 | Multiple cost centers | One optional `CostCenterId` | Add direct assignment, enterprise-team and organization fallback resolution with effective dates |

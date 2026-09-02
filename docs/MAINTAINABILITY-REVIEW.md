@@ -103,16 +103,15 @@ Status: Findings captured for implementation planning
 
 - Severity: Low
 - Effort: Small
-- Evidence: [`Copilot-Guardrail-Gap-Analysis.md`](../Copilot-Guardrail-Gap-Analysis.md) and the pre-implementation matrix in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) describe behaviors that have since been implemented or changed.
+- Status: Resolved 2026-09-02
+- Original evidence: [`Copilot-Guardrail-Gap-Analysis.md`](../Copilot-Guardrail-Gap-Analysis.md) and the pre-implementation matrix in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) described behaviors that have since been implemented or changed.
 - Impact: Maintainers can design new work from an obsolete view of Engine capabilities.
-- Recommended direction: Refresh the matrices or clearly mark them as historical snapshots with dates.
-- Planning acceptance: Every claimed current gap must match the current Engine contract and tests.
+- Resolution: Both matrices are now explicitly labeled as historical snapshots of the Engine state on 31 August 2026 and link to this review for current findings.
+- Verification: Present-tense current-state matrix labels were removed from both historical documents.
 
 ## Low-Hanging Fruit
 
-| Order | Finding | Change | Severity | Effort |
-|---:|---|---|---|---|
-| 1 | F-10 | Mark or update stale gap matrices | Low | Small |
+All identified low-hanging findings are resolved.
 
 ## Planning Dependencies
 
@@ -120,7 +119,7 @@ Status: Findings captured for implementation planning
 - Design F-05 before changing terminal-path balance projections; it defines the shared client contract.
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
 - F-04 can proceed independently in Web after Engine input-validation expectations are fixed.
-- F-02, F-03, F-07, F-08, F-09, and F-10 can be planned as isolated changes.
+- F-02, F-03, F-07, F-08, F-09, and F-10 were resolved as isolated changes.
 
 ## Verification Baseline
 
