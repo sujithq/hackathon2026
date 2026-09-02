@@ -112,10 +112,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) checks uniqueness and references for plan, model, operation, gate, multiplier, Actions runner, and tier IDs without first requiring nonblank identifiers.
+- Status: Resolved 2026-09-02
+- Original evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) checked uniqueness and references for plan, model, operation, gate, multiplier, Actions runner, and tier IDs without first requiring nonblank identifiers.
 - Impact: A catalog can pass Engine construction while containing entities that valid scenarios cannot reference reliably.
-- Recommended direction: Require nonblank stable IDs before uniqueness and reference validation, including nested price-tier IDs.
-- Planning acceptance: Add focused programmatic and JSON catalog tests for every identifier-bearing configuration entity.
+- Resolution: Configuration validation now requires nonblank stable IDs before uniqueness and reference processing, including nested price-tier IDs.
+- Verification: Focused direct-validation and JSON-loader tests cover plans, models, operations, gates, multipliers, Actions runners, and tiers.
 
 ### F-09: Pages deployment has no test gate
 
@@ -141,8 +142,7 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-13 | Reject blank configuration IDs | Medium | Small |
-| 2 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
+| 1 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
 
 ## Planning Dependencies
 
@@ -151,8 +151,7 @@ Status: Findings captured for implementation planning
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
 - F-04 can proceed independently in Web after Engine input-validation expectations are fixed.
 - Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-13 can be resolved independently at the existing Engine configuration-validation boundary.
-- F-02, F-03, F-07, F-08, F-09, F-10, and F-12 were resolved as isolated changes.
+- F-02, F-03, F-07, F-08, F-09, F-10, F-12, and F-13 were resolved as isolated changes.
 
 ## Verification Baseline
 

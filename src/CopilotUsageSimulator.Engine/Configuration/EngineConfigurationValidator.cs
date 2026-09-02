@@ -26,6 +26,12 @@ public static class EngineConfigurationValidator
         RequireItems(configuration.Multipliers, "multipliers");
         RequireItems(configuration.ActionsRunners, "actionsRunners");
 
+        RequireIdentifiers(configuration.Plans.Select(x => x.Id), "plan");
+        RequireIdentifiers(configuration.Models.Select(x => x.Id), "model");
+        RequireIdentifiers(configuration.Operations.Select(x => x.Id), "operation");
+        RequireIdentifiers(configuration.Gates.Select(x => x.Id), "gate");
+        RequireIdentifiers(configuration.Multipliers.Select(x => x.Id), "multiplier");
+        RequireIdentifiers(configuration.ActionsRunners.Select(x => x.Id), "Actions runner");
         EnsureUnique(configuration.Plans.Select(x => x.Id), "plan");
         EnsureUnique(configuration.Models.Select(x => x.Id), "model");
         EnsureUnique(configuration.Operations.Select(x => x.Id), "operation");
@@ -127,6 +133,7 @@ public static class EngineConfigurationValidator
                     throw new ConfigurationException($"Model '{model.Id}' has a price period without tiers.");
                 }
 
+                RequireIdentifiers(period.Tiers.Select(x => x.Id), $"tier for model '{model.Id}'");
                 EnsureUnique(period.Tiers.Select(x => x.Id), $"tier for model '{model.Id}'");
                 var orderedTiers = period.Tiers
                     .OrderBy(x => x.MinimumContextTokensExclusive ?? long.MinValue)
@@ -174,6 +181,14 @@ public static class EngineConfigurationValidator
         for (var index = 0; index < values.Count; index++)
         {
             Require(values[index], $"{path}[{index}]");
+        }
+    }
+
+    private static void RequireIdentifiers(IEnumerable<string> values, string label)
+    {
+        if (values.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ConfigurationException($"{label} id cannot be empty.");
         }
     }
 
