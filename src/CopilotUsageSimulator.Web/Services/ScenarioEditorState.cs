@@ -57,6 +57,8 @@ public sealed class EconomicEditorState
     public decimal IncludedControlConsumed { get; set; }
     public IncludedOverflowBehavior IncludedOverflow { get; set; }
     public GuardrailValue PaidUsage { get; set; }
+    public string PaidUsageProductIds { get; set; } = "";
+    public string PaidUsageSkuIds { get; set; } = "";
     public bool UseCostCenterBudget { get; set; }
     public string? CostCenterBudgetId { get; set; }
     public decimal CostCenterBudgetLimit { get; set; }

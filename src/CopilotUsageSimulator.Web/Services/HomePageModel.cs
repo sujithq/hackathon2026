@@ -77,7 +77,7 @@ public sealed class HomePageModel
             {
                 new("User-level budget exceeded", operation.Id, ExampleScenarioVariant.UserLevelBudgetExceeded),
                 new("Included-use overflow prohibited", operation.Id, ExampleScenarioVariant.IncludedUseOverflowProhibited),
-                new("Paid usage not applicable", operation.Id, ExampleScenarioVariant.PaidUsageNotApplicable),
+                new("Paid usage not authorized for GitHub Copilot", operation.Id, ExampleScenarioVariant.PaidUsageNotApplicable),
                 new("Paid usage disabled", operation.Id, ExampleScenarioVariant.PaidUsageDisabled),
                 new("AI spending budget exceeded", operation.Id, ExampleScenarioVariant.AiSpendingBudgetExceeded)
             };

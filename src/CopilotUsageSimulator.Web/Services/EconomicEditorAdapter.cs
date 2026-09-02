@@ -74,6 +74,8 @@ public sealed class EconomicEditorAdapter
             IncludedControlConsumed = includedControl?.ConsumedCredits ?? 0,
             IncludedOverflow = includedControl?.OverflowBehavior ?? IncludedOverflowBehavior.PaidUsage,
             PaidUsage = economic?.PaidUsage.State ?? GuardrailValue.Unknown,
+            PaidUsageProductIds = FormatApplicabilityIds(economic?.PaidUsage.ProductIds),
+            PaidUsageSkuIds = FormatApplicabilityIds(economic?.PaidUsage.SkuIds),
             UseCostCenterBudget = costCenterBudget is not null,
             CostCenterBudgetId = costCenterBudget?.Id,
             CostCenterBudgetLimit = costCenterBudget?.LimitUsd ?? 0,
@@ -247,7 +249,12 @@ public sealed class EconomicEditorAdapter
         return economic with
         {
             EnterprisePoolConsumedCredits = state.PoolConsumed,
-            PaidUsage = economic.PaidUsage with { State = state.PaidUsage },
+            PaidUsage = economic.PaidUsage with
+            {
+                State = state.PaidUsage,
+                ProductIds = ParseApplicabilityIds(state.PaidUsageProductIds),
+                SkuIds = ParseApplicabilityIds(state.PaidUsageSkuIds)
+            },
             SpendingBudgets = budgets,
             UserLevelBudgets = ulbs,
             IncludedUsageControls = includedControls
@@ -335,4 +342,11 @@ public sealed class EconomicEditorAdapter
             "budget-enterprise",
             budget => budget.Id);
     }
+
+    private static string FormatApplicabilityIds(IReadOnlySet<string>? values) =>
+        values is null ? "" : string.Join(", ", values.Order(StringComparer.OrdinalIgnoreCase));
+
+    private static IReadOnlySet<string> ParseApplicabilityIds(string values) =>
+        values.Split([',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 }

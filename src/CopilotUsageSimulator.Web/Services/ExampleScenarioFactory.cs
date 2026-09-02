@@ -260,7 +260,7 @@ public static class ExampleScenarioFactory
                 {
                     PaidUsage = meteredScenario.EconomicGuardrails.PaidUsage with
                     {
-                        ProductIds = new HashSet<string> { "not-applicable-product" }
+                        ProductIds = new HashSet<string> { "github-actions" }
                     }
                 }
             },

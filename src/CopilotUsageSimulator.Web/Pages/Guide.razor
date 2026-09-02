@@ -100,7 +100,8 @@
                 <tr><td>Pool consumed</td><td>AI credits already consumed from the enterprise included pool.</td></tr>
                 <tr><td>ULB limit</td><td>Maximum AI credits available to the selected individual ULB.</td></tr>
                 <tr><td>ULB consumed</td><td>Credits already consumed under that ULB.</td></tr>
-                <tr><td>Paid usage</td><td>Whether metered usage is allowed after included credits are exhausted.</td></tr>
+                <tr><td>AI credits paid usage policy</td><td>Whether Copilot metered usage is allowed after included credits are exhausted. <a href="@GitHubDocumentationLinks.UsageBasedBilling" target="_blank" rel="noopener noreferrer">GitHub Docs</a></td></tr>
+                <tr><td>Authorized product and SKU IDs</td><td>Simulator applicability scope. Empty lists allow every value; otherwise the scenario product and SKU must match. GitHub documents product-level and SKU-level scopes for budgets. <a href="@GitHubDocumentationLinks.MeteredBudgets" target="_blank" rel="noopener noreferrer">GitHub Docs</a></td></tr>
                 <tr><td>Enterprise budget</td><td>Enterprise metered-usage spending limit and amount already spent.</td></tr>
             </tbody>
         </table>
@@ -108,6 +109,16 @@
             Leave <strong>Cost center</strong> blank to simulate enterprise-only attribution.
             Cost-center ULBs, included-usage controls, and spending budgets will not apply;
             applicable organization and enterprise constraints are still evaluated.
+        </p>
+        <p>
+            The <strong>Paid usage not authorized for GitHub Copilot</strong> starter requests
+            <code>github-copilot</code> while its simulated authorization scope contains only
+            <code>github-actions</code>. This demonstrates the
+            <code>economicGuardrails.paidUsage.productIds</code> rule and stops at
+            <code>paid-usage.not-applicable</code>. GitHub's real paid-usage control is the
+            <strong>AI credits paid usage</strong> policy; the product and SKU allow-lists are
+            simulator inputs, modeled after GitHub's documented budget scopes rather than a
+            literal paid-usage policy setting.
         </p>
     </section>
 

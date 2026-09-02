@@ -436,7 +436,7 @@ public sealed class HomeTests : BunitContext
         Assert.Equal(6, buttons.Count);
         Assert.Contains(buttons, button => button.TextContent.Contains("User-level budget exceeded"));
         Assert.Contains(buttons, button => button.TextContent.Contains("Included-use overflow prohibited"));
-        Assert.Contains(buttons, button => button.TextContent.Contains("Paid usage not applicable"));
+        Assert.Contains(buttons, button => button.TextContent.Contains("Paid usage not authorized for GitHub Copilot"));
         Assert.Contains(buttons, button => button.TextContent.Contains("Paid usage disabled"));
         Assert.Contains(buttons, button => button.TextContent.Contains("AI spending budget exceeded"));
         Assert.Contains(buttons, button => button.TextContent.Contains("Actions spending budget exceeded"));
@@ -471,6 +471,27 @@ public sealed class HomeTests : BunitContext
 
         Assert.Contains("Template defaults", cut.Find(".scenario-state").TextContent);
         Assert.DoesNotContain("customized", cut.Find(".scenario-state").ClassList);
+    }
+
+    [Fact]
+    public void PaidUsageApplicabilityCanBeConfiguredInGuidedFields()
+    {
+        var cut = Render<Home>();
+        cut.Find("button[data-cost-scenario='PaidUsageNotApplicable']").Click();
+
+        Assert.Equal("github-actions", cut.Find("#paid-usage-products").GetAttribute("value"));
+
+        cut.Find("#paid-usage-products").Change("github-copilot");
+        FindButton(cut, "Apply overrides and simulate").Click();
+
+        Assert.Contains("Allowed", cut.Find(".decision-banner").TextContent);
+
+        cut.Find("#paid-usage-products").Change("github-actions");
+        FindButton(cut, "Apply overrides and simulate").Click();
+
+        Assert.Contains("Blocked", cut.Find(".decision-banner").TextContent);
+        Assert.Contains("paid-usage.not-applicable", cut.Find(".decision-banner").TextContent);
+        Assert.Equal(2, cut.FindAll(".paid-usage-scope .docs-link").Count);
     }
 
     [Theory]

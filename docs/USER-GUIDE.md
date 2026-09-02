@@ -35,6 +35,10 @@ To simulate without a cost center, clear the **Cost center** field. The user is 
 
 Optional guardrails are configured with plain-language cards. Universal, cost-center, and individual ULBs can be configured independently. The most specific applicable ULB wins: **Individual → Cost center → Universal**. This lets an individual ULB act as a higher or lower exception to the broader defaults. Turn off a switch to omit that control from the simulation. Each enabled budget exposes its limit, current spending, and stop/alert behavior.
 
+The **AI credits paid usage policy** field represents GitHub's documented control for allowing Copilot overage after included AI credits are exhausted. See [Usage-based billing for organizations and enterprises](https://docs.github.com/en/copilot/concepts/billing/usage-based-billing-for-organizations-and-enterprises#what-happens-if-i-exceed-my-included-ai-credits).
+
+The guided **Authorized product IDs** and **Authorized SKU IDs** fields configure simulator applicability at `economicGuardrails.paidUsage.productIds` and `economicGuardrails.paidUsage.skuIds`. Enter comma-separated IDs; an empty field applies to all values. The **Paid usage not authorized for GitHub Copilot** starter requests `github-copilot` while authorizing only `github-actions`, so it stops at `paid-usage.not-applicable`. These allow-lists are simulator inputs, not a literal GitHub paid-usage policy setting. They model product/SKU scope using the same concepts GitHub documents for [Product-level, SKU-level, and Bundled AI credits budgets](https://docs.github.com/en/billing/how-tos/set-up-budgets#creating-a-budget).
+
 ## Result decisions
 
 | Decision | Meaning |
@@ -93,7 +97,7 @@ Most simulations do not require JSON. The optional complete scenario JSON editor
 - direct, team, and organization cost-center attribution;
 - individual, cost-center, and universal ULBs;
 - included pool consumption and cost-center included-usage controls;
-- paid-usage authorization and product/SKU applicability;
+- paid-usage policy and guided product/SKU applicability;
 - cost-center, organization, and enterprise spending budgets;
 - enterprise budget exclusions;
 - runtime call, depth, duration, and CLI credit limits;

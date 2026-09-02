@@ -132,10 +132,13 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .step { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .form-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.field { display: grid; gap: .35rem; }
+.field { display: grid; gap: .35rem; min-width: 0; }
+.field > input, .field > select, .field > textarea { min-width: 0; max-width: 100%; }
 .field.full { margin-bottom: .9rem; }
 .field label { font-size: .78rem; font-weight: 700; color: #cdd6e9; }
 .field-label, .setting-header { display: flex; align-items: center; justify-content: space-between; gap: .55rem; }
+.paid-usage-scope { grid-column: 1 / -1; }
+.paid-usage-scope .field-label { align-items: flex-start; flex-wrap: wrap; }
 .setting-header { align-items: flex-start; }
 .setting-header .setting-toggle { flex: 1; }
 .docs-link { flex: 0 0 auto; color: #a5b4fc; font-size: .68rem; font-weight: 700; letter-spacing: 0; text-decoration: none; text-transform: none; white-space: nowrap; }

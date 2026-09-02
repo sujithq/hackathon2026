@@ -223,8 +223,8 @@
                 </div>
                 <div id="paid-usage-settings" class="field @ImpactClass(GuardrailCategories.PaidUsageAuthorization)">
                     <div class="field-label">
-                        <label>Paid usage</label>
-                        <DocsLink Url="@Metadata(GuardrailMetadataKeys.PaidUsage).DocumentationUrl" Topic="paid Copilot usage" />
+                        <label>AI credits paid usage policy</label>
+                        <DocsLink Url="@GitHubDocumentationLinks.UsageBasedBilling" Topic="AI credits paid usage policy" />
                     </div>
                     <select @bind="_form.Economic.PaidUsage">
                         @foreach (var value in Enum.GetValues<GuardrailValue>())
@@ -232,6 +232,26 @@
                             <option value="@value">@value</option>
                         }
                     </select>
+                </div>
+                <div class="field paid-usage-scope">
+                    <div class="field-label">
+                        <label for="paid-usage-products">Authorized product IDs <span class="json-sync-badge">Scenario JSON</span></label>
+                        <DocsLink Url="@GitHubDocumentationLinks.MeteredBudgets" Topic="product-level and SKU-level budget scopes" />
+                    </div>
+                    <input id="paid-usage-products"
+                           placeholder="Empty allows all products"
+                           @bind="_form.Economic.PaidUsageProductIds" />
+                    <small>Simulator authorization scope. Path: economicGuardrails.paidUsage.productIds</small>
+                </div>
+                <div class="field paid-usage-scope">
+                    <div class="field-label">
+                        <label for="paid-usage-skus">Authorized SKU IDs <span class="json-sync-badge">Scenario JSON</span></label>
+                        <DocsLink Url="@GitHubDocumentationLinks.MeteredBudgets" Topic="product-level and SKU-level budget scopes" />
+                    </div>
+                    <input id="paid-usage-skus"
+                           placeholder="Empty allows all SKUs"
+                           @bind="_form.Economic.PaidUsageSkuIds" />
+                    <small>Comma-separated; empty means unrestricted. Path: economicGuardrails.paidUsage.skuIds</small>
                 </div>
             </div>
 
