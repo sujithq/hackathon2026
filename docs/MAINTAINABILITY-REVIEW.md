@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: All findings resolved
+Status: Five findings open; ranked by severity below
 
 ## Review Principles
 
@@ -123,6 +123,46 @@ Status: All findings resolved
 - Resolution: Configuration validation now requires nonblank stable IDs before uniqueness and reference processing, including nested price-tier IDs.
 - Verification: Focused direct-validation and JSON-loader tests cover plans, models, operations, gates, multipliers, Actions runners, and tiers.
 
+### F-14: Overlapping effective seats inflate shared entitlement
+
+- Severity: Medium
+- Effort: Small to medium
+- Status: Open
+- Evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validates each seat period independently but does not reject overlapping periods for the same user. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) sums every effective pooled seat when deriving enterprise and cost-center entitlement.
+- Impact: Two effective pooled seats for one non-attributed user are counted as two licensed seats. This can overstate included-credit headroom and allow usage that should be metered or blocked. The attributed user is protected by F-01 ambiguity handling, but other pool members are not.
+- Recommended direction: Reject overlapping seat-assignment periods per user, case-insensitively, at scenario validation. Preserve adjacent exclusive-end periods as valid.
+- Planning acceptance: Add exact-boundary, partial-overlap, open-ended-overlap, case-insensitive user, distinct-user, and non-overlapping-history tests, plus an Engine regression proving pool and cost-center entitlement cannot double-count one user.
+
+### F-15: Browser save can persist a mixed state
+
+- Severity: Medium
+- Effort: Medium
+- Status: Open
+- Evidence: [`BrowserScenarioPersistence.cs`](../src/CopilotUsageSimulator.Web/Services/BrowserScenarioPersistence.cs) writes scenario, catalog, and preferences to three independent local-storage keys in sequence.
+- Impact: If the second or third write fails because storage is unavailable or full, the browser retains a new scenario with an old catalog or preferences. The next load can reject the mismatched state or restore behavior different from what the user saved.
+- Recommended direction: Serialize the complete browser state into one versioned envelope and commit it with one `localStorage.setItem` call.
+- Planning acceptance: Add persistence tests for successful round trips and simulated write failure, asserting that failed saves leave the previously committed envelope intact.
+
+### F-16: The Pages build job receives deployment credentials
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved 2026-09-02
+- Original evidence: [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) granted `pages: write` and `id-token: write` at workflow scope, so checkout, restore, test, publish, and artifact preparation inherited permissions needed only by deployment.
+- Impact: Build scripts and restored tooling execute with unnecessary ability to request an OIDC token and write Pages deployment state, increasing supply-chain blast radius.
+- Resolution: Workflow-level permissions now grant only `contents: read`. The deploy job alone receives `pages: write` and `id-token: write`, while retaining read access for the pinned deployment action.
+- Verification: YAML validation confirms the build job inherits only read-only contents permission, the deploy job has the two required deployment permissions, and every action remains pinned to a full commit SHA.
+
+### F-17: Empty required catalogs pass configuration validation
+
+- Severity: Medium
+- Effort: Small
+- Status: Open
+- Evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) rejects null collection items but does not require `Plans` or `Operations` to contain an item. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) nevertheless requires every scenario to resolve both an operation and a plan.
+- Impact: Engine construction succeeds for a configuration that cannot simulate any scenario, moving a catalog contract failure to every later request.
+- Recommended direction: Require at least one plan and one operation during configuration validation. Keep models, runners, gates, and multipliers optional because valid operation sets may not use them.
+- Planning acceptance: Add direct-validator and JSON-loader tests for empty plans and operations, while retaining coverage that optional collections may be empty when references remain valid.
+
 ### F-09: Pages deployment has no test gate
 
 - Severity: Low
@@ -143,9 +183,33 @@ Status: All findings resolved
 - Resolution: Both matrices are now explicitly labeled as historical snapshots of the Engine state on 31 August 2026 and link to this review for current findings.
 - Verification: Present-tense current-state matrix labels were removed from both historical documents.
 
+### F-18: README reverses the current budget phase order
+
+- Severity: Low
+- Effort: Small
+- Status: Open
+- Evidence: [`README.md`](../README.md) says Actions access and spending are evaluated before AI-credit allocation. After F-02, Actions access preflight remains early, economic guardrails and allocation run next, and the Actions spending budget runs only after economic approval.
+- Impact: Integrators can reproduce the superseded sequence and report the wrong first failing constraint when both economic and Actions budgets fail.
+- Recommended direction: Describe access preflight and the two spending meters separately, matching the canonical flow and current Engine order.
+- Planning acceptance: Align the README wording with the F-02 regression and [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md).
+
+### F-19: README usage sample does not compile
+
+- Severity: Low
+- Effort: Small
+- Status: Open
+- Evidence: [`README.md`](../README.md) assigns `new HashSet<string>` to `ModelCallInput.EnabledMultiplierIds`, whose contract is `IReadOnlyList<string>`.
+- Impact: Consumers copying the primary Engine sample receive a compile-time conversion error before they can evaluate the library.
+- Recommended direction: Use a collection expression or array in the sample and compile the documented snippet in a lightweight documentation test if samples continue to expand.
+- Planning acceptance: Update the sample and verify it compiles against the current public Engine contracts.
+
 ## Low-Hanging Fruit
 
-No findings remain open.
+| Rank | Finding | Severity | Effort | Why now |
+|---:|---|---|---|---|
+| 1 | F-17: Reject empty plan and operation catalogs | Medium | Small | Closes a configuration boundary with two focused checks and tests. |
+| 2 | F-18: Correct README budget ordering | Low | Small | Prevents new clients from implementing superseded sequencing. |
+| 3 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
 
 ## Planning Dependencies
 
@@ -153,7 +217,10 @@ No findings remain open.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
-- F-01 through F-13 are resolved.
+- Resolve F-14 before relying on imported seat histories for historical entitlement or repeated-session state.
+- F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
+- F-17, F-18, and F-19 are independent low-risk changes.
+- F-01 through F-13 and F-16 are resolved.
 
 ## Verification Baseline
 
@@ -166,6 +233,8 @@ Initial review baseline:
 
 Current implementation baseline:
 
+- Worktree was clean before this review-ledger update.
 - Release tests passed: 202 total.
 - Release build succeeded with zero warnings and errors.
+- No vulnerable or deprecated direct or transitive NuGet packages were reported.
 - `git diff --check` passed.
