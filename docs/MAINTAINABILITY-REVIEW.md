@@ -26,10 +26,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) evaluates Actions budgets before economic guardrails. The canonical phases in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) put the secondary Actions meter after economic allocation.
+- Status: Resolved 2026-09-02
+- Original evidence: [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) evaluated Actions budgets before economic guardrails. The canonical phases in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) put the secondary Actions meter after economic allocation.
 - Impact: When both meters fail, the result reports the wrong first failing constraint and produces a trace inconsistent with the documented pipeline.
-- Recommended direction: Retain Actions access preflight before execution, but evaluate calculated Actions usage and budgets after the economic decision.
-- Planning acceptance: Add a simultaneous economic/Actions failure test that asserts the canonical first failure and explanation order.
+- Resolution: Actions access preflight remains early, while the calculated Actions budget is now evaluated only after economic guardrails allow the operation.
+- Verification: A simultaneous-failure regression asserts that the economic budget is first, and the existing Actions-only rejection test confirms that rejected operations do not allocate AI credits.
 
 ### F-03: Repeated unbilled operations consume runtime state
 
@@ -109,10 +110,9 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-02 | Restore canonical economic-before-Actions budget ordering | Medium | Small |
-| 2 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
-| 3 | F-09 | Add Release tests to Pages deployment | Low | Small |
-| 4 | F-10 | Mark or update stale gap matrices | Low | Small |
+| 1 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
+| 2 | F-09 | Add Release tests to Pages deployment | Low | Small |
+| 3 | F-10 | Mark or update stale gap matrices | Low | Small |
 
 ## Planning Dependencies
 

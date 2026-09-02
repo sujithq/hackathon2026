@@ -355,6 +355,51 @@ public sealed class GuardrailEngineTests
     }
 
     [Fact]
+    public void EconomicBudgetFailurePrecedesActionsBudgetFailure()
+    {
+        var scenario = RichScenario(operation: "code-review") with
+        {
+            EconomicGuardrails = MeteredEconomy(
+                new HashSet<string>(),
+                new SpendingBudget
+                {
+                    Id = "economic-budget",
+                    Scope = SpendingBudgetScope.Enterprise,
+                    LimitUsd = 0m,
+                    Enforcement = GuardrailEnforcement.HardStop
+                }),
+            ActionsUsage = new ActionsUsageInput
+            {
+                RunnerId = "linux-2-core",
+                Minutes = 5m
+            },
+            ActionsGuardrails = new ActionsGuardrailSnapshot
+            {
+                ActionsEnabled = GuardrailValue.Enabled,
+                RunnerAvailable = GuardrailValue.Enabled,
+                WorkflowApproved = GuardrailValue.Enabled,
+                RepositoryRulesPermitRun = GuardrailValue.Enabled,
+                Budgets =
+                [
+                    new ActionsSpendingBudget
+                    {
+                        Id = "actions-budget",
+                        LimitUsd = 0m,
+                        Enforcement = GuardrailEnforcement.HardStop
+                    }
+                ]
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("economic-budget", result.FirstFailingGate);
+        Assert.Contains(result.AppliedGuardrails, guardrail => guardrail.Id == "economic-budget");
+        Assert.DoesNotContain(result.AppliedGuardrails, guardrail => guardrail.Id == "actions-budget");
+    }
+
+    [Fact]
     public void OrganizationBudgetAppliesWhenAttributedCostCenterHasNoBudget()
     {
         var scenario = MeteredScenario(

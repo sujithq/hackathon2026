@@ -142,6 +142,27 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
         }
 
         context.ActionsUsage = CalculateActions(operation, scenario, explanation);
+        var economicResult = _economicEvaluator.Evaluate(
+            scenario,
+            context.Attribution!,
+            totalCredits);
+        context.AppliedGuardrails.AddRange(economicResult.AppliedGuardrails);
+        if (economicResult.Message is not null)
+        {
+            explanation.Add(Entry("guardrail", economicResult.FailingGuardrailId ?? "indeterminate", economicResult.Message));
+        }
+
+        if (economicResult.Decision != SimulationDecision.Allowed)
+        {
+            context.Alerts.AddRange(economicResult.Alerts);
+            context.Allocation = economicResult.Allocation;
+            context.EffectiveUlb = economicResult.EffectiveUlb;
+            context.Remaining = economicResult.Remaining;
+            return context.Complete(
+                economicResult.Decision,
+                economicResult.FailingGuardrailId);
+        }
+
         if (context.ActionsUsage is not null && scenario.ActionsGuardrails is not null)
         {
             var actionsBudget = actionsEvaluator.EvaluateBudgets(
@@ -157,27 +178,9 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
             }
         }
 
-        var economicResult = _economicEvaluator.Evaluate(
-            scenario,
-            context.Attribution!,
-            totalCredits);
-        context.AppliedGuardrails.AddRange(economicResult.AppliedGuardrails);
-        context.Alerts.AddRange(economicResult.Alerts);
+        context.Alerts.InsertRange(0, economicResult.Alerts);
         context.Allocation = economicResult.Allocation;
         context.EffectiveUlb = economicResult.EffectiveUlb;
-        context.Remaining = economicResult.Remaining;
-        if (economicResult.Message is not null)
-        {
-            explanation.Add(Entry("guardrail", economicResult.FailingGuardrailId ?? "indeterminate", economicResult.Message));
-        }
-
-        if (economicResult.Decision != SimulationDecision.Allowed)
-        {
-            return context.Complete(
-                economicResult.Decision,
-                economicResult.FailingGuardrailId);
-        }
-
         context.Remaining = _balances.ApplyActionsUsage(
             economicResult.Remaining,
             scenario,
