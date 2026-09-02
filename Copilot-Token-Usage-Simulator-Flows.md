@@ -452,7 +452,7 @@ flowchart LR
 
 ## 8. Implementation boundaries
 
-1. Store prices and plan allowances as effective-dated data, not constants in calculation code.
+1. Store prices and plan allowances as effective-dated data, not constants in calculation code. Allowance periods use an inclusive `effectiveFrom` and exclusive `effectiveTo`; gaps resolve the allowance as `unknown`, and overlapping periods are invalid configuration.
 2. Represent undocumented values as `unknown`; never convert them to zero.
 3. Keep utility-model and unbilled-operation handling outside the credit allocator.
 4. Apply policies before cost calculation, but apply budget checks to the calculated request amount.

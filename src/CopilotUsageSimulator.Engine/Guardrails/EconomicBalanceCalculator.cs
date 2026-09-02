@@ -49,7 +49,8 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
                 EconomicGuardrailApplicabilityResolver.IsEffective(
                     seat.EffectiveFrom,
                     seat.EffectiveTo,
-                    timestamp)));
+                    timestamp)),
+            timestamp);
 
     public SeatEntitlement CalculateCostCenterEntitlement(
         BillingContext billing,
@@ -64,7 +65,8 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
                 EconomicGuardrailApplicabilityResolver.IsEffective(
                     seat.EffectiveFrom,
                     seat.EffectiveTo,
-                    timestamp)));
+                    timestamp)),
+            timestamp);
 
     public SeatInventoryFailure? FindSeatInventoryFailure(
         SimulationScenario scenario,
@@ -261,9 +263,12 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
             .Select(seat => configuration.Plans.SingleOrDefault(plan =>
                 IdEquals(plan.Id, seat.PlanId)))
             .Where(plan => plan?.IsPooled == true)
-            .Sum(plan => plan!.IncludedCreditsPerUser ?? 0m);
+            .Select(plan => ResolveAllowance(plan!, timestamp))
+            .Sum(allowance => allowance ?? 0m);
 
-    private SeatEntitlement SumSeatEntitlements(IEnumerable<EffectiveSeatAssignment> seats)
+    private SeatEntitlement SumSeatEntitlements(
+        IEnumerable<EffectiveSeatAssignment> seats,
+        DateTimeOffset timestamp)
     {
         var total = 0m;
         foreach (var seat in seats)
@@ -280,16 +285,26 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
                 continue;
             }
 
-            if (plan.IncludedCreditsPerUser is null)
+            var allowance = ResolveAllowance(plan, timestamp);
+            if (allowance is null)
             {
                 return SeatEntitlement.Unknown(plan.Id);
             }
 
-            total += plan.IncludedCreditsPerUser.Value;
+            total += allowance.Value;
         }
 
         return SeatEntitlement.Known(total);
     }
+
+    private static decimal? ResolveAllowance(
+        PlanDefinition plan,
+        DateTimeOffset timestamp) =>
+        plan.AllowancePeriods.SingleOrDefault(period =>
+            EconomicGuardrailApplicabilityResolver.IsEffective(
+                period.EffectiveFrom,
+                period.EffectiveTo,
+                timestamp))?.IncludedCreditsPerUser;
 
     private static bool IdEquals(string? left, string? right) =>
         left is not null && right is not null &&

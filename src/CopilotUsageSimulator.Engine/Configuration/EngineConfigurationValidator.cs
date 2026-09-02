@@ -44,6 +44,39 @@ public static class EngineConfigurationValidator
             RequireDefined(operation.ActionsMetering, $"operations['{operation.Id}'].actionsMetering");
         }
 
+        foreach (var plan in configuration.Plans)
+        {
+            Require(plan.AllowancePeriods, $"plans['{plan.Id}'].allowancePeriods");
+            RequireItems(plan.AllowancePeriods, $"plans['{plan.Id}'].allowancePeriods");
+            if (plan.AllowancePeriods.Count == 0)
+            {
+                throw new ConfigurationException($"Plan '{plan.Id}' must define at least one allowance period.");
+            }
+
+            var orderedPeriods = plan.AllowancePeriods.OrderBy(x => x.EffectiveFrom).ToArray();
+            for (var index = 1; index < orderedPeriods.Length; index++)
+            {
+                if (orderedPeriods[index - 1].EffectiveTo is null ||
+                    orderedPeriods[index].EffectiveFrom < orderedPeriods[index - 1].EffectiveTo)
+                {
+                    throw new ConfigurationException($"Plan '{plan.Id}' has overlapping allowance periods.");
+                }
+            }
+
+            foreach (var period in plan.AllowancePeriods)
+            {
+                if (period.EffectiveTo <= period.EffectiveFrom)
+                {
+                    throw new ConfigurationException($"Plan '{plan.Id}' has an invalid allowance effective date range.");
+                }
+
+                if (period.IncludedCreditsPerUser < 0)
+                {
+                    throw new ConfigurationException($"Plan '{plan.Id}' has a negative included-credit allowance.");
+                }
+            }
+        }
+
         var operationIds = configuration.Operations.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var modelIds = configuration.Models.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var planIds = configuration.Plans.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);

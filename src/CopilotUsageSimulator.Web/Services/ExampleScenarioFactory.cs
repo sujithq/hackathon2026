@@ -12,7 +12,7 @@ public static class ExampleScenarioFactory
         var operation = configuration.Operations.SingleOrDefault(candidate =>
             string.Equals(candidate.Id, operationId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ConfigurationException($"Unknown example operation '{operationId}'.");
-        var plan = ResolvePlan(configuration);
+        var plan = ResolvePlan(configuration, timestamp);
         var secondaryPlan = configuration.Plans.FirstOrDefault(candidate =>
             candidate.IsPooled && !string.Equals(candidate.Id, plan.Id, StringComparison.OrdinalIgnoreCase))
             ?? plan;
@@ -197,11 +197,21 @@ public static class ExampleScenarioFactory
         };
     }
 
-    private static PlanDefinition ResolvePlan(EngineConfiguration configuration) =>
-        FindPreferred(configuration.Plans, configuration.ExampleScenario.PreferredPlanId, plan => plan.Id)
-        ?? configuration.Plans.FirstOrDefault(plan => plan.IsPooled && plan.IncludedCreditsPerUser is not null)
-        ?? configuration.Plans.FirstOrDefault()
-        ?? throw new ConfigurationException("An example scenario requires at least one plan.");
+    private static PlanDefinition ResolvePlan(
+        EngineConfiguration configuration,
+        DateTimeOffset timestamp)
+    {
+        var preferred = FindPreferred(
+            configuration.Plans,
+            configuration.ExampleScenario.PreferredPlanId,
+            plan => plan.Id);
+        return preferred is not null && HasEffectiveAllowance(preferred, timestamp)
+            ? preferred
+            : configuration.Plans.FirstOrDefault(plan =>
+                plan.IsPooled && HasEffectiveAllowance(plan, timestamp))
+                ?? configuration.Plans.FirstOrDefault()
+                ?? throw new ConfigurationException("An example scenario requires at least one plan.");
+    }
 
     private static ModelDefinition ResolveModel(
         EngineConfiguration configuration,
@@ -246,4 +256,10 @@ public static class ExampleScenarioFactory
             period.Tiers.Any(tier =>
                 (tier.MinimumContextTokensExclusive is null || 45_000 > tier.MinimumContextTokensExclusive) &&
                 (tier.MaximumContextTokensInclusive is null || 45_000 <= tier.MaximumContextTokensInclusive)));
+
+    private static bool HasEffectiveAllowance(PlanDefinition plan, DateTimeOffset timestamp) =>
+        plan.AllowancePeriods.Any(period =>
+            period.IncludedCreditsPerUser is not null &&
+            period.EffectiveFrom <= timestamp &&
+            (period.EffectiveTo is null || timestamp < period.EffectiveTo));
 }

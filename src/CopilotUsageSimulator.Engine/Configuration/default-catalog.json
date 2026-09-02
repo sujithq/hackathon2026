@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31",
+  "version": "2026-09-02",
   "usdPerCredit": 0.01,
   "poolOverflowBehavior": "split",
   "exampleScenario": {
@@ -11,13 +11,13 @@
     "preferredActionsRunnerId": "linux-2-core"
   },
   "plans": [
-    { "id": "free", "includedCreditsPerUser": null, "isPooled": false },
-    { "id": "student", "includedCreditsPerUser": null, "isPooled": false },
-    { "id": "pro", "includedCreditsPerUser": 1500, "isPooled": false },
-    { "id": "pro-plus", "includedCreditsPerUser": 7000, "isPooled": false },
-    { "id": "max", "includedCreditsPerUser": 20000, "isPooled": false },
-    { "id": "business", "includedCreditsPerUser": 1900, "isPooled": true },
-    { "id": "enterprise", "includedCreditsPerUser": 3900, "isPooled": true }
+    { "id": "free", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": null }], "isPooled": false },
+    { "id": "student", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": null }], "isPooled": false },
+    { "id": "pro", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": 1500 }], "isPooled": false },
+    { "id": "pro-plus", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": 7000 }], "isPooled": false },
+    { "id": "max", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": 20000 }], "isPooled": false },
+    { "id": "business", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": 1900 }], "isPooled": true },
+    { "id": "enterprise", "allowancePeriods": [{ "effectiveFrom": "2026-06-01T00:00:00Z", "includedCreditsPerUser": 3900 }], "isPooled": true }
   ],
   "operations": [
     { "id": "code-completion", "isBilled": false, "actionsMetering": "none" },

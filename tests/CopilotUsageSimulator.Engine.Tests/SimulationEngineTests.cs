@@ -13,7 +13,7 @@ public sealed class SimulationEngineTests
     [Fact]
     public void DefaultCatalogLoadsCompleteCoreDefinitions()
     {
-        Assert.Equal("2026-08-31", _engine.Configuration.Version);
+        Assert.Equal("2026-09-02", _engine.Configuration.Version);
         Assert.Equal(7, _engine.Configuration.Plans.Count);
         Assert.True(_engine.Configuration.Models.Count >= 30);
         Assert.Contains(_engine.Configuration.Operations, x => x.Id == "cloud-agent");
@@ -122,6 +122,37 @@ public sealed class SimulationEngineTests
         Assert.Contains(
             result.Explanation,
             entry => entry.Code == "pool.seat-inventory");
+    }
+
+    [Fact]
+    public void MissingEffectivePlanAllowanceIsIndeterminate()
+    {
+        var configuration = EngineConfigurationLoader.LoadDefault();
+        configuration = configuration with
+        {
+            Plans = configuration.Plans
+                .Select(plan => plan.Id == "business"
+                    ? plan with
+                    {
+                        AllowancePeriods =
+                        [
+                            new PlanAllowancePeriod
+                            {
+                                EffectiveFrom = CatalogDate.AddDays(1),
+                                IncludedCreditsPerUser = 1_900m
+                            }
+                        ]
+                    }
+                    : plan)
+                .ToArray()
+        };
+        var engine = new CopilotUsageSimulationEngine(configuration);
+
+        var result = engine.Simulate(Scenario(Call()));
+
+        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
+        Assert.Equal("pool.seat-inventory", result.FirstFailingGate);
+        Assert.Empty(result.Calls);
     }
 
     [Fact]

@@ -27,8 +27,15 @@ public sealed record ExampleScenarioDefinition
 public sealed record PlanDefinition
 {
     public required string Id { get; init; }
-    public decimal? IncludedCreditsPerUser { get; init; }
+    public IReadOnlyList<PlanAllowancePeriod> AllowancePeriods { get; init; } = [];
     public bool IsPooled { get; init; }
+}
+
+public sealed record PlanAllowancePeriod
+{
+    public required DateTimeOffset EffectiveFrom { get; init; }
+    public DateTimeOffset? EffectiveTo { get; init; }
+    public decimal? IncludedCreditsPerUser { get; init; }
 }
 
 public sealed record ModelDefinition

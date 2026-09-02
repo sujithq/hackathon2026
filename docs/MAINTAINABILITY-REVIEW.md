@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: Findings captured for implementation planning
+Status: All findings resolved
 
 ## Review Principles
 
@@ -97,10 +97,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Large
-- Evidence: [`EngineConfiguration.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfiguration.cs) gives each plan one timeless `IncludedCreditsPerUser` value, and [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) applies it to every scenario timestamp. The lifecycle contract in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) requires effective-dated allowances.
+- Status: Resolved 2026-09-02
+- Original evidence: [`EngineConfiguration.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfiguration.cs) gave each plan one timeless `IncludedCreditsPerUser` value, and [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) applied it to every scenario timestamp. The lifecycle contract in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) requires effective-dated allowances.
 - Impact: Historical and future simulations use the catalog's single current allowance even when a different allowance applied at the simulated time.
-- Recommended direction: Model non-overlapping allowance periods per plan and resolve the applicable period from the scenario timestamp.
-- Planning acceptance: Add boundary, gap, overlap, historical, and unknown-period tests for both pooled and individual plans.
+- Resolution: Plans now define non-overlapping allowance periods with inclusive start and exclusive end timestamps. Pool and cost-center entitlement resolve the period at the simulation timestamp. Missing periods and null allowances produce explicit unknown seat inventory, while empty, overlapping, invalid, and negative allowance periods are rejected as invalid configuration. The timeless allowance property was removed without a legacy fallback.
+- Verification: Configuration tests cover empty, overlapping, invalid, and negative periods. Calculator tests cover historical values, exact boundaries, later values, gaps, pooled cost-center entitlement, and non-pooled plans. An Engine regression confirms that a missing effective allowance returns an indeterminate seat-inventory outcome.
 
 ### F-12: Duplicate call multipliers compound charges
 
@@ -144,15 +145,15 @@ Status: Findings captured for implementation planning
 
 ## Low-Hanging Fruit
 
-No remaining open findings currently qualify as low-hanging fruit.
+No findings remain open.
 
 ## Planning Dependencies
 
 - Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
-- Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-08, F-09, F-10, F-12, and F-13 are resolved.
+- Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
+- F-01 through F-13 are resolved.
 
 ## Verification Baseline
 
@@ -165,8 +166,6 @@ Initial review baseline:
 
 Current implementation baseline:
 
-- Release tests passed: 191 total.
+- Release tests passed: 202 total.
 - Release build succeeded with zero warnings and errors.
 - `git diff --check` passed.
-
-Passing tests do not invalidate the remaining open finding; effective-dated allowances are not currently covered.

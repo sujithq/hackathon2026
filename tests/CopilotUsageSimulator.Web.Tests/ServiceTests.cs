@@ -50,7 +50,14 @@ public sealed class ServiceTests
                 {
                     Id = "custom-plan",
                     IsPooled = true,
-                    IncludedCreditsPerUser = 1_000m
+                    AllowancePeriods =
+                    [
+                        new PlanAllowancePeriod
+                        {
+                            EffectiveFrom = DateTimeOffset.MinValue,
+                            IncludedCreditsPerUser = 1_000m
+                        }
+                    ]
                 }
             ],
             Operations =

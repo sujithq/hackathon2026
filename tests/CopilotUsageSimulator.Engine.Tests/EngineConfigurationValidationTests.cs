@@ -63,6 +63,80 @@ public sealed class EngineConfigurationValidationTests
         Assert.Contains("actionsMetering", exception.Message);
     }
 
+    [Fact]
+    public void ValidatorRejectsPlanWithoutAllowancePeriods()
+    {
+        var configuration = WithPlanAllowancePeriods([]);
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationValidator.Validate(configuration));
+
+        Assert.Contains("at least one allowance period", exception.Message);
+    }
+
+    [Fact]
+    public void ValidatorRejectsOverlappingPlanAllowancePeriods()
+    {
+        var boundary = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+        var configuration = WithPlanAllowancePeriods(
+        [
+            new PlanAllowancePeriod
+            {
+                EffectiveFrom = boundary.AddMonths(-1),
+                EffectiveTo = boundary.AddDays(1),
+                IncludedCreditsPerUser = 1_000m
+            },
+            new PlanAllowancePeriod
+            {
+                EffectiveFrom = boundary,
+                IncludedCreditsPerUser = 2_000m
+            }
+        ]);
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationValidator.Validate(configuration));
+
+        Assert.Contains("overlapping allowance periods", exception.Message);
+    }
+
+    [Fact]
+    public void ValidatorRejectsInvalidPlanAllowanceDateRange()
+    {
+        var boundary = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+        var configuration = WithPlanAllowancePeriods(
+        [
+            new PlanAllowancePeriod
+            {
+                EffectiveFrom = boundary,
+                EffectiveTo = boundary,
+                IncludedCreditsPerUser = 1_000m
+            }
+        ]);
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationValidator.Validate(configuration));
+
+        Assert.Contains("invalid allowance effective date range", exception.Message);
+    }
+
+    [Fact]
+    public void ValidatorRejectsNegativePlanAllowance()
+    {
+        var configuration = WithPlanAllowancePeriods(
+        [
+            new PlanAllowancePeriod
+            {
+                EffectiveFrom = DateTimeOffset.MinValue,
+                IncludedCreditsPerUser = -1m
+            }
+        ]);
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationValidator.Validate(configuration));
+
+        Assert.Contains("negative included-credit allowance", exception.Message);
+    }
+
     [Theory]
     [InlineData("plan", "plan")]
     [InlineData("model", "model")]
@@ -161,6 +235,20 @@ public sealed class EngineConfigurationValidationTests
                 ]
             },
             _ => throw new ArgumentOutOfRangeException(nameof(entity), entity, null)
+        };
+    }
+
+    private static EngineConfiguration WithPlanAllowancePeriods(
+        IReadOnlyList<PlanAllowancePeriod> allowancePeriods)
+    {
+        var configuration = EngineConfigurationLoader.LoadDefault();
+        return configuration with
+        {
+            Plans =
+            [
+                configuration.Plans[0] with { AllowancePeriods = allowancePeriods },
+                .. configuration.Plans.Skip(1)
+            ]
         };
     }
 }
