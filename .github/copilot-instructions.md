@@ -11,6 +11,12 @@ Apply these instructions to every task in this repository.
 - Tests use xUnit and bUnit under the matching projects in `tests`.
 - The SDK is pinned by `global.json` and installed locally under `.dotnet`. On Windows, invoke it with `.\.dotnet\dotnet.exe`.
 
+## Package sources
+
+- For local npm commands that access a registry, use `--registry=https://packagefeedproxy.microsoft.io/npm/`.
+- GitHub Copilot coding agent (CCA) runs may use their default npm registry configuration.
+- Do not commit a repository `.npmrc` that redirects CCA to the local npm proxy.
+
 ## Engineering rules
 
 - Inspect the current working tree, including uncommitted changes, before making or reviewing changes.
