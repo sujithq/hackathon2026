@@ -63,6 +63,50 @@ public sealed class EngineConfigurationValidationTests
         Assert.Contains("actionsMetering", exception.Message);
     }
 
+    [Theory]
+    [InlineData("plans", "plan")]
+    [InlineData("operations", "operation")]
+    public void ValidatorRejectsEmptyRequiredCatalogs(string collection, string expectedLabel)
+    {
+        var configuration = WithEmptyRequiredCollection(collection);
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationValidator.Validate(configuration));
+
+        Assert.Contains($"at least one {expectedLabel}", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("plans", "plan")]
+    [InlineData("operations", "operation")]
+    public void LoaderRejectsEmptyRequiredCatalogs(string collection, string expectedLabel)
+    {
+        var json = JsonSerializer.Serialize(
+            WithEmptyRequiredCollection(collection),
+            SerializerOptions());
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var exception = Assert.Throws<ConfigurationException>(
+            () => EngineConfigurationLoader.Load(stream));
+
+        Assert.Contains($"at least one {expectedLabel}", exception.Message);
+    }
+
+    [Fact]
+    public void ValidatorAllowsEmptyOptionalCatalogsWithoutReferences()
+    {
+        var configuration = EngineConfigurationLoader.LoadDefault() with
+        {
+            Models = [],
+            Gates = [],
+            Multipliers = [],
+            ActionsRunners = [],
+            ExampleScenario = new ExampleScenarioDefinition()
+        };
+
+        EngineConfigurationValidator.Validate(configuration);
+    }
+
     [Fact]
     public void ValidatorRejectsPlanWithoutAllowancePeriods()
     {
@@ -237,6 +281,38 @@ public sealed class EngineConfigurationValidationTests
             _ => throw new ArgumentOutOfRangeException(nameof(entity), entity, null)
         };
     }
+
+    private static EngineConfiguration WithEmptyRequiredCollection(string collection)
+    {
+        var configuration = EngineConfigurationLoader.LoadDefault();
+        return collection switch
+        {
+            "plans" => configuration with
+            {
+                Plans = [],
+                ExampleScenario = configuration.ExampleScenario with
+                {
+                    PreferredPlanId = null
+                }
+            },
+            "operations" => configuration with
+            {
+                Operations = [],
+                ExampleScenario = configuration.ExampleScenario with
+                {
+                    PreferredOperationId = null
+                }
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(collection), collection, null)
+        };
+    }
+
+    private static JsonSerializerOptions SerializerOptions() =>
+        new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        };
 
     private static EngineConfiguration WithPlanAllowancePeriods(
         IReadOnlyList<PlanAllowancePeriod> allowancePeriods)

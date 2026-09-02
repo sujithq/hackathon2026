@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: Five findings open; ranked by severity below
+Status: Four findings open; ranked by severity below
 
 ## Review Principles
 
@@ -157,11 +157,11 @@ Status: Five findings open; ranked by severity below
 
 - Severity: Medium
 - Effort: Small
-- Status: Open
-- Evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) rejects null collection items but does not require `Plans` or `Operations` to contain an item. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) nevertheless requires every scenario to resolve both an operation and a plan.
+- Status: Resolved 2026-09-02
+- Original evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) rejected null collection items but did not require `Plans` or `Operations` to contain an item. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) nevertheless requires every scenario to resolve both an operation and a plan.
 - Impact: Engine construction succeeds for a configuration that cannot simulate any scenario, moving a catalog contract failure to every later request.
-- Recommended direction: Require at least one plan and one operation during configuration validation. Keep models, runners, gates, and multipliers optional because valid operation sets may not use them.
-- Planning acceptance: Add direct-validator and JSON-loader tests for empty plans and operations, while retaining coverage that optional collections may be empty when references remain valid.
+- Resolution: Configuration validation now requires at least one plan and one operation. Models, runners, gates, and multipliers remain optional.
+- Verification: Direct-validator and JSON-loader tests reject empty plan and operation catalogs, while a focused regression confirms that optional catalogs may remain empty without references.
 
 ### F-09: Pages deployment has no test gate
 
@@ -207,9 +207,8 @@ Status: Five findings open; ranked by severity below
 
 | Rank | Finding | Severity | Effort | Why now |
 |---:|---|---|---|---|
-| 1 | F-17: Reject empty plan and operation catalogs | Medium | Small | Closes a configuration boundary with two focused checks and tests. |
-| 2 | F-18: Correct README budget ordering | Low | Small | Prevents new clients from implementing superseded sequencing. |
-| 3 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
+| 1 | F-18: Correct README budget ordering | Low | Small | Prevents new clients from implementing superseded sequencing. |
+| 2 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
 
 ## Planning Dependencies
 
@@ -219,8 +218,8 @@ Status: Five findings open; ranked by severity below
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
 - Resolve F-14 before relying on imported seat histories for historical entitlement or repeated-session state.
 - F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
-- F-17, F-18, and F-19 are independent low-risk changes.
-- F-01 through F-13 and F-16 are resolved.
+- F-18 and F-19 are independent low-risk changes.
+- F-01 through F-13, F-16, and F-17 are resolved.
 
 ## Verification Baseline
 
@@ -233,8 +232,8 @@ Initial review baseline:
 
 Current implementation baseline:
 
-- Worktree was clean before this review-ledger update.
-- Release tests passed: 202 total.
+- Worktree was clean before the F-17 implementation.
+- Release tests passed: 207 total.
 - Release build succeeded with zero warnings and errors.
 - No vulnerable or deprecated direct or transitive NuGet packages were reported.
 - `git diff --check` passed.

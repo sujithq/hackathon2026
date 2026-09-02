@@ -25,6 +25,8 @@ public static class EngineConfigurationValidator
         RequireItems(configuration.Gates, "gates");
         RequireItems(configuration.Multipliers, "multipliers");
         RequireItems(configuration.ActionsRunners, "actionsRunners");
+        RequireAny(configuration.Plans, "plan");
+        RequireAny(configuration.Operations, "operation");
 
         RequireIdentifiers(configuration.Plans.Select(x => x.Id), "plan");
         RequireIdentifiers(configuration.Models.Select(x => x.Id), "model");
@@ -214,6 +216,14 @@ public static class EngineConfigurationValidator
         for (var index = 0; index < values.Count; index++)
         {
             Require(values[index], $"{path}[{index}]");
+        }
+    }
+
+    private static void RequireAny<T>(IReadOnlyList<T> values, string label)
+    {
+        if (values.Count == 0)
+        {
+            throw new ConfigurationException($"Configuration must define at least one {label}.");
         }
     }
 

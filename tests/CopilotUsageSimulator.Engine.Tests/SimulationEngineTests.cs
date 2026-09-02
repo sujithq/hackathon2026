@@ -597,7 +597,7 @@ public sealed class SimulationEngineTests
     [Fact]
     public void RejectsDuplicateConfigurationIds()
     {
-        var configuration = new EngineConfiguration
+        var configuration = EngineConfigurationLoader.LoadDefault() with
         {
             Operations =
             [
