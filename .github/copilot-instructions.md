@@ -42,13 +42,16 @@ Apply these instructions to every task in this repository.
 
 ## Reviews
 
-- Reviews are read-only unless the user explicitly asks for fixes.
+- Reviews are read-only unless the user explicitly asks for fixes, except for the required review-ledger update below.
 - Review the latest working tree, including staged, unstaged, and untracked files.
 - Assess maintainability across the whole solution, including project boundaries, shared contracts, engine behavior, every client, tests, configuration, and documentation. Do not limit the review to recently changed files.
 - Treat business logic implemented or duplicated in a client as a maintainability risk when it could be owned by the reusable engine.
 - Check that the engine remains client-neutral and that clients do not become required dependencies of engine behavior.
 - Report only concrete issues that materially affect correctness, maintainability, extensibility, security, or regression risk.
+- Always sort review findings and low-hanging-fruit tables by descending severity: Critical, High, Medium, Low. Within one severity, rank by impact and then implementation effort.
 - Cite repository-relative paths and current line numbers.
+- Whenever the user requests a review, update `docs/MAINTAINABILITY-REVIEW.md` in the same turn with the review date, scope, current findings, severity, effort, resolution status, ranked low-hanging fruit, dependencies, and validation baseline.
+- Preserve useful resolved findings in the review ledger, add stable finding IDs for new issues, and revise or retire entries that no longer match the current implementation. Do not modify implementation code unless the user also asks for fixes.
 - Follow any requested report format exactly and omit unrelated commentary.
 
 ## Responses and commits

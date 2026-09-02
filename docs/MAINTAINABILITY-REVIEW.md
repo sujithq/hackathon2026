@@ -89,6 +89,33 @@ Status: Findings captured for implementation planning
 - Resolution: Scenario validation now rejects IDs case-insensitively within every mutable guardrail collection.
 - Verification: A focused contract test covers ULBs, included controls, spending budgets, and Actions budgets.
 
+### F-11: Plan allowances are not effective-dated
+
+- Severity: Medium
+- Effort: Large
+- Evidence: [`EngineConfiguration.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfiguration.cs) gives each plan one timeless `IncludedCreditsPerUser` value, and [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) applies it to every scenario timestamp. The lifecycle contract in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) requires effective-dated allowances.
+- Impact: Historical and future simulations use the catalog's single current allowance even when a different allowance applied at the simulated time.
+- Recommended direction: Model non-overlapping allowance periods per plan and resolve the applicable period from the scenario timestamp.
+- Planning acceptance: Add boundary, gap, overlap, historical, and unknown-period tests for both pooled and individual plans.
+
+### F-12: Duplicate call multipliers compound charges
+
+- Severity: Medium
+- Effort: Small
+- Evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validates multiplier identifiers but not uniqueness within a call. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) applies each list entry in sequence.
+- Impact: Repeating the same case-insensitive multiplier ID in imported JSON silently multiplies the charge more than once.
+- Recommended direction: Reject case-insensitive duplicate enabled multiplier IDs at the scenario validation boundary.
+- Planning acceptance: Add exact-case and mixed-case duplicate tests plus a control test for distinct multipliers.
+
+### F-13: Configuration accepts blank stable identifiers
+
+- Severity: Medium
+- Effort: Small
+- Evidence: [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) checks uniqueness and references for plan, model, operation, gate, multiplier, Actions runner, and tier IDs without first requiring nonblank identifiers.
+- Impact: A catalog can pass Engine construction while containing entities that valid scenarios cannot reference reliably.
+- Recommended direction: Require nonblank stable IDs before uniqueness and reference validation, including nested price-tier IDs.
+- Planning acceptance: Add focused programmatic and JSON catalog tests for every identifier-bearing configuration entity.
+
 ### F-09: Pages deployment has no test gate
 
 - Severity: Low
@@ -111,7 +138,11 @@ Status: Findings captured for implementation planning
 
 ## Low-Hanging Fruit
 
-All identified low-hanging findings are resolved.
+| Order | Finding | Change | Severity | Effort |
+|---:|---|---|---|---|
+| 1 | F-12 | Reject duplicate call multiplier IDs | Medium | Small |
+| 2 | F-13 | Reject blank configuration IDs | Medium | Small |
+| 3 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
 
 ## Planning Dependencies
 
@@ -119,6 +150,8 @@ All identified low-hanging findings are resolved.
 - Design F-05 before changing terminal-path balance projections; it defines the shared client contract.
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
 - F-04 can proceed independently in Web after Engine input-validation expectations are fixed.
+- Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
+- F-12 and F-13 can be resolved independently at existing Engine validation boundaries.
 - F-02, F-03, F-07, F-08, F-09, and F-10 were resolved as isolated changes.
 
 ## Verification Baseline
@@ -126,8 +159,8 @@ All identified low-hanging findings are resolved.
 At review time:
 
 - Worktree was clean.
-- Release tests passed: 144 total (`Common` 6, `Engine` 99, `Web` 39).
-- Release build succeeded without errors.
+- Release tests passed: 153 total.
+- Release build succeeded with zero warnings and errors.
 - No vulnerable direct or transitive NuGet packages were reported.
 
-Passing tests do not invalidate these findings; the affected cross-client contracts, combined-failure ordering, malformed-input paths, and terminal balance projections are not currently covered.
+Passing tests do not invalidate the open findings; the affected cross-client contracts, transactional browser paths, complete terminal balances, tracking baselines, effective-dated allowances, and malformed identifier inputs are not currently covered.
