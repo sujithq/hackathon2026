@@ -16,6 +16,8 @@ public sealed class HomePageModel
     private readonly BrowserScenarioPersistence browserPersistence;
     private EngineConfiguration activeConfiguration;
     private ICopilotUsageSimulationEngine activeEngine;
+    private string? selectedTemplateOperationId;
+    private ExampleScenarioVariant selectedTemplateVariant;
 
     public HomePageModel(
         ICopilotUsageSimulationEngine defaultEngine,
@@ -41,6 +43,8 @@ public sealed class HomePageModel
     public string CatalogJson { get; set; } = "";
     public string? Error { get; private set; }
     public string? Notice { get; private set; }
+    public string? ScenarioSourceLabel { get; private set; }
+    public bool IsCustomized { get; private set; }
     public EngineConfiguration ActiveConfiguration => activeConfiguration;
     public OperationDefinition? SelectedOperation => ActiveConfiguration.Operations.FirstOrDefault(
         operation => string.Equals(operation.Id, Form.Workload.OperationId, StringComparison.OrdinalIgnoreCase));
@@ -119,7 +123,27 @@ public sealed class HomePageModel
         ScenarioJsonText = scenarioJson.Serialize(scenario);
         LoadForm(scenario);
         RunScenario(scenario, advanceWorkingState: false);
+        selectedTemplateOperationId = scenario.OperationId;
+        selectedTemplateVariant = variant;
+        ScenarioSourceLabel = variant == ExampleScenarioVariant.Standard
+            ? ActiveConfiguration.Operations.Single(operation =>
+                string.Equals(operation.Id, scenario.OperationId, StringComparison.OrdinalIgnoreCase)).ExampleLabel
+                ?? scenario.OperationId
+            : CostBlockedExamples.Single(example => example.Variant == variant).Label;
+        IsCustomized = false;
         Notice = null;
+    }
+
+    public bool IsSelectedTemplate(string operationId, ExampleScenarioVariant variant) =>
+        string.Equals(selectedTemplateOperationId, operationId, StringComparison.OrdinalIgnoreCase) &&
+        selectedTemplateVariant == variant;
+
+    public void MarkCustomized()
+    {
+        if (ScenarioSourceLabel is not null)
+        {
+            IsCustomized = true;
+        }
     }
 
     public void ApplyOverrides()
@@ -220,6 +244,9 @@ public sealed class HomePageModel
                 Results.ApplyPreferences(saved.Preferences);
             }
             CommitScenario(prepared);
+            selectedTemplateOperationId = null;
+            ScenarioSourceLabel = "Saved scenario";
+            IsCustomized = true;
             Notice = "Saved scenario loaded.";
             Error = null;
         }
@@ -249,6 +276,9 @@ public sealed class HomePageModel
             var importedJson = await BrowserScenarioPersistence.ReadImportAsync(file);
             var prepared = PrepareScenario(importedJson, activeConfiguration, activeEngine);
             CommitScenario(prepared);
+            selectedTemplateOperationId = null;
+            ScenarioSourceLabel = $"Imported: {file.Name}";
+            IsCustomized = true;
             Notice = $"Imported {file.Name}.";
             Error = null;
         }
@@ -276,6 +306,12 @@ public sealed class HomePageModel
             activeConfiguration = configuration;
             activeEngine = engine;
             CommitScenario(prepared);
+            selectedTemplateOperationId = scenario.OperationId;
+            selectedTemplateVariant = ExampleScenarioVariant.Standard;
+            ScenarioSourceLabel = configuration.Operations.Single(operation =>
+                string.Equals(operation.Id, scenario.OperationId, StringComparison.OrdinalIgnoreCase)).ExampleLabel
+                ?? scenario.OperationId;
+            IsCustomized = false;
             Error = null;
             Notice = $"Catalog '{configuration.Version}' applied.";
         }

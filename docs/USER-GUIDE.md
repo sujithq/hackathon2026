@@ -4,7 +4,7 @@ The web app estimates whether an agent task can run under a given GitHub Copilot
 
 ## Quick start
 
-1. Choose **Cloud agent**, **Code review**, or **Chat** as a starting template. Alternatively, select one of the six green cost-blocked scenarios to load and inspect a user-level budget, included-use overflow, paid-usage applicability, paid-usage state, AI spending budget, or Actions spending budget failure.
+1. Choose **Cloud agent**, **Code review**, or **Chat** as a starting template. Alternatively, select one of the six green cost-blocked scenarios to load and inspect a user-level budget, included-use overflow, paid-usage applicability, paid-usage state, AI spending budget, or Actions spending budget failure. The selected starter remains highlighted, and the scenario source changes from **Template defaults** to **Customized** after you edit a field.
 2. Describe the task the agent is expected to perform.
 3. Select the operation first. The guided form shows only settings that operation can use.
 4. For billed operations, select the model and enter expected context, fresh input, cached input, cache-write, and output tokens.

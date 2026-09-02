@@ -84,6 +84,9 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
     padding: .75rem 0; color: var(--muted); font-size: .85rem;
 }
 .template-strip button { padding: .4rem .7rem; font-size: .8rem; background: transparent; }
+.template-strip button.selected-template {
+    color: #fff; border-color: #8b72ff; background: rgba(124,92,255,.18); box-shadow: inset 0 0 0 1px rgba(139,114,255,.22);
+}
 .cost-blocked-templates { padding: .15rem 0 1.5rem; }
 .cost-blocked-heading { display: flex; align-items: center; gap: .55rem; margin-bottom: .6rem; color: var(--muted); font-size: .8rem; }
 .cost-blocked-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; max-width: 980px; }
@@ -92,10 +95,24 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
     text-align: left; border: 1px solid rgba(34,197,94,.52); border-radius: 8px; background: rgba(34,197,94,.08);
 }
 .cost-blocked-grid .template-cost-blocked:hover { border-color: #4ade80; background: rgba(34,197,94,.14); transform: translateY(-1px); }
+.cost-blocked-grid .template-cost-blocked.selected-template {
+    color: #fff; border-color: #4ade80; background: rgba(34,197,94,.22); box-shadow: inset 0 0 0 1px rgba(74,222,128,.2);
+}
 .template-cost-label {
     color: #86efac; background: rgba(34,197,94,.13); border: 1px solid rgba(34,197,94,.35);
     border-radius: 999px; padding: .08rem .35rem; font-size: .55rem; font-weight: 700; text-transform: uppercase;
 }
+.scenario-origin {
+    display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin: -.65rem 0 1rem;
+    padding: .65rem .8rem; border-left: 3px solid var(--accent); color: var(--muted); font-size: .78rem;
+}
+.scenario-origin strong { color: var(--text); }
+.scenario-state {
+    border: 1px solid var(--border); border-radius: 999px; padding: .12rem .42rem;
+    font-size: .58rem; font-weight: 800; text-transform: uppercase;
+}
+.scenario-state.template-defaults { color: #c4b5fd; border-color: rgba(139,114,255,.4); background: rgba(124,92,255,.1); }
+.scenario-state.customized { color: #fcd34d; border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.1); }
 
 .workspace { display: grid; grid-template-columns: minmax(460px, .88fr) minmax(560px, 1.12fr); gap: 1.25rem; align-items: start; }
 .panel {

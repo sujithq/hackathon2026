@@ -442,6 +442,37 @@ public sealed class HomeTests : BunitContext
         Assert.Contains(buttons, button => button.TextContent.Contains("Actions spending budget exceeded"));
     }
 
+    [Fact]
+    public void SelectingStarterShowsItsSourceAndHighlightsItsButton()
+    {
+        var cut = Render<Home>();
+
+        var chat = FindButton(cut, "Chat");
+        chat.Click();
+
+        chat = FindButton(cut, "Chat");
+        Assert.Equal("Chat", cut.Find(".scenario-origin strong").TextContent.Trim());
+        Assert.Equal("true", chat.GetAttribute("aria-pressed"));
+        Assert.Contains("selected-template", chat.ClassList);
+        Assert.Contains("Template defaults", cut.Find(".scenario-state").TextContent);
+    }
+
+    [Fact]
+    public void ChangingScenarioShowsCustomizedAndSelectingStarterResetsIt()
+    {
+        var cut = Render<Home>();
+
+        FindInputByLabel(cut, "Pool consumed").Input("501");
+
+        Assert.Contains("Customized", cut.Find(".scenario-state").TextContent);
+        Assert.Contains("customized", cut.Find(".scenario-state").ClassList);
+
+        FindButton(cut, "Chat").Click();
+
+        Assert.Contains("Template defaults", cut.Find(".scenario-state").TextContent);
+        Assert.DoesNotContain("customized", cut.Find(".scenario-state").ClassList);
+    }
+
     [Theory]
     [InlineData(ExampleScenarioVariant.UserLevelBudgetExceeded, "ulb-user-1")]
     [InlineData(ExampleScenarioVariant.IncludedUseOverflowProhibited, "included-cc-engineering")]
@@ -457,6 +488,9 @@ public sealed class HomeTests : BunitContext
 
         cut.Find($"button[data-cost-scenario='{variant}']").Click();
 
+        var selectedButton = cut.Find($"button[data-cost-scenario='{variant}']");
+        Assert.Equal("true", selectedButton.GetAttribute("aria-pressed"));
+        Assert.Equal(selectedButton.TextContent.Trim(), cut.Find(".scenario-origin strong").TextContent.Trim());
         Assert.Contains("Blocked", cut.Find(".decision-banner").TextContent);
         Assert.Contains(expectedGate, cut.Find(".decision-banner").TextContent);
 

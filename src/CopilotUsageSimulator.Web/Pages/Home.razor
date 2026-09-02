@@ -25,7 +25,9 @@
     @foreach (var operation in ExampleOperations)
     {
         var operationId = operation.Id;
-        <button @onclick="@(() => LoadTemplate(operationId))">@operation.ExampleLabel</button>
+        <button class="@TemplateButtonClass(operationId, ExampleScenarioVariant.Standard)"
+            aria-pressed="@PressedState(operationId, ExampleScenarioVariant.Standard)"
+            @onclick="@(() => LoadTemplate(operationId))">@operation.ExampleLabel</button>
     }
 </section>
 
@@ -41,7 +43,8 @@
             {
                 var operationId = example.OperationId;
                 var variant = example.Variant;
-                <button class="template-cost-blocked"
+                <button class="@TemplateButtonClass(operationId, variant, "template-cost-blocked")"
+                    aria-pressed="@PressedState(operationId, variant)"
                         data-cost-scenario="@variant"
                         @onclick="@(() => LoadTemplate(operationId, variant))">
                     @example.Label
@@ -49,6 +52,17 @@
             }
         </div>
     </section>
+}
+
+@if (PageModel.ScenarioSourceLabel is not null)
+{
+    <div class="scenario-origin" aria-live="polite">
+        <span>Scenario source</span>
+        <strong>@PageModel.ScenarioSourceLabel</strong>
+        <span class="scenario-state @(PageModel.IsCustomized ? "customized" : "template-defaults")">
+            @(PageModel.IsCustomized ? "Customized" : "Template defaults")
+        </span>
+    </div>
 }
 
 @if (!string.IsNullOrWhiteSpace(_error))
@@ -61,7 +75,7 @@
 }
 
 <div class="workspace">
-    <section class="panel configuration-panel">
+    <section class="panel configuration-panel" @oninput="MarkCustomized" @onchange="MarkCustomized">
         <div class="panel-heading">
             <div>
                 <p class="eyebrow">Scenario</p>
@@ -348,6 +362,16 @@
         string template,
         ExampleScenarioVariant variant = ExampleScenarioVariant.Standard) =>
         PageModel.LoadTemplate(template, variant);
+    private void MarkCustomized() => PageModel.MarkCustomized();
+    private string TemplateButtonClass(
+        string operationId,
+        ExampleScenarioVariant variant,
+        string baseClass = "") =>
+        PageModel.IsSelectedTemplate(operationId, variant)
+            ? $"{baseClass} selected-template".Trim()
+            : baseClass;
+    private string PressedState(string operationId, ExampleScenarioVariant variant) =>
+        PageModel.IsSelectedTemplate(operationId, variant) ? "true" : "false";
     private void ApplyOverrides() => PageModel.ApplyOverrides();
     private void ApplyAndRun() => PageModel.ApplyAndRun();
     private void RunJson() => PageModel.RunJson();
