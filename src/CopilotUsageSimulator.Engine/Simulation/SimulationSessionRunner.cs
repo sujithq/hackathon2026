@@ -45,11 +45,13 @@ public sealed class SimulationSessionRunner
             : balances.ApplyAllocation(scenario.EconomicGuardrails, result);
 
         var runtime = scenario.RuntimeGuardrails;
-        if (runtime is not null && scenario.CheckScope == SimulationCheckScope.All)
+        if (runtime is not null &&
+            scenario.CheckScope == SimulationCheckScope.All &&
+            result.Calls.Count > 0)
         {
             runtime = runtime with
             {
-                ModelCallsConsumed = runtime.ModelCallsConsumed + scenario.Calls.Count,
+                ModelCallsConsumed = runtime.ModelCallsConsumed + result.Calls.Count,
                 ElapsedDuration = runtime.ElapsedDuration + runtime.RequestedDuration,
                 CliCreditsConsumed = runtime.CliCreditsConsumed + result.Allocation.TotalCredits
             };

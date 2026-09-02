@@ -116,6 +116,54 @@ public sealed class SimulationSessionRunnerTests
     }
 
     [Fact]
+    public void AllowedRunsWithoutEvaluatedCallsDoNotAdvanceRuntimeState()
+    {
+        var scenario = ScenarioWithRuntime();
+        var engine = new StubEngine(_ => AllowedResult(includeEvaluatedCall: false));
+
+        var session = new SimulationSessionRunner().Run(engine, scenario, repeatCount: 2);
+
+        Assert.Equal(2, session.CompletedRuns);
+        Assert.Equal(4, session.NextScenario.RuntimeGuardrails!.ModelCallsConsumed);
+        Assert.Equal(TimeSpan.FromMinutes(5), session.NextScenario.RuntimeGuardrails.ElapsedDuration);
+        Assert.Equal(6m, session.NextScenario.RuntimeGuardrails.CliCreditsConsumed);
+    }
+
+    [Fact]
+    public void CostOnlyRunsDoNotAdvanceRuntimeState()
+    {
+        var scenario = ScenarioWithRuntime() with
+        {
+            CheckScope = SimulationCheckScope.CostRelatedOnly
+        };
+        var engine = new StubEngine(_ => AllowedResult());
+
+        var session = new SimulationSessionRunner().Run(engine, scenario, repeatCount: 2);
+
+        Assert.Equal(2, session.CompletedRuns);
+        Assert.Equal(4, session.NextScenario.RuntimeGuardrails!.ModelCallsConsumed);
+        Assert.Equal(TimeSpan.FromMinutes(5), session.NextScenario.RuntimeGuardrails.ElapsedDuration);
+        Assert.Equal(6m, session.NextScenario.RuntimeGuardrails.CliCreditsConsumed);
+    }
+
+    [Fact]
+    public void PartiallySimulatedRunDoesNotAdvanceRuntimeState()
+    {
+        var scenario = ScenarioWithRuntime();
+        var engine = new StubEngine(_ => new SimulationResult
+        {
+            Decision = SimulationDecision.PartiallySimulated
+        });
+
+        var session = new SimulationSessionRunner().Run(engine, scenario, repeatCount: 2);
+
+        Assert.Empty(session.Runs.Where(run => run.Decision == SimulationDecision.Allowed));
+        Assert.Equal(4, session.NextScenario.RuntimeGuardrails!.ModelCallsConsumed);
+        Assert.Equal(TimeSpan.FromMinutes(5), session.NextScenario.RuntimeGuardrails.ElapsedDuration);
+        Assert.Equal(6m, session.NextScenario.RuntimeGuardrails.CliCreditsConsumed);
+    }
+
+    [Fact]
     public void StopsAtFirstDisallowedRunAndReturnsLastCommittedScenario()
     {
         var calls = 0;
@@ -153,10 +201,37 @@ public sealed class SimulationSessionRunnerTests
         Assert.Equal("repeat-count-invalid", exception.Code);
     }
 
-    private static SimulationResult AllowedResult() =>
+    private static SimulationScenario ScenarioWithRuntime() =>
+        new()
+        {
+            OperationId = "operation",
+            PlanId = "plan",
+            CheckScope = SimulationCheckScope.All,
+            Calls = [new ModelCallInput { ModelId = "model" }],
+            RuntimeGuardrails = new RuntimeGuardrailSnapshot
+            {
+                ModelCallsConsumed = 4,
+                ElapsedDuration = TimeSpan.FromMinutes(5),
+                RequestedDuration = TimeSpan.FromMinutes(2),
+                CliCreditsConsumed = 6m
+            }
+        };
+
+    private static SimulationResult AllowedResult(bool includeEvaluatedCall = true) =>
         new()
         {
             Decision = SimulationDecision.Allowed,
+            Calls = includeEvaluatedCall
+                ?
+                [
+                    new ModelCallCharge
+                    {
+                        CallIndex = 1,
+                        ModelId = "model",
+                        PriceTierId = "tier"
+                    }
+                ]
+                : [],
             Allocation = new CreditAllocation
             {
                 TotalCredits = 5m,

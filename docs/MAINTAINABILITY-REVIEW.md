@@ -36,10 +36,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`SimulationSessionRunner.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationSessionRunner.cs) advances model-call count and requested duration after every allowed result. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) intentionally skips runtime evaluation for unbilled operations.
+- Status: Resolved 2026-09-02
+- Original evidence: [`SimulationSessionRunner.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationSessionRunner.cs) advanced model-call count and requested duration after every allowed result. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) intentionally skips runtime evaluation for unbilled operations.
 - Impact: Repetition can exhaust runtime controls for work that did not pass through those controls.
-- Recommended direction: Advance runtime state from usage actually evaluated and represented by the result, not directly from scenario requests.
-- Planning acceptance: Cover billed, unbilled, cost-only, and partially simulated repeated operations.
+- Resolution: Full-scope sessions now advance runtime state only when the result contains evaluated model calls, and consumed call count comes from the result.
+- Verification: Session tests cover billed, unevaluated/unbilled, cost-only, and partially simulated repeated operations.
 
 ### F-04: Import and restoration are not transactional
 
@@ -110,9 +111,8 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
-| 2 | F-09 | Add Release tests to Pages deployment | Low | Small |
-| 3 | F-10 | Mark or update stale gap matrices | Low | Small |
+| 1 | F-09 | Add Release tests to Pages deployment | Low | Small |
+| 2 | F-10 | Mark or update stale gap matrices | Low | Small |
 
 ## Planning Dependencies
 
