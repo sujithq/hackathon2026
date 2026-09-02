@@ -6,3 +6,6 @@ TestResults/
 artifacts/
 *.nupkg
 *.snupkg
+
+# APM dependencies
+apm_modules/
