@@ -137,6 +137,38 @@ public sealed class BlockingEndpointTests
         Assert.NotNull(result.ActionsUsage);
         Assert.Equal(0m, result.Allocation.TotalCredits);
         Assert.Empty(result.Alerts);
+        Assert.Equal(0m, result.Remaining.ActionsBudgetRemainingUsd["actions-hard-stop"]);
+    }
+
+    [Fact]
+    public void AllowedActionsProjectEveryBudgetBalance()
+    {
+        var guardrails = EnabledActions() with
+        {
+            Budgets =
+            [
+                new ActionsSpendingBudget
+                {
+                    Id = "actions-alert",
+                    LimitUsd = 1m,
+                    ConsumedUsd = 0.20m,
+                    Enforcement = GuardrailEnforcement.AlertOnly
+                },
+                new ActionsSpendingBudget
+                {
+                    Id = "actions-hard-stop",
+                    LimitUsd = 2m,
+                    ConsumedUsd = 0.50m,
+                    Enforcement = GuardrailEnforcement.HardStop
+                }
+            ]
+        };
+
+        var result = _engine.Simulate(ActionsScenario(guardrails));
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+        Assert.Equal(0.74m, result.Remaining.ActionsBudgetRemainingUsd["actions-alert"]);
+        Assert.Equal(1.44m, result.Remaining.ActionsBudgetRemainingUsd["actions-hard-stop"]);
     }
 
     [Theory]

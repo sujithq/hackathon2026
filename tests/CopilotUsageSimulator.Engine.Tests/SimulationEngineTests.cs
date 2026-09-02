@@ -226,6 +226,7 @@ public sealed class SimulationEngineTests
         Assert.Equal(10m, result.Allocation.MeteredCredits);
         Assert.Equal(0.10m, result.Allocation.MeteredUsd);
         Assert.Equal(9.90m, result.Allocation.MeteredBudgetRemainingUsd["enterprise-budget"]);
+        Assert.Equal(9.90m, result.Remaining.SpendingBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]
@@ -320,6 +321,7 @@ public sealed class SimulationEngineTests
 
         Assert.Equal(SimulationDecision.Allowed, result.Decision);
         Assert.Equal(-0.15m, result.Allocation.MeteredBudgetRemainingUsd["alert-only"]);
+        Assert.Equal(-0.15m, result.Remaining.SpendingBudgetRemainingUsd["alert-only"]);
     }
 
     [Fact]

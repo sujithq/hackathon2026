@@ -31,7 +31,7 @@ internal sealed class SimulationPipelineContext(
             EffectiveUlb = EffectiveUlb,
             AppliedGuardrails = AppliedGuardrails,
             Alerts = Alerts,
-            Remaining = Remaining ?? balances.CreateUnchangedRemaining(scenario),
+            Remaining = Remaining ?? balances.CreateUnchangedRemaining(scenario, Attribution),
             Assumptions = Assumptions,
             Explanation = Explanation
         };

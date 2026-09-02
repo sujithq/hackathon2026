@@ -96,42 +96,114 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
             "An active pooled seat references a plan with an unknown included-credit allowance.");
     }
 
-    public RemainingState CreateUnchangedRemaining(SimulationScenario scenario)
+    public RemainingState CreateUnchangedRemaining(
+        SimulationScenario scenario,
+        AttributionResult? attribution = null)
     {
         var actionsRemaining = scenario.ActionsGuardrails is null
             ? scenario.ActionsUsage?.IncludedMinutesRemaining
             : Available(
                 scenario.ActionsGuardrails.IncludedMinutes,
                 scenario.ActionsGuardrails.ConsumedIncludedMinutes);
+        var actionsBudgetRemaining = scenario.ActionsGuardrails?.Budgets.ToDictionary(
+            budget => budget.Id,
+            budget => Headroom(budget.LimitUsd, budget.ConsumedUsd),
+            StringComparer.OrdinalIgnoreCase) ??
+            new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var remaining = new RemainingState
+        {
+            ActionsIncludedMinutes = actionsRemaining,
+            ActionsBudgetRemainingUsd = actionsBudgetRemaining
+        };
 
         if (scenario.BillingContext is null || scenario.EconomicGuardrails is null)
         {
-            return new RemainingState { ActionsIncludedMinutes = actionsRemaining };
+            return remaining;
         }
 
-        return new RemainingState
+        remaining = remaining with
         {
             IncludedPoolCredits = Available(
-                CalculateKnownPoolEntitlement(scenario.BillingContext, scenario.Timestamp),
-                scenario.EconomicGuardrails.EnterprisePoolConsumedCredits),
-            ActionsIncludedMinutes = actionsRemaining
+                CalculateKnownPoolEntitlement(
+                    scenario.BillingContext,
+                    scenario.Timestamp),
+                scenario.EconomicGuardrails.EnterprisePoolConsumedCredits)
+        };
+
+        if (attribution is null)
+        {
+            return remaining;
+        }
+
+        var userBudget = _applicability.ResolveEffectiveUserLevelBudget(
+            scenario.EconomicGuardrails,
+            attribution,
+            scenario.Timestamp);
+        var includedControl = _applicability.ResolveIncludedUsageControl(
+            scenario.EconomicGuardrails,
+            attribution,
+            scenario.Timestamp);
+        decimal? includedControlRemaining = null;
+        if (!includedControl.IsAmbiguous && includedControl.Value is not null)
+        {
+            var costCenterEntitlement = CalculateCostCenterEntitlement(
+                scenario.BillingContext,
+                attribution.CostCenterId!,
+                scenario.Timestamp);
+            if (costCenterEntitlement.IsKnown)
+            {
+                includedControlRemaining = Available(
+                    costCenterEntitlement.Credits,
+                    includedControl.Value.ConsumedCredits);
+            }
+        }
+
+        return remaining with
+        {
+            EffectiveUserBudgetCredits = userBudget.IsAmbiguous || userBudget.Value is null
+                ? null
+                : Headroom(
+                    userBudget.Value.LimitCredits,
+                    userBudget.Value.ConsumedCredits),
+            IncludedUsageControlCredits = includedControlRemaining,
+            SpendingBudgetRemainingUsd = _applicability.ResolveSpendingBudgets(
+                    scenario.EconomicGuardrails,
+                    attribution,
+                    scenario.ProductId,
+                    scenario.SkuId,
+                    scenario.Timestamp)
+                .ToDictionary(
+                    budget => budget.Id,
+                    budget => Headroom(budget.LimitUsd, budget.ConsumedUsd),
+                    StringComparer.OrdinalIgnoreCase)
         };
     }
 
     public RemainingState ApplyActionsUsage(
         RemainingState remaining,
         SimulationScenario scenario,
-        ActionsUsageResult? usage) =>
-        remaining with
+        ActionsUsageResult? usage)
+    {
+        if (usage is null)
         {
-            ActionsIncludedMinutes = usage is null
-                ? null
-                : Available(
-                    scenario.ActionsGuardrails?.IncludedMinutes ??
-                        scenario.ActionsUsage!.IncludedMinutesRemaining,
-                    (scenario.ActionsGuardrails?.ConsumedIncludedMinutes ?? 0m) +
-                        usage.IncludedMinutes)
+            return remaining;
+        }
+
+        var actionsBudgetRemaining = scenario.ActionsGuardrails?.Budgets.ToDictionary(
+            budget => budget.Id,
+            budget => Headroom(budget.LimitUsd, budget.ConsumedUsd) - usage.AdditionalUsd,
+            StringComparer.OrdinalIgnoreCase) ??
+            remaining.ActionsBudgetRemainingUsd;
+        return remaining with
+        {
+            ActionsIncludedMinutes = Available(
+                scenario.ActionsGuardrails?.IncludedMinutes ??
+                    scenario.ActionsUsage!.IncludedMinutesRemaining,
+                (scenario.ActionsGuardrails?.ConsumedIncludedMinutes ?? 0m) +
+                    usage.IncludedMinutes),
+            ActionsBudgetRemainingUsd = actionsBudgetRemaining
         };
+    }
 
     public EconomicGuardrailSnapshot ApplyAllocation(
         EconomicGuardrailSnapshot snapshot,

@@ -71,7 +71,9 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
                 var message = missing
                     ? $"No effective seat assignment exists for user '{context.Attribution.UserId}' at the simulation timestamp."
                     : $"Multiple effective seat assignments exist for user '{context.Attribution.UserId}' at the simulation timestamp.";
-                context.Remaining = new RemainingState();
+                context.Remaining = _balances.CreateUnchangedRemaining(
+                    scenario,
+                    context.Attribution);
                 explanation.Add(Entry("guardrail", guardrailId, message));
                 return context.Complete(SimulationDecision.Indeterminate, guardrailId);
             }
@@ -84,7 +86,9 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
                     context.Attribution);
                 if (inventoryFailure is not null)
                 {
-                    context.Remaining = new RemainingState();
+                    context.Remaining = _balances.CreateUnchangedRemaining(
+                        scenario,
+                        context.Attribution);
                     explanation.Add(Entry(
                         "guardrail",
                         inventoryFailure.Value.GuardrailId,

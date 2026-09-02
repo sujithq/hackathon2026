@@ -85,7 +85,11 @@ public sealed record RemainingState
     public decimal IncludedPoolCredits { get; init; }
     public decimal? EffectiveUserBudgetCredits { get; init; }
     public decimal? IncludedUsageControlCredits { get; init; }
+    public IReadOnlyDictionary<string, decimal> SpendingBudgetRemainingUsd { get; init; } =
+        new Dictionary<string, decimal>();
     public decimal? ActionsIncludedMinutes { get; init; }
+    public IReadOnlyDictionary<string, decimal> ActionsBudgetRemainingUsd { get; init; } =
+        new Dictionary<string, decimal>();
 }
 
 public sealed record ExplanationEntry

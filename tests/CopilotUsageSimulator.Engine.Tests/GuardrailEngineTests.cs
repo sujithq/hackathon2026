@@ -198,6 +198,8 @@ public sealed class GuardrailEngineTests
         Assert.Equal(SimulationDecision.Blocked, result.Decision);
         Assert.Equal("cc-budget", result.FirstFailingGate);
         Assert.Contains(result.AppliedGuardrails, x => x.Id == "enterprise-budget");
+        Assert.Equal(0.10m, result.Remaining.SpendingBudgetRemainingUsd["cc-budget"]);
+        Assert.Equal(0.15m, result.Remaining.SpendingBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]
@@ -283,13 +285,24 @@ public sealed class GuardrailEngineTests
         {
             EconomicGuardrails = Economy(
                 poolConsumed: 1_900m,
-                paidUsage: GuardrailValue.Unknown)
+                paidUsage: GuardrailValue.Unknown,
+                spendingBudgets:
+                [
+                    new SpendingBudget
+                    {
+                        Id = "enterprise-budget",
+                        Scope = SpendingBudgetScope.Enterprise,
+                        LimitUsd = 1m,
+                        ConsumedUsd = 0.25m
+                    }
+                ])
         };
 
         var result = _engine.Simulate(scenario);
 
         Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
         Assert.Equal("paid-usage.unknown", result.FirstFailingGate);
+        Assert.Equal(0.75m, result.Remaining.SpendingBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]
@@ -316,6 +329,15 @@ public sealed class GuardrailEngineTests
     {
         var scenario = RichScenario() with
         {
+            EconomicGuardrails = MeteredEconomy(
+                new HashSet<string>(),
+                new SpendingBudget
+                {
+                    Id = "enterprise-budget",
+                    Scope = SpendingBudgetScope.Enterprise,
+                    LimitUsd = 1m,
+                    ConsumedUsd = 0.25m
+                }),
             RuntimeGuardrails = new RuntimeGuardrailSnapshot
             {
                 CliSoftCreditLimit = 10m,
@@ -327,6 +349,7 @@ public sealed class GuardrailEngineTests
 
         Assert.Equal(SimulationDecision.SoftStopped, result.Decision);
         Assert.Equal("runtime.cli-soft-credits", result.FirstFailingGate);
+        Assert.Equal(0.75m, result.Remaining.SpendingBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]
@@ -344,7 +367,16 @@ public sealed class GuardrailEngineTests
                 ActionsEnabled = GuardrailValue.Enabled,
                 RunnerAvailable = GuardrailValue.Enabled,
                 WorkflowApproved = GuardrailValue.Disabled,
-                RepositoryRulesPermitRun = GuardrailValue.Enabled
+                RepositoryRulesPermitRun = GuardrailValue.Enabled,
+                Budgets =
+                [
+                    new ActionsSpendingBudget
+                    {
+                        Id = "actions-budget",
+                        LimitUsd = 1m,
+                        ConsumedUsd = 0.25m
+                    }
+                ]
             }
         };
 
@@ -352,6 +384,28 @@ public sealed class GuardrailEngineTests
 
         Assert.Equal(SimulationDecision.Waiting, result.Decision);
         Assert.Equal("actions.workflow-approval", result.FirstFailingGate);
+        Assert.Equal(0.75m, result.Remaining.ActionsBudgetRemainingUsd["actions-budget"]);
+    }
+
+    [Fact]
+    public void MissingCallsReturnUnchangedApplicableBudgetBalances()
+    {
+        var scenario = MeteredScenario(
+            new SpendingBudget
+            {
+                Id = "enterprise-budget",
+                Scope = SpendingBudgetScope.Enterprise,
+                LimitUsd = 1m,
+                ConsumedUsd = 0.25m
+            }) with
+        {
+            Calls = []
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.PartiallySimulated, result.Decision);
+        Assert.Equal(0.75m, result.Remaining.SpendingBudgetRemainingUsd["enterprise-budget"]);
     }
 
     [Fact]

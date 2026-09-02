@@ -57,10 +57,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Medium to large
-- Evidence: [`SimulationResult.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationResult.cs) cannot represent remaining spending-budget headroom. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) supplies only partial unchanged balances on terminal paths. The minimum result contract in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) requires every spending budget and Actions headroom.
+- Status: Resolved 2026-09-02
+- Original evidence: [`SimulationResult.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationResult.cs) could not represent remaining spending-budget headroom. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) supplied only partial unchanged balances on terminal paths. The minimum result contract in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) requires every spending budget and Actions headroom.
 - Impact: Clients cannot consistently render or persist complete projected state, especially for blocked and indeterminate outcomes.
-- Recommended direction: Expand the Engine result contract to expose all applicable unchanged/projected balances on every terminal path.
-- Planning acceptance: Add contract tests for allowed, blocked, soft-stopped, partially simulated, and indeterminate outcomes.
+- Resolution: `RemainingState` now exposes AI and Actions spending-budget headroom by stable budget ID. A centralized Engine snapshot supplies applicable unchanged pool, ULB, included-control, AI budget, Actions-minute, and Actions-budget balances to terminal paths; allowed operations replace those values with projected balances only after the corresponding meter permits the charge. The allocation-level AI balance dictionary remains available for compatibility.
+- Verification: Engine contract tests cover allowed AI and Actions projections, multiple applicable budgets, alert-only negative headroom, economic and Actions blocks, soft stops, waiting, partial simulation, indeterminate paid-usage state, and preservation of known pooled balance when other seat inventory is unknown.
 
 ### F-06: `TrackingStartedAt` is persisted but ignored
 
@@ -146,11 +147,11 @@ No remaining open findings currently qualify as low-hanging fruit.
 
 ## Planning Dependencies
 
-- Resolve F-01 before expanding entitlement or plan-selection behavior in other clients.
-- Design F-05 before changing terminal-path balance projections; it defines the shared client contract.
+- Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
+- Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
 - Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-02, F-03, F-04, F-07, F-08, F-09, F-10, F-12, and F-13 were resolved as isolated changes.
+- F-01, F-02, F-03, F-04, F-05, F-07, F-08, F-09, F-10, F-12, and F-13 are resolved.
 
 ## Verification Baseline
 
@@ -161,4 +162,4 @@ At review time:
 - Release build succeeded with zero warnings and errors.
 - No vulnerable direct or transitive NuGet packages were reported.
 
-Passing tests do not invalidate the open findings; the affected cross-client contracts, complete terminal balances, tracking baselines, and effective-dated allowances are not currently covered.
+Passing tests do not invalidate the open findings; tracking baselines and effective-dated allowances are not currently covered.

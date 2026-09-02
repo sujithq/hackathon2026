@@ -30,7 +30,7 @@ public sealed class EconomicGuardrailEvaluator(
                 "billing-cycle.timestamp",
                 applied,
                 alerts,
-                new RemainingState(),
+                balances.CreateUnchangedRemaining(scenario, attribution),
                 message: "The simulation timestamp is outside the supplied billing cycle.");
         }
 
@@ -43,14 +43,14 @@ public sealed class EconomicGuardrailEvaluator(
                 failure.GuardrailId,
                 applied,
                 alerts,
-                new RemainingState(),
+                balances.CreateUnchangedRemaining(scenario, attribution),
                 message: failure.Message);
         }
 
         var poolRemaining = EconomicBalanceCalculator.Available(
             poolEntitlement.Credits,
             snapshot.EnterprisePoolConsumedCredits);
-        var unchangedRemaining = new RemainingState { IncludedPoolCredits = poolRemaining };
+        var unchangedRemaining = balances.CreateUnchangedRemaining(scenario, attribution);
         var ulbResolution = _applicability.ResolveEffectiveUserLevelBudget(
             snapshot,
             attribution,
@@ -322,13 +322,16 @@ public sealed class EconomicGuardrailEvaluator(
             MeteredBudgetId = blockingBudget?.Id ?? applicableBudgets.FirstOrDefault()?.Id,
             MeteredBudgetRemainingUsd = budgetRemaining
         };
-        var remainingState = new RemainingState
+        var remainingState = unchangedRemaining with
         {
             IncludedPoolCredits = poolRemaining - includedCredits,
             EffectiveUserBudgetCredits = effectiveUlb?.RemainingCredits,
             IncludedUsageControlCredits = controlRemaining is null
                 ? null
-                : Math.Max(0m, controlRemaining.Value - includedCredits)
+                : Math.Max(0m, controlRemaining.Value - includedCredits),
+            SpendingBudgetRemainingUsd = meteredCredits == 0
+                ? unchangedRemaining.SpendingBudgetRemainingUsd
+                : budgetRemaining
         };
 
         if (blockingBudget is null)
