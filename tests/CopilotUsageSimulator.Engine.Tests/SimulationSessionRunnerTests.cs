@@ -157,7 +157,7 @@ public sealed class SimulationSessionRunnerTests
 
         var session = new SimulationSessionRunner().Run(engine, scenario, repeatCount: 2);
 
-        Assert.Empty(session.Runs.Where(run => run.Decision == SimulationDecision.Allowed));
+        Assert.DoesNotContain(session.Runs, run => run.Decision == SimulationDecision.Allowed);
         Assert.Equal(4, session.NextScenario.RuntimeGuardrails!.ModelCallsConsumed);
         Assert.Equal(TimeSpan.FromMinutes(5), session.NextScenario.RuntimeGuardrails.ElapsedDuration);
         Assert.Equal(6m, session.NextScenario.RuntimeGuardrails.CliCreditsConsumed);
