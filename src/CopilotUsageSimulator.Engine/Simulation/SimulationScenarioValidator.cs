@@ -80,6 +80,7 @@ public static class SimulationScenarioValidator
         Require(call.EnabledMultiplierIds, $"{path}.enabledMultiplierIds");
         Require(call.Metadata, $"{path}.metadata");
         ValidateIdentifiers(call.EnabledMultiplierIds, $"{path}.enabledMultiplierIds");
+        EnsureUnique(call.EnabledMultiplierIds, $"{path}.enabledMultiplierIds");
     }
 
     private static void ValidateBillingContext(BillingContext context)

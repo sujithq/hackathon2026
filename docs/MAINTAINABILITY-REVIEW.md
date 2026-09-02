@@ -102,10 +102,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validates multiplier identifiers but not uniqueness within a call. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) applies each list entry in sequence.
+- Status: Resolved 2026-09-02
+- Original evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validated multiplier identifiers but not uniqueness within a call. [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) applies each list entry in sequence.
 - Impact: Repeating the same case-insensitive multiplier ID in imported JSON silently multiplies the charge more than once.
-- Recommended direction: Reject case-insensitive duplicate enabled multiplier IDs at the scenario validation boundary.
-- Planning acceptance: Add exact-case and mixed-case duplicate tests plus a control test for distinct multipliers.
+- Resolution: Scenario validation now rejects duplicate enabled multiplier IDs case-insensitively before calculation.
+- Verification: Focused contract tests cover exact-case duplicates, mixed-case duplicates, and distinct multiplier IDs.
 
 ### F-13: Configuration accepts blank stable identifiers
 
@@ -140,9 +141,8 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-12 | Reject duplicate call multiplier IDs | Medium | Small |
-| 2 | F-13 | Reject blank configuration IDs | Medium | Small |
-| 3 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
+| 1 | F-13 | Reject blank configuration IDs | Medium | Small |
+| 2 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
 
 ## Planning Dependencies
 
@@ -151,8 +151,8 @@ Status: Findings captured for implementation planning
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
 - F-04 can proceed independently in Web after Engine input-validation expectations are fixed.
 - Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-12 and F-13 can be resolved independently at existing Engine validation boundaries.
-- F-02, F-03, F-07, F-08, F-09, and F-10 were resolved as isolated changes.
+- F-13 can be resolved independently at the existing Engine configuration-validation boundary.
+- F-02, F-03, F-07, F-08, F-09, F-10, and F-12 were resolved as isolated changes.
 
 ## Verification Baseline
 

@@ -337,6 +337,54 @@ public sealed class SimulationScenarioValidatorTests
             "actionsGuardrails.budgets");
     }
 
+    [Theory]
+    [InlineData("auto-model-selection", "auto-model-selection")]
+    [InlineData("auto-model-selection", "AUTO-MODEL-SELECTION")]
+    public void RejectsDuplicateCallMultiplierIdsCaseInsensitively(
+        string firstMultiplierId,
+        string secondMultiplierId)
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                Calls =
+                [
+                    new ModelCallInput
+                    {
+                        ModelId = "gpt-5.6-luna",
+                        EnabledMultiplierIds =
+                        [
+                            firstMultiplierId,
+                            secondMultiplierId
+                        ]
+                    }
+                ]
+            },
+            "calls[0].enabledMultiplierIds");
+    }
+
+    [Fact]
+    public void AllowsDistinctCallMultiplierIds()
+    {
+        var scenario = Scenario() with
+        {
+            Calls =
+            [
+                new ModelCallInput
+                {
+                    ModelId = "gpt-5.6-luna",
+                    EnabledMultiplierIds =
+                    [
+                        "auto-model-selection",
+                        "agent-mode"
+                    ]
+                }
+            ]
+        };
+
+        SimulationScenarioValidator.Validate(scenario);
+    }
+
     [Fact]
     public void RejectsNegativeUsageValuesAtTheContractBoundary()
     {
