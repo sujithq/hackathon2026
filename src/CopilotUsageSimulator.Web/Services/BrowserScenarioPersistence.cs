@@ -6,9 +6,8 @@ namespace CopilotUsageSimulator.Web.Services;
 
 public sealed class BrowserScenarioPersistence(IJSRuntime js)
 {
-    private const string ScenarioStorageKey = "copilot-usage-simulator.scenario.v1";
-    private const string CatalogStorageKey = "copilot-usage-simulator.catalog.v1";
-    private const string PreferenceStorageKey = "copilot-usage-simulator.preferences.v1";
+    private const string StateStorageKey = "copilot-usage-simulator.state.v1";
+    private const int StateVersion = 1;
     private const long MaximumImportSize = 2 * 1024 * 1024;
 
     public async Task SaveAsync(
@@ -16,14 +15,16 @@ public sealed class BrowserScenarioPersistence(IJSRuntime js)
         string catalogJson,
         DisplayPreferences preferences)
     {
+        var stateJson = JsonSerializer.Serialize(
+            new BrowserScenarioStateEnvelope(
+                StateVersion,
+                scenarioJson,
+                catalogJson,
+                preferences));
+
         try
         {
-            await js.InvokeVoidAsync("localStorage.setItem", ScenarioStorageKey, scenarioJson);
-            await js.InvokeVoidAsync("localStorage.setItem", CatalogStorageKey, catalogJson);
-            await js.InvokeVoidAsync(
-                "localStorage.setItem",
-                PreferenceStorageKey,
-                JsonSerializer.Serialize(preferences));
+            await js.InvokeVoidAsync("localStorage.setItem", StateStorageKey, stateJson);
         }
         catch (JSException exception)
         {
@@ -35,18 +36,30 @@ public sealed class BrowserScenarioPersistence(IJSRuntime js)
     {
         try
         {
-            var scenarioJson = await js.InvokeAsync<string?>("localStorage.getItem", ScenarioStorageKey);
-            if (string.IsNullOrWhiteSpace(scenarioJson))
+            var stateJson = await js.InvokeAsync<string?>("localStorage.getItem", StateStorageKey);
+            if (string.IsNullOrWhiteSpace(stateJson))
             {
                 return null;
             }
 
-            var catalogJson = await js.InvokeAsync<string?>("localStorage.getItem", CatalogStorageKey);
-            var preferencesJson = await js.InvokeAsync<string?>("localStorage.getItem", PreferenceStorageKey);
-            var preferences = string.IsNullOrWhiteSpace(preferencesJson)
-                ? null
-                : JsonSerializer.Deserialize<DisplayPreferences>(preferencesJson);
-            return new BrowserScenarioState(scenarioJson, catalogJson, preferences);
+            var state = JsonSerializer.Deserialize<BrowserScenarioStateEnvelope>(stateJson)
+                ?? throw new JsonException("The saved browser state is empty.");
+            if (state.Version != StateVersion)
+            {
+                throw new JsonException($"Unsupported browser state version '{state.Version}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(state.ScenarioJson) ||
+                string.IsNullOrWhiteSpace(state.CatalogJson) ||
+                state.Preferences is null)
+            {
+                throw new JsonException("The saved browser state is incomplete.");
+            }
+
+            return new BrowserScenarioState(
+                state.ScenarioJson,
+                state.CatalogJson,
+                state.Preferences);
         }
         catch (JSException exception)
         {
@@ -72,6 +85,12 @@ public sealed class BrowserScenarioPersistence(IJSRuntime js)
         using var reader = new StreamReader(stream);
         return await reader.ReadToEndAsync();
     }
+
+    private sealed record BrowserScenarioStateEnvelope(
+        int Version,
+        string ScenarioJson,
+        string CatalogJson,
+        DisplayPreferences? Preferences);
 }
 
 public sealed record BrowserScenarioState(

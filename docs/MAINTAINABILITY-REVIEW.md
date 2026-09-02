@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: One finding open; ranked by severity below
+Status: No findings open
 
 ## Review Principles
 
@@ -137,11 +137,11 @@ Status: One finding open; ranked by severity below
 
 - Severity: Medium
 - Effort: Medium
-- Status: Open
-- Evidence: [`BrowserScenarioPersistence.cs`](../src/CopilotUsageSimulator.Web/Services/BrowserScenarioPersistence.cs) writes scenario, catalog, and preferences to three independent local-storage keys in sequence.
+- Status: Resolved 2026-09-02
+- Original evidence: [`BrowserScenarioPersistence.cs`](../src/CopilotUsageSimulator.Web/Services/BrowserScenarioPersistence.cs) wrote scenario, catalog, and preferences to three independent local-storage keys in sequence.
 - Impact: If the second or third write fails because storage is unavailable or full, the browser retains a new scenario with an old catalog or preferences. The next load can reject the mismatched state or restore behavior different from what the user saved.
-- Recommended direction: Serialize the complete browser state into one versioned envelope and commit it with one `localStorage.setItem` call.
-- Planning acceptance: Add persistence tests for successful round trips and simulated write failure, asserting that failed saves leave the previously committed envelope intact.
+- Resolution: Browser persistence now serializes scenario, catalog, and preferences into one versioned envelope and commits it with one `localStorage.setItem` call. Loading validates the envelope version and completeness before returning state to the existing transactional restoration path. Legacy three-key state is not loaded.
+- Verification: Web service tests cover complete round trips, one-key storage, missing state, unsupported and incomplete envelopes, malformed-state preservation, invalid scenario and catalog preservation, and simulated write failure retaining the previously committed envelope.
 
 ### F-16: The Pages build job receives deployment credentials
 
@@ -213,8 +213,7 @@ No open findings currently qualify as low-hanging fruit.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
-- F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
-- F-01 through F-14 and F-16 through F-19 are resolved.
+- F-01 through F-19 are resolved.
 
 ## Verification Baseline
 
@@ -228,7 +227,7 @@ Initial review baseline:
 Current implementation baseline:
 
 - Worktree was clean before the F-17 implementation.
-- Release tests passed: 212 total.
+- Release tests passed: 218 total.
 - Release build succeeded with zero warnings and errors.
 - No vulnerable or deprecated direct or transitive NuGet packages were reported.
 - `git diff --check` passed.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Guardrails;
@@ -412,6 +413,92 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public async Task BrowserPersistenceRoundTripsCompleteStateWithOneWrite()
+    {
+        var runtime = new AtomicStorageJsRuntime();
+        var persistence = new BrowserScenarioPersistence(runtime);
+        var preferences = new DisplayPreferences("custom", ["runtime", "actions"]);
+
+        await persistence.SaveAsync("scenario", "catalog", preferences);
+        var saved = await persistence.LoadAsync();
+
+        Assert.NotNull(saved);
+        Assert.Equal("scenario", saved.ScenarioJson);
+        Assert.Equal("catalog", saved.CatalogJson);
+        Assert.Equal("custom", saved.Preferences!.VisibilityMode);
+        Assert.Equal(["runtime", "actions"], saved.Preferences.HiddenCategories);
+        Assert.Equal(1, runtime.SetItemCalls);
+        Assert.Equal(1, runtime.StoredItemCount);
+    }
+
+    [Fact]
+    public async Task FailedBrowserSavePreservesPreviousEnvelope()
+    {
+        var runtime = new AtomicStorageJsRuntime();
+        var persistence = new BrowserScenarioPersistence(runtime);
+        await persistence.SaveAsync(
+            "previous-scenario",
+            "previous-catalog",
+            new DisplayPreferences("summary", []));
+        runtime.RejectWrites = true;
+
+        await Assert.ThrowsAsync<BrowserPersistenceException>(
+            () => persistence.SaveAsync(
+                "new-scenario",
+                "new-catalog",
+                new DisplayPreferences("custom", ["runtime"])));
+        runtime.RejectWrites = false;
+        var saved = await persistence.LoadAsync();
+
+        Assert.Equal("previous-scenario", saved!.ScenarioJson);
+        Assert.Equal("previous-catalog", saved.CatalogJson);
+        Assert.Equal("summary", saved.Preferences!.VisibilityMode);
+    }
+
+    [Fact]
+    public async Task BrowserPersistenceReturnsNullWhenNoStateIsSaved()
+    {
+        var saved = await new BrowserScenarioPersistence(new AtomicStorageJsRuntime()).LoadAsync();
+
+        Assert.Null(saved);
+    }
+
+    [Fact]
+    public async Task BrowserPersistenceRejectsUnsupportedStateVersion()
+    {
+        var persistence = new BrowserScenarioPersistence(
+            new StorageJsRuntime(SavedState("scenario", "catalog", version: 2)));
+
+        var exception = await Assert.ThrowsAsync<JsonException>(() => persistence.LoadAsync());
+
+        Assert.Contains("Unsupported browser state version '2'", exception.Message);
+    }
+
+    [Fact]
+    public async Task BrowserPersistenceRejectsIncompleteState()
+    {
+        var persistence = new BrowserScenarioPersistence(
+            new StorageJsRuntime(JsonSerializer.Serialize(new { Version = 1 })));
+
+        var exception = await Assert.ThrowsAsync<JsonException>(() => persistence.LoadAsync());
+
+        Assert.Contains("saved browser state is incomplete", exception.Message);
+    }
+
+    [Fact]
+    public async Task MalformedSavedEnvelopePreservesExistingPageState()
+    {
+        var model = CreateHomePageModel(new StorageJsRuntime("{"));
+        var previous = CaptureState(model);
+
+        await model.LoadAsync();
+
+        AssertStatePreserved(model, previous);
+        Assert.NotNull(model.Error);
+        Assert.Null(model.Notice);
+    }
+
+    [Fact]
     public async Task InvalidSavedCatalogPreservesExistingPageState()
     {
         var serializer = new ScenarioJson();
@@ -420,9 +507,9 @@ public sealed class ServiceTests
             Plans = [_configuration.Plans[0] with { Id = " " }, .. _configuration.Plans.Skip(1)]
         };
         var runtime = new StorageJsRuntime(
-            serializer.Serialize(ExampleScenarioFactory.Create(_configuration, "chat")),
-            serializer.SerializeConfiguration(invalidConfiguration),
-            null);
+            SavedState(
+                serializer.Serialize(ExampleScenarioFactory.Create(_configuration, "chat")),
+                serializer.SerializeConfiguration(invalidConfiguration)));
         var model = CreateHomePageModel(runtime);
         var previous = CaptureState(model);
 
@@ -441,7 +528,10 @@ public sealed class ServiceTests
         {
             OperationId = ""
         };
-        var runtime = new StorageJsRuntime(serializer.Serialize(invalidScenario), null, null);
+        var runtime = new StorageJsRuntime(
+            SavedState(
+                serializer.Serialize(invalidScenario),
+                serializer.SerializeConfiguration(_configuration)));
         var model = CreateHomePageModel(runtime);
         var previous = CaptureState(model);
 
@@ -490,6 +580,19 @@ public sealed class ServiceTests
         Assert.Equal(previous.Preferences.HiddenCategories, model.Results.HiddenCategories);
     }
 
+    private static string SavedState(
+        string scenarioJson,
+        string catalogJson,
+        DisplayPreferences? preferences = null,
+        int version = 1) =>
+        JsonSerializer.Serialize(new
+        {
+            Version = version,
+            ScenarioJson = scenarioJson,
+            CatalogJson = catalogJson,
+            Preferences = preferences ?? new DisplayPreferences("summary", [])
+        });
+
     private sealed record PageStateSnapshot(
         EngineConfiguration Configuration,
         string CatalogJson,
@@ -516,6 +619,65 @@ public sealed class ServiceTests
         {
             var value = index < values.Length ? values[index++] : null;
             return ValueTask.FromResult((TValue)(object?)value!);
+        }
+    }
+
+    private sealed class AtomicStorageJsRuntime : IJSRuntime
+    {
+        private readonly Dictionary<string, string> values = [];
+
+        public bool RejectWrites { get; set; }
+        public int SetItemCalls { get; private set; }
+        public int StoredItemCount => values.Count;
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
+        {
+            try
+            {
+                return Dispatch<TValue>(identifier, args);
+            }
+            catch (JSException)
+            {
+                throw;
+            }
+        }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(
+            string identifier,
+            CancellationToken cancellationToken,
+            object?[]? args)
+        {
+            try
+            {
+                return Dispatch<TValue>(identifier, args);
+            }
+            catch (JSException)
+            {
+                throw;
+            }
+        }
+
+        private ValueTask<TValue> Dispatch<TValue>(string identifier, object?[]? args)
+        {
+            if (identifier == "localStorage.setItem")
+            {
+                SetItemCalls++;
+                if (RejectWrites)
+                {
+                    throw new JSException("Storage quota exceeded.");
+                }
+
+                values[(string)args![0]!] = (string)args[1]!;
+                return ValueTask.FromResult(default(TValue)!);
+            }
+
+            if (identifier == "localStorage.getItem")
+            {
+                values.TryGetValue((string)args![0]!, out var value);
+                return ValueTask.FromResult((TValue)(object?)value!);
+            }
+
+            throw new InvalidOperationException($"Unexpected JS invocation '{identifier}'.");
         }
     }
 
