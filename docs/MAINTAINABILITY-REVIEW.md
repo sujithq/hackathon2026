@@ -81,10 +81,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validates individual IDs but not collection uniqueness. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) applies allocations by ID.
+- Status: Resolved 2026-09-02
+- Original evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validated individual IDs but not collection uniqueness. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) applies allocations by ID.
 - Impact: One allocation can mutate multiple records with the same ID, making repeated simulation state ambiguous and non-reproducible.
-- Recommended direction: Reject IDs case-insensitively within every scenario guardrail collection.
-- Planning acceptance: Add duplicate-ID tests for ULBs, included controls, spending budgets, and Actions budgets.
+- Resolution: Scenario validation now rejects IDs case-insensitively within every mutable guardrail collection.
+- Verification: A focused contract test covers ULBs, included controls, spending budgets, and Actions budgets.
 
 ### F-09: Pages deployment has no test gate
 
@@ -108,11 +109,10 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-08 | Reject duplicate scenario guardrail IDs | Medium | Small |
-| 2 | F-02 | Restore canonical economic-before-Actions budget ordering | Medium | Small |
-| 3 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
-| 4 | F-09 | Add Release tests to Pages deployment | Low | Small |
-| 5 | F-10 | Mark or update stale gap matrices | Low | Small |
+| 1 | F-02 | Restore canonical economic-before-Actions budget ordering | Medium | Small |
+| 2 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
+| 3 | F-09 | Add Release tests to Pages deployment | Low | Small |
+| 4 | F-10 | Mark or update stale gap matrices | Low | Small |
 
 ## Planning Dependencies
 

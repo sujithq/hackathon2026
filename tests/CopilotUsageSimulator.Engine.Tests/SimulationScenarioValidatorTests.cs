@@ -273,6 +273,71 @@ public sealed class SimulationScenarioValidatorTests
     }
 
     [Fact]
+    public void RejectsDuplicateGuardrailIdsCaseInsensitively()
+    {
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    UserLevelBudgets =
+                    [
+                        new UserLevelBudget { Id = "user-budget" },
+                        new UserLevelBudget { Id = "USER-BUDGET" }
+                    ]
+                }
+            },
+            "economicGuardrails.userLevelBudgets");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    IncludedUsageControls =
+                    [
+                        new CostCenterIncludedUsageControl
+                        {
+                            Id = "included-control",
+                            CostCenterId = "cc-1"
+                        },
+                        new CostCenterIncludedUsageControl
+                        {
+                            Id = "INCLUDED-CONTROL",
+                            CostCenterId = "cc-2"
+                        }
+                    ]
+                }
+            },
+            "economicGuardrails.includedUsageControls");
+        AssertInvalid(
+            Scenario() with
+            {
+                EconomicGuardrails = Economy() with
+                {
+                    SpendingBudgets =
+                    [
+                        new SpendingBudget { Id = "spending-budget" },
+                        new SpendingBudget { Id = "SPENDING-BUDGET" }
+                    ]
+                }
+            },
+            "economicGuardrails.spendingBudgets");
+        AssertInvalid(
+            Scenario() with
+            {
+                ActionsGuardrails = new ActionsGuardrailSnapshot
+                {
+                    Budgets =
+                    [
+                        new ActionsSpendingBudget { Id = "actions-budget" },
+                        new ActionsSpendingBudget { Id = "ACTIONS-BUDGET" }
+                    ]
+                }
+            },
+            "actionsGuardrails.budgets");
+    }
+
+    [Fact]
     public void RejectsNegativeUsageValuesAtTheContractBoundary()
     {
         AssertInvalid(

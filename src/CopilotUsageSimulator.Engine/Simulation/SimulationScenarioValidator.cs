@@ -176,6 +176,9 @@ public static class SimulationScenarioValidator
             RequireNonNegative(budget.ConsumedCredits, $"{path}.consumedCredits");
             RequireEffectivePeriod(budget.EffectiveFrom, budget.EffectiveTo, path);
         }
+        EnsureUnique(
+            guardrails.UserLevelBudgets.Select(budget => budget.Id),
+            "economicGuardrails.userLevelBudgets");
 
         for (var index = 0; index < guardrails.IncludedUsageControls.Count; index++)
         {
@@ -187,6 +190,9 @@ public static class SimulationScenarioValidator
             RequireDefined(control.OverflowBehavior, $"{path}.overflowBehavior");
             RequireEffectivePeriod(control.EffectiveFrom, control.EffectiveTo, path);
         }
+        EnsureUnique(
+            guardrails.IncludedUsageControls.Select(control => control.Id),
+            "economicGuardrails.includedUsageControls");
 
         ValidatePaidUsage(guardrails.PaidUsage);
 
@@ -212,6 +218,9 @@ public static class SimulationScenarioValidator
             ValidateIdentifiers(budget.SkuIds, $"{path}.skuIds");
             RequireEffectivePeriod(budget.EffectiveFrom, budget.EffectiveTo, path);
         }
+        EnsureUnique(
+            guardrails.SpendingBudgets.Select(budget => budget.Id),
+            "economicGuardrails.spendingBudgets");
     }
 
     private static void ValidatePaidUsage(PaidUsageAuthorization paidUsage)
@@ -266,6 +275,9 @@ public static class SimulationScenarioValidator
             RequireNonNegative(budget.ConsumedUsd, $"{path}.consumedUsd");
             RequireDefined(budget.Enforcement, $"{path}.enforcement");
         }
+        EnsureUnique(
+            guardrails.Budgets.Select(budget => budget.Id),
+            "actionsGuardrails.budgets");
     }
 
     private static T Require<T>(T? value, string path) where T : class =>
@@ -278,6 +290,17 @@ public static class SimulationScenarioValidator
         {
             RequireIdentifier(identifier, $"{path}[{index}]");
             index++;
+        }
+    }
+
+    private static void EnsureUnique(IEnumerable<string> identifiers, string path)
+    {
+        var duplicate = identifiers
+            .GroupBy(identifier => identifier, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            Invalid($"{path} contains duplicate id '{duplicate.Key}'.");
         }
     }
 
