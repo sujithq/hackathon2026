@@ -71,10 +71,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small
-- Evidence: [`EngineConfigurationLoader.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationLoader.cs) allows integer enum deserialization, while [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) does not validate all configuration enum values.
+- Status: Resolved 2026-09-02
+- Original evidence: [`EngineConfigurationLoader.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationLoader.cs) allowed integer enum deserialization, while [`EngineConfigurationValidator.cs`](../src/CopilotUsageSimulator.Engine/Configuration/EngineConfigurationValidator.cs) did not validate all configuration enum values.
 - Impact: Unknown values can silently enter fallback branches and change charging behavior rather than rejecting malformed configuration.
-- Recommended direction: Configure string enum conversion to reject integers and validate every configuration enum at the boundary.
-- Planning acceptance: Add malformed-catalog tests for numeric and unknown string values for each configuration enum.
+- Resolution: String enum conversion now rejects integers, and the validator checks every configuration enum at the programmatic boundary.
+- Verification: Focused tests cover numeric and unknown string catalog values plus undefined programmatic values for both configuration enums.
 
 ### F-08: Duplicate scenario guardrail IDs are accepted
 
@@ -107,12 +108,11 @@ Status: Findings captured for implementation planning
 
 | Order | Finding | Change | Severity | Effort |
 |---:|---|---|---|---|
-| 1 | F-07 | Reject undefined configuration enum values | Medium | Small |
-| 2 | F-08 | Reject duplicate scenario guardrail IDs | Medium | Small |
-| 3 | F-02 | Restore canonical economic-before-Actions budget ordering | Medium | Small |
-| 4 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
-| 5 | F-09 | Add Release tests to Pages deployment | Low | Small |
-| 6 | F-10 | Mark or update stale gap matrices | Low | Small |
+| 1 | F-08 | Reject duplicate scenario guardrail IDs | Medium | Small |
+| 2 | F-02 | Restore canonical economic-before-Actions budget ordering | Medium | Small |
+| 3 | F-03 | Stop advancing runtime state for unevaluated usage | Medium | Small |
+| 4 | F-09 | Add Release tests to Pages deployment | Low | Small |
+| 5 | F-10 | Mark or update stale gap matrices | Low | Small |
 
 ## Planning Dependencies
 

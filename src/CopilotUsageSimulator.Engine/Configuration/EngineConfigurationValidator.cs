@@ -11,6 +11,7 @@ public static class EngineConfigurationValidator
             throw new ConfigurationException("usdPerCredit must be greater than zero.");
         }
 
+        RequireDefined(configuration.PoolOverflowBehavior, "poolOverflowBehavior");
         Require(configuration.Plans, "plans");
         Require(configuration.Models, "models");
         Require(configuration.Operations, "operations");
@@ -31,6 +32,11 @@ public static class EngineConfigurationValidator
         EnsureUnique(configuration.Gates.Select(x => x.Id), "gate");
         EnsureUnique(configuration.Multipliers.Select(x => x.Id), "multiplier");
         EnsureUnique(configuration.ActionsRunners.Select(x => x.Id), "Actions runner");
+
+        foreach (var operation in configuration.Operations)
+        {
+            RequireDefined(operation.ActionsMetering, $"operations['{operation.Id}'].actionsMetering");
+        }
 
         var operationIds = configuration.Operations.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var modelIds = configuration.Models.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -203,6 +209,15 @@ public static class EngineConfigurationValidator
         if (!string.IsNullOrWhiteSpace(reference) && !knownValues.Contains(reference))
         {
             throw new ConfigurationException($"Unknown {label} id '{reference}'.");
+        }
+    }
+
+    private static void RequireDefined<TEnum>(TEnum value, string path)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new ConfigurationException($"Configuration property '{path}' has an unsupported value.");
         }
     }
 }
