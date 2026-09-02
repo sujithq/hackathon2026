@@ -149,7 +149,7 @@ var scenario = new SimulationScenario
 var result = engine.Simulate(scenario);
 ```
 
-`AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access and spending are evaluated before AI-credit allocation, so denied or waiting workflows leave both meters unchanged.
+`AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access is checked before economic evaluation. Economic guardrails and AI-credit allocation run next, followed by the Actions spending budget only after economic approval. This preserves the economic constraint as the first failure when both spending meters would reject the request.
 
 ## Web simulator
 

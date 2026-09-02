@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: Four findings open; ranked by severity below
+Status: Three findings open; ranked by severity below
 
 ## Review Principles
 
@@ -187,11 +187,11 @@ Status: Four findings open; ranked by severity below
 
 - Severity: Low
 - Effort: Small
-- Status: Open
-- Evidence: [`README.md`](../README.md) says Actions access and spending are evaluated before AI-credit allocation. After F-02, Actions access preflight remains early, economic guardrails and allocation run next, and the Actions spending budget runs only after economic approval.
+- Status: Resolved 2026-09-02
+- Original evidence: [`README.md`](../README.md) said Actions access and spending were evaluated before AI-credit allocation. After F-02, Actions access preflight remains early, economic guardrails and allocation run next, and the Actions spending budget runs only after economic approval.
 - Impact: Integrators can reproduce the superseded sequence and report the wrong first failing constraint when both economic and Actions budgets fail.
-- Recommended direction: Describe access preflight and the two spending meters separately, matching the canonical flow and current Engine order.
-- Planning acceptance: Align the README wording with the F-02 regression and [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md).
+- Resolution: The README now separates Actions access preflight from the economic and Actions spending phases and documents their current Engine order.
+- Verification: The documented sequence matches the F-02 simultaneous-failure regression and [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md).
 
 ### F-19: README usage sample does not compile
 
@@ -207,8 +207,7 @@ Status: Four findings open; ranked by severity below
 
 | Rank | Finding | Severity | Effort | Why now |
 |---:|---|---|---|---|
-| 1 | F-18: Correct README budget ordering | Low | Small | Prevents new clients from implementing superseded sequencing. |
-| 2 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
+| 1 | F-19: Fix the README multiplier collection | Low | Small | Removes an immediate compile failure from the primary sample. |
 
 ## Planning Dependencies
 
@@ -218,8 +217,8 @@ Status: Four findings open; ranked by severity below
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
 - Resolve F-14 before relying on imported seat histories for historical entitlement or repeated-session state.
 - F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
-- F-18 and F-19 are independent low-risk changes.
-- F-01 through F-13, F-16, and F-17 are resolved.
+- F-19 is an independent low-risk change.
+- F-01 through F-13 and F-16 through F-18 are resolved.
 
 ## Verification Baseline
 
