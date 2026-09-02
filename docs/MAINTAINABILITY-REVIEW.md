@@ -46,10 +46,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Small to medium
-- Evidence: [`HomePageModel.cs`](../src/CopilotUsageSimulator.Web/Services/HomePageModel.cs) mutates catalog/scenario state before all deserialization, adapter mapping, validation, and simulation steps succeed. Its import and reload filters do not cover every failure produced before Engine validation. Failed catalog application does not stop saved-scenario restoration.
+- Status: Resolved 2026-09-02
+- Original evidence: [`HomePageModel.cs`](../src/CopilotUsageSimulator.Web/Services/HomePageModel.cs) mutated catalog/scenario state before all deserialization, adapter mapping, validation, and simulation steps succeeded. Its import and reload filters did not cover every failure produced before Engine validation. Failed catalog application did not stop saved-scenario restoration.
 - Impact: Malformed but syntactically valid input can escape normal UI error handling or leave mixed old/new state while reporting a successful load.
-- Recommended direction: Build and validate temporary catalog, Engine, scenario, form, and result state; commit them only after the complete operation succeeds.
-- Planning acceptance: Add malformed import, invalid saved catalog, invalid saved scenario, and previous-state-preservation tests.
+- Resolution: Catalog application, saved-state restoration, and import now prepare configuration, Engine, scenario, form, and results before committing live page state. Guided reload handles the same domain failures without replacing the existing form.
+- Verification: Focused tests cover malformed imports, invalid saved catalogs, invalid saved scenarios, and preservation of configuration, catalog JSON, scenario JSON, form, results, and display preferences.
 
 ### F-05: The result balance contract is incomplete
 
@@ -140,18 +141,15 @@ Status: Findings captured for implementation planning
 
 ## Low-Hanging Fruit
 
-| Order | Finding | Change | Severity | Effort |
-|---:|---|---|---|---|
-| 1 | F-04 | Make import and restoration state-preserving, then consolidate persistence | Medium | Small to medium |
+No remaining open findings currently qualify as low-hanging fruit.
 
 ## Planning Dependencies
 
 - Resolve F-01 before expanding entitlement or plan-selection behavior in other clients.
 - Design F-05 before changing terminal-path balance projections; it defines the shared client contract.
 - Decide F-06 semantics before changing spending-budget persistence or historical simulation.
-- F-04 can proceed independently in Web after Engine input-validation expectations are fixed.
 - Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-02, F-03, F-07, F-08, F-09, F-10, F-12, and F-13 were resolved as isolated changes.
+- F-02, F-03, F-04, F-07, F-08, F-09, F-10, F-12, and F-13 were resolved as isolated changes.
 
 ## Verification Baseline
 
@@ -162,4 +160,4 @@ At review time:
 - Release build succeeded with zero warnings and errors.
 - No vulnerable direct or transitive NuGet packages were reported.
 
-Passing tests do not invalidate the open findings; the affected cross-client contracts, transactional browser paths, complete terminal balances, tracking baselines, effective-dated allowances, and malformed identifier inputs are not currently covered.
+Passing tests do not invalidate the open findings; the affected cross-client contracts, complete terminal balances, tracking baselines, and effective-dated allowances are not currently covered.

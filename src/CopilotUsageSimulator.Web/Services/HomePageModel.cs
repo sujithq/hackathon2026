@@ -112,13 +112,16 @@ public sealed class HomePageModel
     {
         try
         {
-            LoadForm(scenarioJson.Deserialize(ScenarioJsonText));
+            var form = editorAdapter.MapFromScenario(
+                scenarioJson.Deserialize(ScenarioJsonText),
+                ActiveConfiguration);
+            Form = form;
             Error = null;
             Notice = "Guided fields refreshed from JSON.";
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (IsScenarioInputException(exception))
         {
-            Error = exception.Message;
+            SetError(exception);
         }
     }
 
@@ -147,25 +150,39 @@ public sealed class HomePageModel
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(saved.CatalogJson))
+            var hasSavedCatalog = !string.IsNullOrWhiteSpace(saved.CatalogJson);
+            var configuration = hasSavedCatalog
+                ? scenarioJson.DeserializeConfiguration(saved.CatalogJson!)
+                : activeConfiguration;
+            var engine = hasSavedCatalog
+                ? new CopilotUsageSimulationEngine(configuration)
+                : activeEngine;
+            var prepared = PrepareScenario(saved.ScenarioJson, configuration, engine);
+
+            if (saved.Preferences is not null)
             {
-                CatalogJson = saved.CatalogJson;
-                ApplyCatalog();
+                var preferencesProbe = new SimulationResultsState();
+                preferencesProbe.ApplyPreferences(saved.Preferences);
             }
 
+            activeConfiguration = configuration;
+            activeEngine = engine;
+            if (hasSavedCatalog)
+            {
+                CatalogJson = saved.CatalogJson!;
+            }
             if (saved.Preferences is not null)
             {
                 Results.ApplyPreferences(saved.Preferences);
             }
-
-            ScenarioJsonText = saved.ScenarioJson;
-            ReloadGuidedFields();
-            RunJsonCore(advanceWorkingState: false);
+            CommitScenario(prepared);
             Notice = "Saved scenario loaded.";
+            Error = null;
         }
-        catch (BrowserPersistenceException exception)
+        catch (Exception exception) when (
+            exception is BrowserPersistenceException || IsScenarioInputException(exception))
         {
-            Error = $"{exception.Message} {exception.InnerException?.Message}";
+            SetError(exception);
         }
     }
 
@@ -185,14 +202,16 @@ public sealed class HomePageModel
     {
         try
         {
-            ScenarioJsonText = await BrowserScenarioPersistence.ReadImportAsync(file);
-            ReloadGuidedFields();
-            RunJsonCore(advanceWorkingState: false);
+            var importedJson = await BrowserScenarioPersistence.ReadImportAsync(file);
+            var prepared = PrepareScenario(importedJson, activeConfiguration, activeEngine);
+            CommitScenario(prepared);
             Notice = $"Imported {file.Name}.";
+            Error = null;
         }
-        catch (Exception exception) when (exception is IOException or JsonException)
+        catch (Exception exception) when (
+            exception is IOException || IsScenarioInputException(exception))
         {
-            Error = exception.Message;
+            SetError(exception);
         }
     }
 
@@ -200,16 +219,25 @@ public sealed class HomePageModel
     {
         try
         {
-            activeConfiguration = scenarioJson.DeserializeConfiguration(CatalogJson);
-            activeEngine = new CopilotUsageSimulationEngine(activeConfiguration);
-            LoadTemplate(InitialExampleOperationId);
+            var configuration = scenarioJson.DeserializeConfiguration(CatalogJson);
+            var engine = new CopilotUsageSimulationEngine(configuration);
+            var scenario = ExampleScenarioFactory.Create(
+                configuration,
+                GetInitialExampleOperationId(configuration));
+            var prepared = PrepareScenario(
+                scenarioJson.Serialize(scenario),
+                configuration,
+                engine);
+
+            activeConfiguration = configuration;
+            activeEngine = engine;
+            CommitScenario(prepared);
             Error = null;
-            Notice = $"Catalog '{activeConfiguration.Version}' applied.";
+            Notice = $"Catalog '{configuration.Version}' applied.";
         }
-        catch (Exception exception) when (exception is JsonException or ConfigurationException)
+        catch (Exception exception) when (IsScenarioInputException(exception))
         {
-            Error = exception.Message;
-            Notice = null;
+            SetError(exception);
         }
     }
 
@@ -221,11 +249,47 @@ public sealed class HomePageModel
         Error = null;
     }
 
-    private string InitialExampleOperationId =>
-        ActiveConfiguration.ExampleScenario.PreferredOperationId
-        ?? ExampleOperations.FirstOrDefault()?.Id
-        ?? ActiveConfiguration.Operations.FirstOrDefault()?.Id
+    private string InitialExampleOperationId => GetInitialExampleOperationId(ActiveConfiguration);
+
+    private static string GetInitialExampleOperationId(EngineConfiguration configuration) =>
+        configuration.ExampleScenario.PreferredOperationId
+        ?? configuration.Operations.FirstOrDefault(operation =>
+            !string.IsNullOrWhiteSpace(operation.ExampleLabel))?.Id
+        ?? configuration.Operations.FirstOrDefault()?.Id
         ?? throw new ConfigurationException("The active catalog does not define an operation.");
+
+    private PreparedScenarioState PrepareScenario(
+        string json,
+        EngineConfiguration configuration,
+        ICopilotUsageSimulationEngine engine)
+    {
+        var scenario = scenarioJson.Deserialize(json);
+        var form = editorAdapter.MapFromScenario(scenario, configuration);
+        var session = sessionRunner.Run(engine, scenario, form.Workload.RepeatCount);
+        return new PreparedScenarioState(json, form, session);
+    }
+
+    private void CommitScenario(PreparedScenarioState prepared)
+    {
+        ScenarioJsonText = prepared.Json;
+        Form = prepared.Form;
+        Results.SetRuns(prepared.Session.Runs);
+    }
+
+    private void SetError(Exception exception)
+    {
+        Error = exception switch
+        {
+            SimulationException simulation => $"{simulation.Code}: {simulation.Message}",
+            BrowserPersistenceException persistence =>
+                $"{persistence.Message} {persistence.InnerException?.Message}".Trim(),
+            _ => exception.Message
+        };
+        Notice = null;
+    }
+
+    private static bool IsScenarioInputException(Exception exception) =>
+        exception is JsonException or ConfigurationException or SimulationException or InvalidOperationException;
 
     private void RunJsonCore(bool advanceWorkingState)
     {
@@ -263,4 +327,9 @@ public sealed class HomePageModel
     {
         Form = editorAdapter.MapFromScenario(scenario, ActiveConfiguration);
     }
+
+    private sealed record PreparedScenarioState(
+        string Json,
+        ScenarioEditorState Form,
+        SimulationSessionResult Session);
 }

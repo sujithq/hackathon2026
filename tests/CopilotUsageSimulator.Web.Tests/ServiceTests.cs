@@ -3,6 +3,8 @@ using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 using CopilotUsageSimulator.Web.Services;
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.JSInterop;
 
 namespace CopilotUsageSimulator.Web.Tests;
 
@@ -387,5 +389,143 @@ public sealed class ServiceTests
         Assert.Null(state.Result);
         Assert.Empty(state.Runs);
         Assert.Equal(0, state.CompletedRuns);
+    }
+
+    [Fact]
+    public async Task MalformedImportPreservesExistingPageState()
+    {
+        var model = CreateHomePageModel(new StorageJsRuntime());
+        var previous = CaptureState(model);
+
+        await model.ImportAsync(new MemoryBrowserFile("invalid.json", "{"));
+
+        AssertStatePreserved(model, previous);
+        Assert.NotNull(model.Error);
+        Assert.Null(model.Notice);
+    }
+
+    [Fact]
+    public async Task InvalidSavedCatalogPreservesExistingPageState()
+    {
+        var serializer = new ScenarioJson();
+        var invalidConfiguration = _configuration with
+        {
+            Plans = [_configuration.Plans[0] with { Id = " " }, .. _configuration.Plans.Skip(1)]
+        };
+        var runtime = new StorageJsRuntime(
+            serializer.Serialize(ExampleScenarioFactory.Create(_configuration, "chat")),
+            serializer.SerializeConfiguration(invalidConfiguration),
+            null);
+        var model = CreateHomePageModel(runtime);
+        var previous = CaptureState(model);
+
+        await model.LoadAsync();
+
+        AssertStatePreserved(model, previous);
+        Assert.Contains("plan id", model.Error);
+        Assert.Null(model.Notice);
+    }
+
+    [Fact]
+    public async Task InvalidSavedScenarioPreservesExistingPageState()
+    {
+        var serializer = new ScenarioJson();
+        var invalidScenario = ExampleScenarioFactory.Create(_configuration, "chat") with
+        {
+            OperationId = ""
+        };
+        var runtime = new StorageJsRuntime(serializer.Serialize(invalidScenario), null, null);
+        var model = CreateHomePageModel(runtime);
+        var previous = CaptureState(model);
+
+        await model.LoadAsync();
+
+        AssertStatePreserved(model, previous);
+        Assert.Contains("operationId", model.Error);
+        Assert.Null(model.Notice);
+    }
+
+    private HomePageModel CreateHomePageModel(IJSRuntime jsRuntime)
+    {
+        var serializer = new ScenarioJson();
+        var model = new HomePageModel(
+            new CopilotUsageSimulationEngine(_configuration),
+            _configuration,
+            serializer,
+            CreateScenarioEditorAdapter(),
+            new SimulationSessionRunner(),
+            new BrowserScenarioPersistence(jsRuntime));
+        model.Initialize();
+        model.Results.VisibilityMode = "custom";
+        model.Results.HiddenCategories.Add("runtime");
+        return model;
+    }
+
+    private static PageStateSnapshot CaptureState(HomePageModel model) =>
+        new(
+            model.ActiveConfiguration,
+            model.CatalogJson,
+            model.ScenarioJsonText,
+            model.Form,
+            model.Results.Result,
+            model.Results.Runs.ToArray(),
+            model.Results.GetPreferences());
+
+    private static void AssertStatePreserved(HomePageModel model, PageStateSnapshot previous)
+    {
+        Assert.Same(previous.Configuration, model.ActiveConfiguration);
+        Assert.Equal(previous.CatalogJson, model.CatalogJson);
+        Assert.Equal(previous.ScenarioJson, model.ScenarioJsonText);
+        Assert.Same(previous.Form, model.Form);
+        Assert.Same(previous.Result, model.Results.Result);
+        Assert.Equal(previous.Runs, model.Results.Runs);
+        Assert.Equal(previous.Preferences.VisibilityMode, model.Results.VisibilityMode);
+        Assert.Equal(previous.Preferences.HiddenCategories, model.Results.HiddenCategories);
+    }
+
+    private sealed record PageStateSnapshot(
+        EngineConfiguration Configuration,
+        string CatalogJson,
+        string ScenarioJson,
+        ScenarioEditorState Form,
+        SimulationResult? Result,
+        SimulationResult[] Runs,
+        DisplayPreferences Preferences);
+
+    private sealed class StorageJsRuntime(params string?[] values) : IJSRuntime
+    {
+        private int index;
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
+        {
+            var value = index < values.Length ? values[index++] : null;
+            return ValueTask.FromResult((TValue)(object?)value!);
+        }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(
+            string identifier,
+            CancellationToken cancellationToken,
+            object?[]? args)
+        {
+            var value = index < values.Length ? values[index++] : null;
+            return ValueTask.FromResult((TValue)(object?)value!);
+        }
+    }
+
+    private sealed class MemoryBrowserFile(string name, string content) : IBrowserFile
+    {
+        private readonly byte[] bytes = System.Text.Encoding.UTF8.GetBytes(content);
+
+        public string Name { get; } = name;
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UtcNow;
+        public long Size => bytes.Length;
+        public string ContentType { get; } = "application/json";
+
+        public Stream OpenReadStream(
+            long maxAllowedSize = 512000,
+            CancellationToken cancellationToken = default) =>
+            Size > maxAllowedSize
+                ? throw new IOException("The file exceeds the permitted size.")
+                : new MemoryStream(bytes, writable: false);
     }
 }
