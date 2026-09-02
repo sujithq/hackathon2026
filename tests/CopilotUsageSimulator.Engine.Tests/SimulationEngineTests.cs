@@ -437,6 +437,130 @@ public sealed class SimulationEngineTests
         Assert.Equal(1_880m, result.Remaining.IncludedPoolCredits);
     }
 
+    [Theory]
+    [InlineData(SimulationCheckScope.All)]
+    [InlineData(SimulationCheckScope.CostRelatedOnly)]
+    public void MatchingEffectiveSeatSupportsSelectedPlanInEveryScope(
+        SimulationCheckScope checkScope)
+    {
+        var scenario = Scenario(Call()) with { CheckScope = checkScope };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+    }
+
+    [Fact]
+    public void EffectiveSeatPlanMatchesSelectedPlanCaseInsensitively()
+    {
+        var scenario = Scenario(Call()) with
+        {
+            BillingContext = Scenario().BillingContext! with
+            {
+                SeatAssignments =
+                [
+                    Scenario().BillingContext!.SeatAssignments[0] with
+                    {
+                        PlanId = "BUSINESS"
+                    }
+                ]
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+    }
+
+    [Fact]
+    public void ConflictingEffectiveSeatPlanIsRejectedAsInvalidContract()
+    {
+        var scenario = Scenario(Call()) with
+        {
+            PlanId = "enterprise"
+        };
+
+        var exception = Assert.Throws<SimulationException>(() => _engine.Simulate(scenario));
+
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains("enterprise", exception.Message);
+        Assert.Contains("business", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("2026-09-02T00:00:00+00:00", null)]
+    [InlineData(null, "2026-08-01T00:00:00+00:00")]
+    public void MissingOrIneffectiveSelectedUserSeatIsIndeterminate(
+        string? effectiveFrom,
+        string? effectiveTo)
+    {
+        var seats = effectiveFrom is null && effectiveTo is null
+            ? Array.Empty<EffectiveSeatAssignment>()
+            :
+            [
+                Scenario().BillingContext!.SeatAssignments[0] with
+                {
+                    EffectiveFrom = effectiveFrom is null
+                        ? DateTimeOffset.MinValue
+                        : DateTimeOffset.Parse(effectiveFrom),
+                    EffectiveTo = effectiveTo is null
+                        ? null
+                        : DateTimeOffset.Parse(effectiveTo)
+                }
+            ];
+        var scenario = Scenario(Call()) with
+        {
+            BillingContext = Scenario().BillingContext! with { SeatAssignments = seats }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
+        Assert.Equal("seat-assignment.missing", result.FirstFailingGate);
+    }
+
+    [Fact]
+    public void SeatForAnotherUserDoesNotSatisfySelectedUserInvariant()
+    {
+        var scenario = Scenario(Call()) with
+        {
+            BillingContext = Scenario().BillingContext! with
+            {
+                SeatAssignments =
+                [
+                    Scenario().BillingContext!.SeatAssignments[0] with
+                    {
+                        UserId = "user-2"
+                    }
+                ]
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
+        Assert.Equal("seat-assignment.missing", result.FirstFailingGate);
+    }
+
+    [Fact]
+    public void MultipleEffectiveSelectedUserSeatsAreIndeterminate()
+    {
+        var seat = Scenario().BillingContext!.SeatAssignments[0];
+        var scenario = Scenario(Call()) with
+        {
+            BillingContext = Scenario().BillingContext! with
+            {
+                SeatAssignments = [seat, seat with { CostCenterId = "cc-2" }]
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
+        Assert.Equal("seat-assignment.ambiguous", result.FirstFailingGate);
+    }
+
     [Fact]
     public void RejectsDuplicateConfigurationIds()
     {

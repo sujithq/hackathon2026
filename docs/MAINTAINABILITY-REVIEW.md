@@ -17,10 +17,11 @@ Status: Findings captured for implementation planning
 
 - Severity: High
 - Effort: Medium
-- Evidence: [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) validates that `Scenario.PlanId` exists but does not reconcile it with the effective seat. [`WorkloadEditorAdapter.cs`](../src/CopilotUsageSimulator.Web/Services/WorkloadEditorAdapter.cs) performs that synchronization only for Web.
+- Status: Resolved 2026-09-02
+- Original evidence: [`CopilotUsageSimulationEngine.cs`](../src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs) validated that `Scenario.PlanId` existed but did not reconcile it with the effective seat. [`WorkloadEditorAdapter.cs`](../src/CopilotUsageSimulator.Web/Services/WorkloadEditorAdapter.cs) performed that synchronization only for Web.
 - Impact: Other Engine clients can calculate an entitlement from a seat plan that conflicts with the scenario's selected plan. Equivalent user intent can therefore produce client-dependent results.
-- Recommended direction: Define and enforce the selected-plan/effective-seat invariant in Engine. Leave Web responsible only for editing scenario input.
-- Planning acceptance: Add Engine tests for matching, conflicting, missing, and ineffective seat assignments; remove reliance on Web-only normalization.
+- Resolution: Engine now resolves the attributed user's effective seat at the simulation timestamp and enforces selected-plan consistency independently of Web. A conflicting known plan is rejected as an invalid scenario contract; missing or ambiguous seats produce explicit indeterminate outcomes; unknown seat plans retain the existing seat-inventory outcome.
+- Verification: Engine tests cover matching plans in both simulation scopes, case-insensitive identity, conflicting plans, missing assignments, future and expired assignments, unrelated-user assignments, and multiple effective assignments.
 
 ### F-02: Actions budget failures precede economic failures
 

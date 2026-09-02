@@ -54,6 +54,28 @@ public sealed class CopilotUsageSimulationEngine : ICopilotUsageSimulationEngine
                 return context.Complete(SimulationDecision.Indeterminate, "attribution");
             }
 
+            var selectedPlanSeat = _balances.ResolveSelectedPlanSeat(
+                scenario,
+                context.Attribution);
+            if (selectedPlanSeat.Status == SelectedPlanSeatStatus.Conflicting)
+            {
+                throw new SimulationException(
+                    $"Scenario plan '{scenario.PlanId}' does not match the effective seat plan '{selectedPlanSeat.Seat!.PlanId}' for user '{context.Attribution.UserId}'.",
+                    SimulationScenarioValidator.InvalidContractCode);
+            }
+
+            if (selectedPlanSeat.Status is SelectedPlanSeatStatus.Missing or SelectedPlanSeatStatus.Ambiguous)
+            {
+                var missing = selectedPlanSeat.Status == SelectedPlanSeatStatus.Missing;
+                var guardrailId = missing ? "seat-assignment.missing" : "seat-assignment.ambiguous";
+                var message = missing
+                    ? $"No effective seat assignment exists for user '{context.Attribution.UserId}' at the simulation timestamp."
+                    : $"Multiple effective seat assignments exist for user '{context.Attribution.UserId}' at the simulation timestamp.";
+                context.Remaining = new RemainingState();
+                explanation.Add(Entry("guardrail", guardrailId, message));
+                return context.Complete(SimulationDecision.Indeterminate, guardrailId);
+            }
+
             if (scenario.Timestamp >= scenario.BillingContext.CycleStart &&
                 scenario.Timestamp < scenario.BillingContext.CycleEnd)
             {

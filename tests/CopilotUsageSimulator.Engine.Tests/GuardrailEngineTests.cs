@@ -443,6 +443,7 @@ public sealed class GuardrailEngineTests
     {
         var scenario = RichScenario() with
         {
+            PlanId = "pro",
             BillingContext = Billing(
                 new EffectiveSeatAssignment
                 {

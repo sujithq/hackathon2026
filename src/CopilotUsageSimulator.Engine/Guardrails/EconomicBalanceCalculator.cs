@@ -7,6 +7,40 @@ public sealed class EconomicBalanceCalculator(EngineConfiguration configuration)
 {
     private readonly EconomicGuardrailApplicabilityResolver _applicability = new();
 
+    public SelectedPlanSeatResolution ResolveSelectedPlanSeat(
+        SimulationScenario scenario,
+        AttributionResult attribution)
+    {
+        var effectiveSeats = scenario.BillingContext!.SeatAssignments
+            .Where(seat =>
+                string.Equals(seat.UserId, attribution.UserId, StringComparison.OrdinalIgnoreCase) &&
+                EconomicGuardrailApplicabilityResolver.IsEffective(
+                    seat.EffectiveFrom,
+                    seat.EffectiveTo,
+                    scenario.Timestamp))
+            .ToArray();
+
+        if (effectiveSeats.Length == 0)
+        {
+            return SelectedPlanSeatResolution.Missing();
+        }
+
+        if (effectiveSeats.Length > 1)
+        {
+            return SelectedPlanSeatResolution.Ambiguous();
+        }
+
+        var seat = effectiveSeats[0];
+        if (!configuration.Plans.Any(plan => IdEquals(plan.Id, seat.PlanId)))
+        {
+            return SelectedPlanSeatResolution.UnknownPlan(seat);
+        }
+
+        return IdEquals(seat.PlanId, scenario.PlanId)
+            ? SelectedPlanSeatResolution.Matched(seat)
+            : SelectedPlanSeatResolution.Conflicting(seat);
+    }
+
     public SeatEntitlement CalculatePoolEntitlement(
         BillingContext billing,
         DateTimeOffset timestamp) =>
@@ -208,3 +242,32 @@ public readonly record struct SeatEntitlement(
 }
 
 public readonly record struct SeatInventoryFailure(string GuardrailId, string Message);
+
+public readonly record struct SelectedPlanSeatResolution(
+    SelectedPlanSeatStatus Status,
+    EffectiveSeatAssignment? Seat)
+{
+    public static SelectedPlanSeatResolution Matched(EffectiveSeatAssignment seat) =>
+        new(SelectedPlanSeatStatus.Matched, seat);
+
+    public static SelectedPlanSeatResolution Missing() =>
+        new(SelectedPlanSeatStatus.Missing, null);
+
+    public static SelectedPlanSeatResolution Ambiguous() =>
+        new(SelectedPlanSeatStatus.Ambiguous, null);
+
+    public static SelectedPlanSeatResolution Conflicting(EffectiveSeatAssignment seat) =>
+        new(SelectedPlanSeatStatus.Conflicting, seat);
+
+    public static SelectedPlanSeatResolution UnknownPlan(EffectiveSeatAssignment seat) =>
+        new(SelectedPlanSeatStatus.UnknownPlan, seat);
+}
+
+public enum SelectedPlanSeatStatus
+{
+    Matched,
+    Missing,
+    Ambiguous,
+    Conflicting,
+    UnknownPlan
+}
