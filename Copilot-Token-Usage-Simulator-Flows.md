@@ -303,7 +303,7 @@ An exhausted spending limit with `Stop usage when budget limit is reached = off`
 
 Cost-center and organization budgets are **narrower constraints**, not replacements for the enterprise failsafe. By default their metered charges count against the enterprise budget too. Organization budgets can further restrict an enterprise control but cannot loosen it. Cost-center exclusion is the explicit exception.
 
-The first cycle after budget creation needs a `trackingStartedAt` or baseline: usage before creation does not count toward that budget, so apparent first-cycle overshoot is valid.
+The first cycle after budget creation needs a `trackingStartedAt` or baseline: usage before creation does not count toward that budget, so apparent first-cycle overshoot is valid. A budget is applicable at and after `trackingStartedAt`; callers supply `consumedUsd` as the consumption tracked since that baseline because the scenario snapshot does not contain dated usage history.
 
 ### 5.5 Guardrail applicability dimensions
 

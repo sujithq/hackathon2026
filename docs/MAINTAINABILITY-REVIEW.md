@@ -67,10 +67,11 @@ Status: Findings captured for implementation planning
 
 - Severity: Medium
 - Effort: Medium
-- Evidence: [`EconomicGuardrails.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrails.cs) defines `TrackingStartedAt`, but Engine applicability and consumption do not use it. The flow document states that first-cycle pre-creation usage must not count toward the budget.
+- Status: Resolved 2026-09-02
+- Original evidence: [`EconomicGuardrails.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrails.cs) defined `TrackingStartedAt`, but Engine applicability and consumption did not use it. The flow document states that first-cycle pre-creation usage must not count toward the budget.
 - Impact: First-cycle budget decisions can incorrectly include consumption from before tracking began, or callers can assume semantics the Engine does not implement.
-- Recommended direction: Define and enforce tracking-baseline semantics in Engine, or remove the field and documentation until the required consumption history is representable.
-- Planning acceptance: Add before-baseline, at-baseline, after-baseline, and later-cycle tests.
+- Resolution: Spending-budget applicability now starts inclusively at `TrackingStartedAt` and continues across later billing cycles while the budget remains effective. Before the baseline, the budget is neither evaluated nor included in remaining balances. `ConsumedUsd` is explicitly defined as consumption tracked since the baseline because scenarios do not contain dated usage history.
+- Verification: Resolver tests cover timestamps before, at, after, and well after the tracking baseline. Engine tests confirm pre-baseline metered usage is not blocked, exact-boundary usage is evaluated, later-cycle usage remains constrained, and F-05 remaining balances use the same applicability decision.
 
 ### F-07: Configuration accepts undefined numeric enum values
 
@@ -149,17 +150,23 @@ No remaining open findings currently qualify as low-hanging fruit.
 
 - Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
-- Decide F-06 semantics before changing spending-budget persistence or historical simulation.
+- Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
 - Design F-11 before adding historical allowance or entitlement behavior; it changes the configuration contract used by F-01.
-- F-01, F-02, F-03, F-04, F-05, F-07, F-08, F-09, F-10, F-12, and F-13 are resolved.
+- F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-08, F-09, F-10, F-12, and F-13 are resolved.
 
 ## Verification Baseline
 
-At review time:
+Initial review baseline:
 
 - Worktree was clean.
 - Release tests passed: 153 total.
 - Release build succeeded with zero warnings and errors.
 - No vulnerable direct or transitive NuGet packages were reported.
 
-Passing tests do not invalidate the open findings; tracking baselines and effective-dated allowances are not currently covered.
+Current implementation baseline:
+
+- Release tests passed: 191 total.
+- Release build succeeded with zero warnings and errors.
+- `git diff --check` passed.
+
+Passing tests do not invalidate the remaining open finding; effective-dated allowances are not currently covered.

@@ -70,6 +70,7 @@ public sealed class EconomicGuardrailApplicabilityResolver
     {
         var effective = snapshot.SpendingBudgets.Where(budget =>
             IsEffective(budget.EffectiveFrom, budget.EffectiveTo, timestamp) &&
+            (budget.TrackingStartedAt is null || timestamp >= budget.TrackingStartedAt) &&
             Matches(budget.ProductIds, productId) &&
             Matches(budget.SkuIds, skuId));
 

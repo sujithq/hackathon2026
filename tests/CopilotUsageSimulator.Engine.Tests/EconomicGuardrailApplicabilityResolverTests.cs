@@ -86,6 +86,37 @@ public sealed class EconomicGuardrailApplicabilityResolverTests
         Assert.Equal(2, selection.Matches.Count);
     }
 
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(40, true)]
+    public void SpendingBudgetAppliesFromTrackingBaselineOnward(
+        int daysFromTrackingStart,
+        bool expected)
+    {
+        var trackingStartedAt = Timestamp.AddDays(1);
+        var snapshot = new EconomicGuardrailSnapshot
+        {
+            SpendingBudgets =
+            [
+                Budget("tracked-budget", SpendingBudgetScope.Enterprise, null) with
+                {
+                    TrackingStartedAt = trackingStartedAt
+                }
+            ]
+        };
+
+        var budgets = _resolver.ResolveSpendingBudgets(
+            snapshot,
+            Attribution(),
+            "github-copilot",
+            "copilot-ai-credits",
+            trackingStartedAt.AddDays(daysFromTrackingStart));
+
+        Assert.Equal(expected, budgets.Count == 1);
+    }
+
     private static AttributionResult Attribution() =>
         new()
         {

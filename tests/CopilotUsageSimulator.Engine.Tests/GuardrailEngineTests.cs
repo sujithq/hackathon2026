@@ -230,6 +230,75 @@ public sealed class GuardrailEngineTests
     }
 
     [Fact]
+    public void SpendingBudgetDoesNotApplyBeforeTrackingBaseline()
+    {
+        var scenario = MeteredScenario(
+            new SpendingBudget
+            {
+                Id = "tracked-budget",
+                Scope = SpendingBudgetScope.Enterprise,
+                LimitUsd = 0m,
+                Enforcement = GuardrailEnforcement.HardStop,
+                TrackingStartedAt = Timestamp.AddDays(1)
+            });
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Allowed, result.Decision);
+        Assert.DoesNotContain(result.AppliedGuardrails, guardrail => guardrail.Id == "tracked-budget");
+        Assert.DoesNotContain("tracked-budget", result.Remaining.SpendingBudgetRemainingUsd.Keys);
+    }
+
+    [Fact]
+    public void SpendingBudgetAppliesAtTrackingBaseline()
+    {
+        var scenario = MeteredScenario(
+            new SpendingBudget
+            {
+                Id = "tracked-budget",
+                Scope = SpendingBudgetScope.Enterprise,
+                LimitUsd = 0m,
+                Enforcement = GuardrailEnforcement.HardStop,
+                TrackingStartedAt = Timestamp
+            });
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("tracked-budget", result.FirstFailingGate);
+        Assert.Equal(0m, result.Remaining.SpendingBudgetRemainingUsd["tracked-budget"]);
+    }
+
+    [Fact]
+    public void SpendingBudgetTrackingBaselineContinuesIntoLaterCycles()
+    {
+        var laterTimestamp = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+        var scenario = MeteredScenario(
+            new SpendingBudget
+            {
+                Id = "tracked-budget",
+                Scope = SpendingBudgetScope.Enterprise,
+                LimitUsd = 0m,
+                Enforcement = GuardrailEnforcement.HardStop,
+                TrackingStartedAt = Timestamp
+            });
+        scenario = scenario with
+        {
+            Timestamp = laterTimestamp,
+            BillingContext = scenario.BillingContext! with
+            {
+                CycleStart = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+                CycleEnd = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero)
+            }
+        };
+
+        var result = _engine.Simulate(scenario);
+
+        Assert.Equal(SimulationDecision.Blocked, result.Decision);
+        Assert.Equal("tracked-budget", result.FirstFailingGate);
+    }
+
+    [Fact]
     public void CostCenterExclusionRemovesEnterpriseBudgetConstraint()
     {
         var scenario = MeteredScenario(
