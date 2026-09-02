@@ -577,7 +577,7 @@ public sealed class SimulationEngineTests
     }
 
     [Fact]
-    public void MultipleEffectiveSelectedUserSeatsAreIndeterminate()
+    public void OverlappingSelectedUserSeatsAreInvalid()
     {
         var seat = Scenario().BillingContext!.SeatAssignments[0];
         var scenario = Scenario(Call()) with
@@ -588,10 +588,10 @@ public sealed class SimulationEngineTests
             }
         };
 
-        var result = _engine.Simulate(scenario);
+        var exception = Assert.Throws<SimulationException>(() => _engine.Simulate(scenario));
 
-        Assert.Equal(SimulationDecision.Indeterminate, result.Decision);
-        Assert.Equal("seat-assignment.ambiguous", result.FirstFailingGate);
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains("overlapping effective periods", exception.Message);
     }
 
     [Fact]

@@ -171,6 +171,58 @@ public sealed class GuardrailEngineTests
         Assert.Equal(1_900m, control.Limit);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OverlappingSeatsCannotInflateSharedEntitlement(bool useCostCenterControl)
+    {
+        var includedControls = useCostCenterControl
+            ? new CostCenterIncludedUsageControl[]
+            {
+                new()
+                {
+                    Id = "cc-1-included",
+                    CostCenterId = "cc-1",
+                    ConsumedCredits = 3_790m,
+                    OverflowBehavior = IncludedOverflowBehavior.Block
+                }
+            }
+            : [];
+        var scenario = RichScenario() with
+        {
+            BillingContext = Billing(
+                new EffectiveSeatAssignment
+                {
+                    UserId = "user-1",
+                    PlanId = "business",
+                    CostCenterId = "cc-1"
+                },
+                new EffectiveSeatAssignment
+                {
+                    UserId = "user-2",
+                    PlanId = "business",
+                    CostCenterId = "cc-1",
+                    EffectiveTo = Timestamp.AddHours(1)
+                },
+                new EffectiveSeatAssignment
+                {
+                    UserId = "USER-2",
+                    PlanId = "business",
+                    CostCenterId = "cc-1",
+                    EffectiveFrom = Timestamp.AddHours(-1)
+                }),
+            EconomicGuardrails = Economy(
+                poolConsumed: useCostCenterControl ? 0m : 3_790m,
+                includedControls: includedControls,
+                paidUsage: GuardrailValue.Disabled)
+        };
+
+        var exception = Assert.Throws<SimulationException>(() => _engine.Simulate(scenario));
+
+        Assert.Equal(SimulationScenarioValidator.InvalidContractCode, exception.Code);
+        Assert.Contains("overlapping effective periods for user 'user-2'", exception.Message);
+    }
+
     [Fact]
     public void LowestHeadroomAcrossCostCenterAndEnterpriseBudgetsBlocks()
     {

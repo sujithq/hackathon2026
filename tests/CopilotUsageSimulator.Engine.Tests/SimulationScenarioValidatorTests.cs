@@ -111,6 +111,62 @@ public sealed class SimulationScenarioValidatorTests
     }
 
     [Fact]
+    public void RejectsPartiallyOverlappingSeatAssignmentsCaseInsensitively()
+    {
+        var scenario = Scenario() with
+        {
+            BillingContext = Billing() with
+            {
+                SeatAssignments =
+                [
+                    Seat("user-1", Timestamp, Timestamp.AddHours(8)),
+                    Seat("USER-1", Timestamp.AddHours(4), Timestamp.AddHours(12))
+                ]
+            }
+        };
+
+        AssertInvalid(scenario, "overlapping effective periods for user 'user-1'");
+    }
+
+    [Fact]
+    public void RejectsOpenEndedOverlappingSeatAssignments()
+    {
+        var scenario = Scenario() with
+        {
+            BillingContext = Billing() with
+            {
+                SeatAssignments =
+                [
+                    Seat("user-1", Timestamp, null),
+                    Seat("user-1", Timestamp.AddHours(1), Timestamp.AddHours(2))
+                ]
+            }
+        };
+
+        AssertInvalid(scenario, "overlapping effective periods for user 'user-1'");
+    }
+
+    [Fact]
+    public void AllowsAdjacentHistoricalSeatAssignmentsAndOverlapsForDistinctUsers()
+    {
+        var scenario = Scenario() with
+        {
+            BillingContext = Billing() with
+            {
+                SeatAssignments =
+                [
+                    Seat("user-1", Timestamp.AddDays(-2), Timestamp.AddDays(-1)),
+                    Seat("USER-1", Timestamp.AddDays(-1), Timestamp),
+                    Seat("user-1", Timestamp.AddHours(1), null),
+                    Seat("user-2", Timestamp.AddDays(-1), Timestamp.AddHours(2))
+                ]
+            }
+        };
+
+        SimulationScenarioValidator.Validate(scenario);
+    }
+
+    [Fact]
     public void RejectsNegativeEconomicValuesAndInvalidEffectivePeriods()
     {
         AssertInvalid(
@@ -479,6 +535,18 @@ public sealed class SimulationScenarioValidatorTests
             BillingEntityId = "enterprise-1",
             CycleStart = Timestamp,
             CycleEnd = Timestamp.AddDays(1)
+        };
+
+    private static EffectiveSeatAssignment Seat(
+        string userId,
+        DateTimeOffset effectiveFrom,
+        DateTimeOffset? effectiveTo) =>
+        new()
+        {
+            UserId = userId,
+            PlanId = "business",
+            EffectiveFrom = effectiveFrom,
+            EffectiveTo = effectiveTo
         };
 
     private static EconomicGuardrailSnapshot Economy() => new();

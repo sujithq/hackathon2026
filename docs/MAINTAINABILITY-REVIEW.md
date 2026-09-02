@@ -2,7 +2,7 @@
 
 Reviewed: 2026-09-02  
 Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: Two findings open; ranked by severity below
+Status: One finding open; ranked by severity below
 
 ## Review Principles
 
@@ -127,11 +127,11 @@ Status: Two findings open; ranked by severity below
 
 - Severity: Medium
 - Effort: Small to medium
-- Status: Open
-- Evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validates each seat period independently but does not reject overlapping periods for the same user. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) sums every effective pooled seat when deriving enterprise and cost-center entitlement.
+- Status: Resolved 2026-09-02
+- Original evidence: [`SimulationScenarioValidator.cs`](../src/CopilotUsageSimulator.Engine/Simulation/SimulationScenarioValidator.cs) validated each seat period independently but did not reject overlapping periods for the same user. [`EconomicBalanceCalculator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicBalanceCalculator.cs) summed every effective pooled seat when deriving enterprise and cost-center entitlement.
 - Impact: Two effective pooled seats for one non-attributed user are counted as two licensed seats. This can overstate included-credit headroom and allow usage that should be metered or blocked. The attributed user is protected by F-01 ambiguity handling, but other pool members are not.
-- Recommended direction: Reject overlapping seat-assignment periods per user, case-insensitively, at scenario validation. Preserve adjacent exclusive-end periods as valid.
-- Planning acceptance: Add exact-boundary, partial-overlap, open-ended-overlap, case-insensitive user, distinct-user, and non-overlapping-history tests, plus an Engine regression proving pool and cost-center entitlement cannot double-count one user.
+- Resolution: Scenario validation now rejects overlapping seat-assignment periods per user, using case-insensitive identity and inclusive-start/exclusive-end intervals. Adjacent and non-overlapping historical periods remain valid.
+- Verification: Validator tests cover exact-boundary adjacency, partial and open-ended overlap, case-insensitive identity, distinct users, and non-overlapping history. Engine regressions prove duplicate effective seats cannot inflate enterprise-pool or cost-center entitlement.
 
 ### F-15: Browser save can persist a mixed state
 
@@ -213,9 +213,8 @@ No open findings currently qualify as low-hanging fruit.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
 - Preserve F-11 inclusive-start/exclusive-end allowance semantics when adding historical entitlement behavior or catalog periods.
-- Resolve F-14 before relying on imported seat histories for historical entitlement or repeated-session state.
 - F-15 is independent of Engine behavior but should retain transactional load semantics from F-04.
-- F-01 through F-13 and F-16 through F-19 are resolved.
+- F-01 through F-14 and F-16 through F-19 are resolved.
 
 ## Verification Baseline
 
@@ -229,7 +228,7 @@ Initial review baseline:
 Current implementation baseline:
 
 - Worktree was clean before the F-17 implementation.
-- Release tests passed: 207 total.
+- Release tests passed: 212 total.
 - Release build succeeded with zero warnings and errors.
 - No vulnerable or deprecated direct or transitive NuGet packages were reported.
 - `git diff --check` passed.

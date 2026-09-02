@@ -101,6 +101,24 @@ public static class SimulationScenarioValidator
             RequireOptionalIdentifier(assignment.CostCenterId, $"{path}.costCenterId");
             RequireEffectivePeriod(assignment.EffectiveFrom, assignment.EffectiveTo, path);
         }
+
+        foreach (var userAssignments in context.SeatAssignments.GroupBy(
+                     assignment => assignment.UserId,
+                     StringComparer.OrdinalIgnoreCase))
+        {
+            var orderedAssignments = userAssignments
+                .OrderBy(assignment => assignment.EffectiveFrom)
+                .ToArray();
+            for (var index = 1; index < orderedAssignments.Length; index++)
+            {
+                if (orderedAssignments[index - 1].EffectiveTo is null ||
+                    orderedAssignments[index].EffectiveFrom < orderedAssignments[index - 1].EffectiveTo)
+                {
+                    Invalid(
+                        $"billingContext.seatAssignments has overlapping effective periods for user '{userAssignments.Key}'.");
+                }
+            }
+        }
     }
 
     private static void ValidateAttribution(AttributionInput attribution)
