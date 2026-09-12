@@ -2,9 +2,9 @@
 
 Reviewed: 2026-09-12
 
-Scope: Accuracy of the user-supplied AI-credit decision-flow SVG and `sujithq/ghccp`'s `docs/decision-flow.md`, compared with current official billing documentation and this solution's Engine contracts, applicability, preview client, tests, and supported-scope documentation. The earlier 2026-09-02 whole-solution findings are preserved below; this is not a fresh whole-solution security audit.
+Scope: Alignment of the current Engine, Web clients, tests, and supported profile with the maintained local [`docs/decision-flow.md`](decision-flow.md). The earlier external-flow accuracy review and 2026-09-02 whole-solution findings are preserved below; this is not a fresh whole-solution security audit.
 
-Status: No open findings. F-20 through F-25 were resolved upstream and verified against current official evidence, this repository's canonical flow, and Engine behavior.
+Status: No implementation-alignment findings. F-01 through F-25 remain resolved.
 
 ## Review Principles
 
@@ -13,7 +13,27 @@ Status: No open findings. F-20 through F-25 were resolved upstream and verified 
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
 
-## Current Decision-Flow Findings
+## Current Implementation Alignment Review
+
+Result: No concrete correctness, maintainability, extensibility, security, or material regression-risk mismatch was found between the implementation and the maintained local financial flow.
+
+- Pipeline order matches the documented boundary: billing attribution and selected-seat validation precede runtime/access and pricing; AI economics precede the final Actions spending decision. First-failing termination prevents later budget evaluation after an earlier denial.
+- Economic evaluation uses request-sized ULB headroom, the non-negative minimum of pool and applicable included-control headroom, configurable split behavior, paid authorization only for a metered remainder, every applicable hard spending budget, and alert emission only for accepted usage.
+- Attribution resolves the licensing organization before direct/team/organization cost-center precedence, then reuses the same resolved identity for seat, ULB, included-control, organization fallback, enterprise exclusion, and spending-budget applicability.
+- Terminal results are atomic: blocked, indeterminate, waiting, soft-stopped, and partially simulated outcomes accept no allocation or alerts; an Actions budget rejection also restores unchanged AI and Actions balances. Required costs and applied checks remain observable separately.
+- Cost Compass uses copied scenarios and never advances working balances. The Advanced simulator explicitly labels repeat-and-advance behavior and carries state forward only after allowed runs.
+- `CompassPreviewProfile` enforces the documented Business/Enterprise date window, supported Chat/CLI/private cloud-agent workloads, standard Linux runner assumptions, whole pre-accounted Actions minutes, and cost-only exclusions.
+
+Residual risk: Individual and legacy branches remain explanatory rather than implemented Compass paths. Supplied attribution, access, consumption, and account/payment states are offline assumptions, not live GitHub observations. The advanced catalog supports `MeterEntireRequest`, while the diagram deliberately presents the default split policy.
+
+Validation at `362c784` (`docs(flows): preserve upstream and refresh AI-credit decision flow`):
+
+- Release tests passed: 465 total.
+- Release build succeeded with zero warnings and errors.
+- No vulnerable direct or transitive NuGet packages were reported from the configured package source.
+- The reviewed worktree was clean before this required ledger update.
+
+## Resolved Decision-Flow Findings
 
 Reviewed source: [external `docs/decision-flow.md`](https://github.com/sujithq/ghccp/blob/main/docs/decision-flow.md), retrieved 2026-09-12. Its own research date remains 2026-08-25. Line numbers below refer to that retrieved 92-line Markdown source, not a file in this checkout. The attached single-line SVG has matching nodes and edges but abbreviated labels; SHA-256: `221DB10A4A4B8285F30FD0302A9270B700F80C5672534791CC1296DB6EF804D3`.
 
