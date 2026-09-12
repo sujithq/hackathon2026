@@ -1,17 +1,21 @@
 using CopilotUsageSimulator.Engine.Guardrails;
+using CopilotUsageSimulator.Engine.Configuration;
 
 namespace CopilotUsageSimulator.Engine.Simulation;
 
 internal sealed class SimulationPipelineContext(
     SimulationScenario scenario,
-    EconomicBalanceCalculator balances)
+    EconomicBalanceCalculator balances,
+    EngineConfiguration configuration)
 {
+    public SimulationTraceRecorder Trace { get; } = new(configuration, scenario);
     public List<ExplanationEntry> Explanation { get; } = [];
     public List<string> Assumptions { get; } = [];
     public List<AppliedGuardrail> AppliedGuardrails { get; } = [];
     public List<ThresholdEvent> Alerts { get; } = [];
     public IReadOnlyList<ModelCallCharge> Calls { get; set; } = [];
     public CreditAllocation Allocation { get; set; } = new();
+    public SimulationCostRequirement CostRequirement { get; set; } = new();
     public ActionsUsageResult? ActionsUsage { get; set; }
     public AttributionResult? Attribution { get; set; }
     public EffectiveUserLevelBudgetResult? EffectiveUlb { get; set; }
@@ -25,14 +29,22 @@ internal sealed class SimulationPipelineContext(
             Decision = decision,
             FirstFailingGate = failingGate,
             Calls = Calls,
-            Allocation = Allocation,
+            Allocation = decision == SimulationDecision.Allowed ? Allocation : new(),
             ActionsUsage = ActionsUsage,
             Attribution = Attribution,
-            EffectiveUlb = EffectiveUlb,
-            AppliedGuardrails = AppliedGuardrails,
-            Alerts = Alerts,
+            EffectiveUlb = decision == SimulationDecision.Allowed || EffectiveUlb is null
+                ? EffectiveUlb
+                : EffectiveUlb with
+                {
+                    ReservedCredits = 0m,
+                    RemainingCredits = EffectiveUlb.LimitCredits - EffectiveUlb.ConsumedBeforeCredits
+                },
+            AppliedGuardrails = AppliedGuardrails.ToArray(),
+            Trace = Trace.Complete(Attribution),
+            CostRequirement = CostRequirement,
+            Alerts = decision == SimulationDecision.Allowed ? Alerts.ToArray() : [],
             Remaining = Remaining ?? balances.CreateUnchangedRemaining(scenario, Attribution),
-            Assumptions = Assumptions,
-            Explanation = Explanation
+            Assumptions = Assumptions.ToArray(),
+            Explanation = Explanation.ToArray()
         };
 }

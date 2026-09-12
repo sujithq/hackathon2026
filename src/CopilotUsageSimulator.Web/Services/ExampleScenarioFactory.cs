@@ -9,9 +9,10 @@ public static class ExampleScenarioFactory
     public static SimulationScenario Create(
         EngineConfiguration configuration,
         string operationId,
-        ExampleScenarioVariant variant = ExampleScenarioVariant.Standard)
+        ExampleScenarioVariant variant = ExampleScenarioVariant.Standard,
+        DateTimeOffset? simulationTimestamp = null)
     {
-        var timestamp = DateTimeOffset.UtcNow;
+        var timestamp = simulationTimestamp ?? DateTimeOffset.UtcNow;
         var operation = configuration.Operations.SingleOrDefault(candidate =>
             string.Equals(candidate.Id, operationId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ConfigurationException($"Unknown example operation '{operationId}'.");

@@ -4,10 +4,21 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Copilot usage simulator</title>
+    <title>GitHub Copilot Cost Compass</title>
     <base href="/" />
+    <script>
+        (() => {
+            const param = new URLSearchParams(window.location.search).get("scoutTheme");
+            const theme = param === "light" || param === "dark"
+                ? param
+                : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/compass.css" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
     <!-- If you add any scoped CSS files, uncomment the following to load them
     <link href="CopilotUsageSimulator.Web.styles.css" rel="stylesheet" /> -->
     <script type="importmap"></script>

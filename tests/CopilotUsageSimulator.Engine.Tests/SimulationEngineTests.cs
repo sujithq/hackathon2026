@@ -13,7 +13,7 @@ public sealed class SimulationEngineTests
     [Fact]
     public void DefaultCatalogLoadsCompleteCoreDefinitions()
     {
-        Assert.Equal("2026-09-02", _engine.Configuration.Version);
+        Assert.Equal("2026-09-11", _engine.Configuration.Version);
         Assert.Equal(7, _engine.Configuration.Plans.Count);
         Assert.True(_engine.Configuration.Models.Count >= 30);
         Assert.Contains(_engine.Configuration.Operations, x => x.Id == "cloud-agent");

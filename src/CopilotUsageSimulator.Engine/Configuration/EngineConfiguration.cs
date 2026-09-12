@@ -3,6 +3,7 @@ namespace CopilotUsageSimulator.Engine.Configuration;
 public sealed record EngineConfiguration
 {
     public string Version { get; init; } = "unspecified";
+    public ReferenceSnapshotDefinition? ReferenceSnapshot { get; init; }
     public decimal UsdPerCredit { get; init; } = 0.01m;
     public PoolOverflowBehavior PoolOverflowBehavior { get; init; } = PoolOverflowBehavior.Split;
     public IReadOnlyList<PlanDefinition> Plans { get; init; } = [];
@@ -41,6 +42,10 @@ public sealed record PlanAllowancePeriod
 public sealed record ModelDefinition
 {
     public required string Id { get; init; }
+    public string? DisplayName { get; init; }
+    public ModelAvailabilityDefinition? Availability { get; init; }
+    public IReadOnlySet<TokenComponent>? SupportedTokenComponents { get; init; }
+    public IReadOnlyList<string>? SourceIds { get; init; }
     public IReadOnlyList<ModelPricePeriod> PricePeriods { get; init; } = [];
 }
 
@@ -48,6 +53,7 @@ public sealed record ModelPricePeriod
 {
     public required DateTimeOffset EffectiveFrom { get; init; }
     public DateTimeOffset? EffectiveTo { get; init; }
+    public IReadOnlyList<string>? SourceIds { get; init; }
     public IReadOnlyList<TokenPriceTier> Tiers { get; init; } = [];
 }
 
@@ -98,6 +104,9 @@ public sealed record MultiplierDefinition
     public decimal Factor { get; init; } = 1m;
     public IReadOnlySet<string> ApplicableOperationIds { get; init; } = new HashSet<string>();
     public IReadOnlySet<string> ApplicableModelIds { get; init; } = new HashSet<string>();
+    public IReadOnlySet<string>? ApplicablePlanIds { get; init; }
+    public bool? IsReferenceSupported { get; init; }
+    public IReadOnlyList<string>? SourceIds { get; init; }
 }
 
 public sealed record ActionsRunnerDefinition

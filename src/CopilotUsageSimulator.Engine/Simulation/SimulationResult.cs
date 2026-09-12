@@ -12,10 +12,27 @@ public sealed record SimulationResult
     public AttributionResult? Attribution { get; init; }
     public EffectiveUserLevelBudgetResult? EffectiveUlb { get; init; }
     public IReadOnlyList<AppliedGuardrail> AppliedGuardrails { get; init; } = [];
+    public IReadOnlyList<SimulationTraceEntry> Trace { get; init; } = [];
+    public SimulationCostRequirement CostRequirement { get; init; } = new();
     public IReadOnlyList<ThresholdEvent> Alerts { get; init; } = [];
     public RemainingState Remaining { get; init; } = new();
     public IReadOnlyList<string> Assumptions { get; init; } = [];
     public IReadOnlyList<ExplanationEntry> Explanation { get; init; } = [];
+}
+
+/// <summary>
+/// Workload requirements, not accepted consumption. Values stay null until their pricing or
+/// allocation stage runs. ModelUsd includes included usage; AiUsd is only additional metered spend.
+/// </summary>
+public sealed record SimulationCostRequirement
+{
+    public decimal? AiCredits { get; init; }
+    public decimal? ModelUsd { get; init; }
+    public decimal? IncludedCredits { get; init; }
+    public decimal? MeteredCredits { get; init; }
+    public decimal? AiUsd { get; init; }
+    public decimal? ActionsUsd { get; init; }
+    public decimal? TotalUsd => AiUsd + ActionsUsd;
 }
 
 public enum SimulationDecision
@@ -33,6 +50,7 @@ public sealed record ModelCallCharge
     public int CallIndex { get; init; }
     public required string ModelId { get; init; }
     public required string PriceTierId { get; init; }
+    public ModelCallPricingEvidence? Pricing { get; init; }
     public decimal FreshInputUsd { get; init; }
     public decimal CachedInputUsd { get; init; }
     public decimal CacheWriteUsd { get; init; }
@@ -41,6 +59,24 @@ public sealed record ModelCallCharge
     public decimal AdjustedUsd { get; init; }
     public decimal Credits { get; init; }
     public IReadOnlyList<AppliedMultiplier> AppliedMultipliers { get; init; } = [];
+}
+
+/// <summary>
+/// The tariff selected by actual call pricing, before multipliers. EffectiveFrom is inclusive
+/// and EffectiveTo is exclusive. An explicitly unsupported token component has a null rate.
+/// </summary>
+public sealed record ModelCallPricingEvidence
+{
+    public required string PriceTierId { get; init; }
+    public required DateTimeOffset EffectiveFrom { get; init; }
+    public DateTimeOffset? EffectiveTo { get; init; }
+    public long? MinimumContextTokensExclusive { get; init; }
+    public long? MaximumContextTokensInclusive { get; init; }
+    public decimal? InputUsdPerMillion { get; init; }
+    public decimal? CachedInputUsdPerMillion { get; init; }
+    public decimal? CacheWriteUsdPerMillion { get; init; }
+    public decimal? OutputUsdPerMillion { get; init; }
+    public IReadOnlyList<string> SourceIds { get; init; } = [];
 }
 
 public sealed record AppliedMultiplier

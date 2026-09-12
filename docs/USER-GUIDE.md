@@ -1,8 +1,26 @@
-# Copilot usage simulator user guide
+# Cost Compass and advanced simulator user guide
 
 The web app estimates whether an agent task can run under a given GitHub Copilot billing and guardrail configuration. It runs entirely in the browser and does not send scenario data to a server.
 
-## Quick start
+## Cost Compass: configure, simulate, explain, resolve
+
+The root page (`/`, or `/compass`) offers focused **Chat**, **Cloud agent**, and **CLI** presets for standard September Business/Enterprise pooled-seat scenarios. The default demo requires 100 credits with 60 included credits remaining and paid usage disabled. It is a rejected request, not consumed usage.
+
+Edit the billed user, selected seat plan, cost center, workload, and controls. Select **Simulate** for an immutable preview: pressing it again does not consume additional balances. An input change replaces the old verdict with **Needs simulation**. Invalid numbers and failed imports cannot leave a stale success visible.
+
+The result shows the exact first blocker, required credits, proposed charges, accepted allocation, and remaining balances. The trace differentiates actual checks from **Not applicable**, **Not evaluated**, and **Excluded** in cost-only mode. These are the deterministic engine's stages, not a discovered live GitHub request pipeline.
+
+Select **Preview alternatives** to re-evaluate candidate changes. Compare their decisions, USD deltas, and any remaining blocker. **Use this scenario** changes only the local form; simulate again to confirm it. A smaller workload is not advertised as fitting an empty allowance, and enabling paid usage may reveal a subsequent hard-stop budget.
+
+The cloud-agent preset accepts pre-accounted, per-job-rounded minutes for a private repository on a standard Linux 2-core runner. Its GitHub account allowance is separate from Copilot credits. Code review's undisclosed model, unlicensed/fallback behavior, and non-guaranteed price ranges are explained rather than presented as a fixed-price preset. Personal billing, historical promotional cohorts, compliance modifier stacking, broader runner classes, standalone Actions, and future rollout/payment scenarios are not silently modeled as supported.
+
+**Save scenario** uses a separate single browser slot. **Export bundle** includes current form edits, complete scenario, catalog, reference source/date metadata, engine contract version, and catalog fingerprint. **Load browser save** and **Import** validate the bundle before changing the working state. Legacy scenario-only imports clearly use the active reference. Use the complete bundle editor for additional calls and advanced records; the guided workload fields edit the first call without discarding the others.
+
+The result evidence identifies the simulation date, catalog, verification date, limitations, and official sources. A fingerprint detects accidental catalog mismatches, not the trustworthiness of a custom reference. The header theme switch supports light/dark; an explicit `scoutTheme=light` or `scoutTheme=dark` query parameter takes precedence over OS preference.
+
+## Advanced simulator quick start
+
+Open `/advanced` for the preserved full simulator. **Only this workflow advances balances on successful runs.** The instructions below describe Advanced, not the preview-only Compass.
 
 1. Choose **Cloud agent**, **Code review**, or **Chat** as a starting template. Alternatively, select one of the six green cost-blocked scenarios to load and inspect a user-level budget, included-use overflow, paid-usage applicability, paid-usage state, AI spending budget, or Actions spending budget failure. The selected starter remains highlighted, and the scenario source changes from **Template defaults** to **Customized** after you edit a field.
 2. Describe the task the agent is expected to perform.

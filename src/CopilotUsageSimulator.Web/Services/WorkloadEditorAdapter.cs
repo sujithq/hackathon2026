@@ -63,6 +63,29 @@ public sealed class WorkloadEditorAdapter
             state.PlanId);
     }
 
+    public SimulationScenario ApplyChangesToScenario(
+        SimulationScenario scenario,
+        WorkloadEditorState state,
+        WorkloadEditorState baseline)
+    {
+        var proposed = ApplyToScenario(scenario, state);
+        var callChanged = state.ModelId != baseline.ModelId ||
+            state.ContextTokens != baseline.ContextTokens ||
+            state.FreshInputTokens != baseline.FreshInputTokens ||
+            state.CachedInputTokens != baseline.CachedInputTokens ||
+            state.CacheWriteTokens != baseline.CacheWriteTokens ||
+            state.OutputTokens != baseline.OutputTokens;
+        var metadata = new Dictionary<string, string>(scenario.Metadata, StringComparer.OrdinalIgnoreCase);
+        if (state.Task != baseline.Task) metadata["task"] = state.Task;
+        if (state.RepeatCount != baseline.RepeatCount) metadata["repeatCount"] = state.RepeatCount.ToString();
+        return proposed with
+        {
+            Calls = callChanged ? proposed.Calls : scenario.Calls,
+            BillingContext = state.PlanId != baseline.PlanId ? proposed.BillingContext : scenario.BillingContext,
+            Metadata = metadata
+        };
+    }
+
     private static SimulationScenario ApplyPlanSelection(
         SimulationScenario scenario,
         string planId)

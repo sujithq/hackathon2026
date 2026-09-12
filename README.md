@@ -1,8 +1,55 @@
-# Copilot Usage Simulator Engine
+# GitHub Copilot Cost Compass
 
-A configurable, UI-agnostic .NET 11 class library for simulating GitHub Copilot AI-credit usage, request blocking, budget allocation, and GitHub Actions runner charges.
+**Configure. Simulate. Explain. Resolve.** A responsive, offline Blazor WebAssembly experience for exploring GitHub Copilot usage costs and the first modeled blocker, backed by the existing deterministic .NET 11 engine.
 
-The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Token-Usage-Simulator-Flows.md). It can be hosted by a CLI, ASP.NET Core API, desktop application, test harness, notebook, or background service without changing the engine.
+This new version is implemented in the independent `GitHub Copilot Cost Compass` clone, based on `sujithq/hackathon2026` at `413f6f5359719c32ad00301861c3fdae12da3ab8`. The original implementation analysis and repository history are preserved. The [refreshed Cost Compass analysis and build plan](docs/COST-COMPASS-ANALYSIS.md) is the dated pre-implementation snapshot, verified against 23 official sources on 11 September 2026; it records the supported-case decisions and acceptance criteria.
+
+The reusable engine still follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Token-Usage-Simulator-Flows.md). It has no browser, UI, persistence, or network dependency and can also serve a CLI, API, desktop application, or test harness.
+
+## Run Cost Compass
+
+Install the SDK pinned in `global.json`, **11.0.100-preview.7.26381.103**, into the ignored `.dotnet` directory, or use an existing installation of that exact SDK. No Node.js packages, CDN, credentials, or backend service are required.
+
+```powershell
+.\.dotnet\dotnet.exe run --project src\CopilotUsageSimulator.Web --configuration Release --no-launch-profile --urls http://localhost:5086
+```
+
+Open `http://localhost:5086/` (also available at `/compass`). `/advanced` retains the original full simulator, including its explicit repeat-and-advance workflow. Append `?scoutTheme=light` or `?scoutTheme=dark` to choose a theme; otherwise the app follows the OS preference.
+
+## Supported preview scope
+
+| Area | Supported in Compass | Explicit boundary |
+|---|---|---|
+| Billing | Business and Enterprise pooled effective seats; standard September allowance | Not personal subscriptions, legacy annual plans, or inferred historical promotional cohorts |
+| Workloads | Supplied Chat, CLI, and cloud-agent token calls | The task description is not a token predictor; extra calls remain explicit |
+| Cloud-agent Actions | Private repository, standard Linux 2-core runner, USD 0.006 per accounted minute after supplied included minutes | Enter per-job-rounded, pre-accounted minutes, not raw durations. The account allowance is separate from the Copilot plan |
+| Controls | Supplied access and runtime assumptions, attribution, ULBs, included usage, paid usage, AI budgets, Actions budgets | A simulator trace is not a claim about GitHub's internal processing order or discovered live settings |
+| Model adjustments | Qualified Auto model-cost discount | Residency/FedRAMP eligibility and combined modifier stacking are not asserted as universal rules |
+| Code review | Official-source explanation of uncertainty | No invented actual review model, guaranteed price, unlicensed-seat denial, or limited-review fallback calculation |
+| Future announcements | Visible scope/evidence boundaries | September 28 unified/Sandbox changes and October cohort/payment behavior are not default live rules |
+
+Estimates are **incremental usage**, not complete invoices: seat subscriptions, taxes, currency conversion, infrastructure, and invoice reconciliation are excluded. Standalone Actions, public/self-hosted/larger-runner accounting, and complete code-review billing are deferred.
+
+Full-scope cloud-agent previews require an explicit Actions guardrail snapshot. Cost-only scope can omit it, but clearly excludes access/approval verification. Unchanged imported scenarios are not silently completed with new seats, model calls, direct cost-center assignments, or passing permissions from editor defaults.
+
+### The two-minute demo
+
+The default Chat fixture is pinned to 11 September 2026: **100 AI credits required, 60 pooled credits remaining, paid usage disabled**. It is genuinely blocked despite a nonzero allowance. The required credits are shown separately from accepted consumption.
+
+1. **Simulate** repeatedly: the same inputs produce the same decision; balances do not advance.
+2. **Preview alternatives**: each proposed change is re-run through the engine. A smaller workload can fit the included allowance; enabling paid usage can expose a later spending budget instead of falsely promising success.
+3. **Use this scenario** applies only a local candidate. Simulate again to confirm it. Raising an AI spending budget cannot override an earlier ULB, access, or model restriction.
+4. Select **Cloud agent** to see a distinct Actions meter, or **Copilot CLI** for a local workflow without runner charges.
+
+Input changes invalidate the previous verdict. Invalid numeric edits and failed imports cannot leave a successful verdict looking current. All six engine outcomes remain distinct; an unsupported or unpriced request is a non-estimate, not zero cost.
+
+### Save and reproduce the evidence
+
+**Save scenario** stores one Compass bundle in browser storage, separately from the Advanced simulator's save slot. Save and export capture current valid form edits even before simulation. A versioned bundle contains the complete scenario, matching catalog and reference metadata, engine contract identity, and a SHA-256 catalog fingerprint. The fingerprint detects mismatches; it is not a digital signature or proof that custom prices are official.
+
+Load/import validates the schema, version, scenario, catalog, and fingerprint before replacing the working state. Malformed input preserves the previous scenario and catalog while clearing the old verdict. Legacy scenario-only JSON remains importable with an explicit warning that the active catalog is being used.
+
+Sources have a verification date separate from the simulation date. Calendar-date model announcements use explicit midnight-UTC simulation boundaries, not an inferred exact live billing cutover. Sol's old promotional period is preserved alongside its sourced standard successor; no undocumented post-promotion Gemini price or cache-write rate is invented.
 
 ## Projects
 
@@ -10,7 +57,7 @@ The implementation follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Toke
 |---|---|
 | `src/CopilotUsageSimulator.Common` | Shared guardrail metadata, stable identifiers, cost classification, and GitHub documentation links |
 | `src/CopilotUsageSimulator.Engine` | Pure simulation domain and JSON configuration loader |
-| `src/CopilotUsageSimulator.Web` | Standalone Blazor WebAssembly simulator for GitHub Pages |
+| `src/CopilotUsageSimulator.Web` | Cost Compass at `/`, preserved full simulator at `/advanced`, and static GitHub Pages hosting |
 | `tests/CopilotUsageSimulator.Common.Tests` | Shared metadata contract and documentation-link tests |
 | `tests/CopilotUsageSimulator.Engine.Tests` | Contract and calculation tests |
 | `tests/CopilotUsageSimulator.Web.Tests` | bUnit component, guided-workflow, and serialization tests |
@@ -65,7 +112,11 @@ var result = engine.Simulate(new SimulationScenario
 Console.WriteLine($"{result.Decision}: {result.Allocation.TotalCredits} credits");
 ```
 
-`SimulationResult.Explanation` contains an ordered decision and calculation trace suitable for direct presentation. `FirstFailingGate` is a stable machine-readable identifier. Each applied guardrail carries a shared `MetadataKey`; hosts can resolve it through `GuardrailMetadataCatalog` for a consistent label, category, settings anchor, documentation link, unit, and cost classification.
+`SimulationResult.Explanation` preserves the legacy prose explanation. The additive structured trace distinguishes actual evaluated checks from not-applicable, skipped, and cost-only-excluded stages. `FirstFailingGate` remains a stable machine-readable identifier. Each applied guardrail carries a shared `MetadataKey`; hosts can resolve it through `GuardrailMetadataCatalog` for a consistent label, category, settings anchor, documentation link, unit, and cost classification.
+
+For the constrained Compass profile, any client can call `new SimulationPreviewService(configuration).Preview(scenario)` or `.Compare(scenario)`. `SimulationPreview` exposes nullable required costs, accepted costs, initial balances, reference identity, and explicit diagnostics. `SimulationComparison` carries an independent candidate scenario and its re-evaluated result; it does not mutate the baseline or authorize a live settings change. Use `ModelEligibilityEvaluator` in the engine's `Reference` namespace for supported model choices and selected tariff evidence rather than treating every historical catalog entry as currently available.
+
+Direct core pricing also honors declared model restrictions where evidence covers the scenario, explicitly unpriced token components, and multiplier plan applicability for the selected seat. Unknown legacy availability metadata still permits configured historical pricing. Compass preview is stricter: unverified eligibility produces a non-estimate rather than approval.
 
 ## Configuration
 
@@ -87,7 +138,7 @@ var engine = new CopilotUsageSimulationEngine(configuration);
 
 Configuration is validated at load and engine construction. Unknown references, duplicate IDs, invalid effective periods, invalid context ranges, and negative prices are rejected.
 
-An empty applicability set means "all." IDs are compared case-insensitively. A model may have several non-overlapping `pricePeriods`, making promotions and future price changes data changes rather than code changes. Undocumented future prices should be omitted; the engine then fails explicitly with `pricing-not-effective`.
+An empty operation/model applicability set means "all." Nullable multiplier `applicablePlanIds` preserves legacy all-plan behavior when omitted; a supplied set is an explicit allow-list. IDs are compared case-insensitively. A model may have several non-overlapping `pricePeriods`, making promotions and future price changes data changes rather than code changes. Undocumented future prices should be omitted; the engine then fails explicitly with `pricing-not-effective`.
 
 ## Access integration
 
@@ -151,28 +202,30 @@ var result = engine.Simulate(scenario);
 
 `AppliedGuardrails` reports every evaluated constraint, `EffectiveUlb` identifies the selected individual, cost-center, or universal limit, and `Alerts` contains thresholds crossed only by accepted charges. Actions access is checked before economic evaluation. Economic guardrails and AI-credit allocation run next, followed by the Actions spending budget only after economic approval. This preserves the economic constraint as the first failure when both spending meters would reject the request.
 
-## Web simulator
+## Advanced simulator and hosting
 
 The standalone web client runs the engine entirely in the browser. It provides guided task, workload, cost-center, ULB, budget, and Actions overrides, plus complete JSON editors for every scenario and catalog setting. Every evaluated check is visible by default and can be filtered by outcome or category.
 
 See the [end-user guide](docs/USER-GUIDE.md), which is also available from the **User guide** link inside the app.
 
 ```powershell
-dotnet run --project src\CopilotUsageSimulator.Web
+.\.dotnet\dotnet.exe run --project src\CopilotUsageSimulator.Web --configuration Release
 ```
 
-Scenarios, custom catalogs, and display preferences can be saved to browser storage. Scenario JSON can also be imported and exported. No usage data is sent to a server.
+The original Advanced workflow can still save scenarios, custom catalogs, and display preferences to its browser slot; its legacy export remains scenario-only. Use Compass bundles for portable matching reference evidence. No scenario data is sent to a server by either client.
 
 The workflow in `.github\workflows\deploy-pages.yml` publishes the static WebAssembly output to GitHub Pages on pushes to `main`. Enable **Settings → Pages → Source: GitHub Actions** in the destination repository.
 
 ## Build and test
 
 ```powershell
-dotnet test CopilotUsageSimulator.slnx
+.\.dotnet\dotnet.exe test CopilotUsageSimulator.slnx --configuration Release
+.\.dotnet\dotnet.exe build CopilotUsageSimulator.slnx --configuration Release --no-restore
+git diff --check
 ```
 
 The web tests run through bUnit without starting a browser. They cover template rendering,
 cost-only visibility, repeated simulations, blocking-setting highlights, validation errors,
 official documentation links, shared controls, and JSON round trips.
 
-The repository pins `.NET SDK 11.0.100-preview.7.26381.103` through `global.json`. The SDK is installed in `.dotnet` and the system-wide installation remains unchanged.
+The repository pins `.NET SDK 11.0.100-preview.7.26381.103` through `global.json`. `.dotnet` is ignored; no machine-specific SDK path is committed.

@@ -34,6 +34,8 @@ public sealed class EconomicGuardrailEvaluator(
                 message: "The simulation timestamp is outside the supplied billing cycle.");
         }
 
+        applied.Add(Observation("billing-cycle.timestamp", "billing-cycle", GuardrailOutcome.Passed,
+            "The timestamp is within the supplied billing cycle."));
         var poolEntitlement = balances.CalculatePoolEntitlement(billing, scenario.Timestamp);
         if (!poolEntitlement.IsKnown)
         {
@@ -47,6 +49,12 @@ public sealed class EconomicGuardrailEvaluator(
                 message: failure.Message);
         }
 
+        applied.Add(Observation("pool-entitlement", "pool-entitlement", GuardrailOutcome.Passed,
+            "The active pooled seats have known effective allowances.") with
+        {
+            Limit = poolEntitlement.Credits,
+            ConsumedBefore = snapshot.EnterprisePoolConsumedCredits
+        });
         var poolRemaining = EconomicBalanceCalculator.Available(
             poolEntitlement.Credits,
             snapshot.EnterprisePoolConsumedCredits);
@@ -92,7 +100,7 @@ public sealed class EconomicGuardrailEvaluator(
                 RemainingAfter = blocked ? remaining : remaining - requestedCredits,
                 Message = blocked
                     ? "The effective user-level budget cannot cover the request."
-                    : "The effective user-level budget reserved the request credits."
+                    : "The effective user-level budget provisionally reserved the request credits; rejected usage releases the reservation."
             });
             effectiveUlb = new EffectiveUserLevelBudgetResult
             {
@@ -117,6 +125,11 @@ public sealed class EconomicGuardrailEvaluator(
                     unchangedRemaining,
                     effectiveUlb);
             }
+        }
+        else
+        {
+            applied.Add(Observation("user-level-budget", GuardrailCategories.UserLevelBudget,
+                GuardrailOutcome.NotApplicable, "No effective ULB applies to the selected user."));
         }
 
         var includedAvailable = poolRemaining;
@@ -193,6 +206,11 @@ public sealed class EconomicGuardrailEvaluator(
                     effectiveUlb);
             }
         }
+        else
+        {
+            applied.Add(Observation("included-usage-control", GuardrailCategories.IncludedUsageControl,
+                GuardrailOutcome.NotApplicable, "No included-usage control applies to the attributed cost center."));
+        }
 
         var split = configuration.PoolOverflowBehavior == PoolOverflowBehavior.Split;
         var includedCredits = requestedCredits <= includedAvailable
@@ -200,6 +218,14 @@ public sealed class EconomicGuardrailEvaluator(
             : split ? includedAvailable : 0m;
         var meteredCredits = requestedCredits - includedCredits;
         var meteredUsd = meteredCredits * configuration.UsdPerCredit;
+        var requiredAllocation = new CreditAllocation
+        {
+            TotalCredits = requestedCredits,
+            IncludedCredits = includedCredits,
+            IncludedUsageControlId = includedControl.Value?.Id,
+            MeteredCredits = meteredCredits,
+            MeteredUsd = meteredUsd
+        };
 
         applied.Add(new AppliedGuardrail
         {
@@ -212,7 +238,7 @@ public sealed class EconomicGuardrailEvaluator(
             ConsumedBefore = snapshot.EnterprisePoolConsumedCredits,
             Requested = includedCredits,
             RemainingAfter = poolRemaining - includedCredits,
-            Message = $"Allocated {includedCredits:G29} credits from the enterprise pool."
+            Message = $"Proposed {includedCredits:G29} credits from the enterprise pool; allocation is accepted only if every check permits the request."
         });
 
         if (meteredCredits > 0)
@@ -224,6 +250,11 @@ public sealed class EconomicGuardrailEvaluator(
                     snapshot.PaidUsage.SkuIds,
                     scenario.SkuId))
             {
+                applied.Add(AuthorizationGuardrail(GuardrailOutcome.Blocked) with
+                {
+                    Id = "paid-usage.not-applicable",
+                    Message = "Paid usage is not authorized for this product and SKU."
+                });
                 return EconomicGuardrailEvaluation.Stop(
                     SimulationDecision.Blocked,
                     "paid-usage.not-applicable",
@@ -231,11 +262,19 @@ public sealed class EconomicGuardrailEvaluator(
                     alerts,
                     unchangedRemaining,
                     effectiveUlb,
-                    "Paid usage is not authorized for this product and SKU.");
+                    "Paid usage is not authorized for this product and SKU.") with
+                {
+                    RequiredAllocation = requiredAllocation
+                };
             }
 
             if (snapshot.PaidUsage.State == GuardrailValue.Unknown)
             {
+                applied.Add(AuthorizationGuardrail(GuardrailOutcome.Indeterminate) with
+                {
+                    Id = "paid-usage.unknown",
+                    Message = "Paid-usage authorization is unknown."
+                });
                 return EconomicGuardrailEvaluation.Stop(
                     SimulationDecision.Indeterminate,
                     "paid-usage.unknown",
@@ -243,7 +282,10 @@ public sealed class EconomicGuardrailEvaluator(
                     alerts,
                     unchangedRemaining,
                     effectiveUlb,
-                    "Paid-usage authorization is unknown.");
+                    "Paid-usage authorization is unknown.") with
+                {
+                    RequiredAllocation = requiredAllocation
+                };
             }
 
             if (snapshot.PaidUsage.State == GuardrailValue.Disabled)
@@ -255,10 +297,20 @@ public sealed class EconomicGuardrailEvaluator(
                     applied,
                     alerts,
                     unchangedRemaining,
-                    effectiveUlb);
+                    effectiveUlb) with
+                {
+                    RequiredAllocation = requiredAllocation
+                };
             }
 
             applied.Add(AuthorizationGuardrail(GuardrailOutcome.Passed));
+        }
+        else
+        {
+            applied.Add(AuthorizationGuardrail(GuardrailOutcome.NotApplicable) with
+            {
+                Message = "The workload is fully included; paid-usage authorization is not required."
+            });
         }
 
         var applicableBudgets = meteredCredits == 0
@@ -269,6 +321,14 @@ public sealed class EconomicGuardrailEvaluator(
                 scenario.ProductId,
                 scenario.SkuId,
                 scenario.Timestamp);
+        if (applicableBudgets.Count == 0)
+        {
+            applied.Add(Observation("metered-spending-budget", GuardrailCategories.MeteredSpendingBudget,
+                GuardrailOutcome.NotApplicable,
+                meteredCredits == 0
+                    ? "No metered charge requires a spending budget."
+                    : "No spending budget applies to the attributed user, product, SKU, and timestamp."));
+        }
         var budgetAlerts = new List<ThresholdEvent>();
         var budgetRemaining = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         SpendingBudget? blockingBudget = null;
@@ -349,7 +409,10 @@ public sealed class EconomicGuardrailEvaluator(
                 effectiveUlb,
                 applied,
                 alerts,
-                null);
+                null)
+            {
+                RequiredAllocation = allocation
+            };
         }
 
         var rejectedUlb = effectiveUlb is null
@@ -362,12 +425,15 @@ public sealed class EconomicGuardrailEvaluator(
         return new EconomicGuardrailEvaluation(
             SimulationDecision.Blocked,
             blockingBudget.Id,
-            new CreditAllocation { TotalCredits = requestedCredits },
+            new CreditAllocation(),
             unchangedRemaining,
             rejectedUlb,
             applied,
             alerts,
-            null);
+            null)
+        {
+            RequiredAllocation = allocation
+        };
 
         AppliedGuardrail AuthorizationGuardrail(GuardrailOutcome outcome) =>
             new()
@@ -410,6 +476,17 @@ public sealed class EconomicGuardrailEvaluator(
         }
     }
 
+    private static AppliedGuardrail Observation(string id, string category, GuardrailOutcome outcome, string message) =>
+        new()
+        {
+            Id = id,
+            MetadataKey = category,
+            Category = category,
+            Enforcement = GuardrailEnforcement.ObserveOnly,
+            Outcome = outcome,
+            Message = message
+        };
+
 }
 
 public sealed record EconomicGuardrailEvaluation(
@@ -422,6 +499,8 @@ public sealed record EconomicGuardrailEvaluation(
     IReadOnlyList<ThresholdEvent> Alerts,
     string? Message)
 {
+    public CreditAllocation? RequiredAllocation { get; init; }
+
     public static EconomicGuardrailEvaluation Stop(
         SimulationDecision decision,
         string id,
@@ -435,7 +514,11 @@ public sealed record EconomicGuardrailEvaluation(
             id,
             new CreditAllocation(),
             remaining,
-            effectiveUlb,
+            effectiveUlb is null ? null : effectiveUlb with
+            {
+                ReservedCredits = 0m,
+                RemainingCredits = effectiveUlb.LimitCredits - effectiveUlb.ConsumedBeforeCredits
+            },
             applied,
             alerts,
             message);

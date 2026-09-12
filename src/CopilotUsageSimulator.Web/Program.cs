@@ -25,5 +25,8 @@ builder.Services.AddSingleton<ActionsEditorAdapter>();
 builder.Services.AddSingleton<ScenarioEditorAdapter>();
 builder.Services.AddScoped<BrowserScenarioPersistence>();
 builder.Services.AddScoped<HomePageModel>();
+builder.Services.AddSingleton<CompassBundleCodec>();
+builder.Services.AddScoped<CompassBrowserPersistence>();
+builder.Services.AddScoped<CompassPageModel>();
 
 await builder.Build().RunAsync();

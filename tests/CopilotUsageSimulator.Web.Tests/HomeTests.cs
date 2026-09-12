@@ -532,6 +532,13 @@ public sealed class HomeTests : BunitContext
             {
                 PreferredOperationId = "custom-operation"
             },
+            Models = original.Models.Select(model => model with
+            {
+                Availability = model.Availability is null ? null : model.Availability with
+                {
+                    AutoModelSelectionOperationIds = []
+                }
+            }).ToArray(),
             Operations =
             [
                 new OperationDefinition

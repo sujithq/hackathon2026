@@ -1,6 +1,6 @@
 namespace CopilotUsageSimulator.Engine.Configuration;
 
-public static class EngineConfigurationValidator
+public static partial class EngineConfigurationValidator
 {
     public static void Validate(EngineConfiguration configuration)
     {
@@ -83,6 +83,8 @@ public static class EngineConfigurationValidator
         var modelIds = configuration.Models.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var planIds = configuration.Plans.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var runnerIds = configuration.ActionsRunners.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        ValidateReferenceMetadata(configuration, planIds, operationIds);
 
         if (string.IsNullOrWhiteSpace(configuration.ExampleScenario.ProductId) ||
             string.IsNullOrWhiteSpace(configuration.ExampleScenario.SkuId))
