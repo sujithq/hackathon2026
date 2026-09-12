@@ -61,6 +61,20 @@ public sealed class CompassTests : BunitContext
     }
 
     [Fact]
+    public void DecisionFlowIsEmbeddedInPrimaryCompassPage()
+    {
+        var cut = Render<Compass>();
+
+        Assert.NotNull(cut.Find("#cc-decision-flow"));
+        Assert.Equal("#cc-decision-flow", cut.Find("nav[aria-label='Compass navigation'] a").GetAttribute("href"));
+        Assert.Equal("AI-credit decision flow", cut.Find("#cc-flow-title").TextContent);
+
+        cut.Find("nav[aria-label='Compass navigation'] a").Click();
+
+        Assert.Contains(JSInterop.Invocations, invocation => invocation.Identifier == "decisionFlow.reveal");
+    }
+
+    [Fact]
     public void EditingChildConfigurationInvalidatesParentVerdictAndComparisons()
     {
         var cut = Render<Compass>();

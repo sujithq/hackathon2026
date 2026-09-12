@@ -261,6 +261,35 @@ html[data-theme="dark"] {
 .cp-review-note { margin: 10px 0 0; border-left: 2px solid var(--cp-accent); padding-left: 10px; }
 .cp-link-button { padding: 0; min-height: 32px; border: 0; color: var(--cp-link); background: var(--cp-surface); font-size: .76rem; text-decoration: underline; text-align: left; }
 .cp-link-button:hover { color: var(--cp-accent); }
+.cp-flow {
+    max-width: 1840px; margin: 20px auto 0; overflow: hidden;
+    border: 1px solid var(--cp-border); border-radius: 16px;
+    background: var(--cp-surface); box-shadow: 0 1px 2px var(--cp-border);
+    scroll-margin-top: 16px;
+}
+.cp-flow-header {
+    display: flex; align-items: end; justify-content: space-between; gap: 20px;
+    padding: 20px 20px 16px; border-bottom: 1px solid var(--cp-border);
+}
+.cp-flow-header > div:first-child { display: grid; gap: 4px; }
+.cp-flow-header h2 { font-size: 1rem; }
+.cp-flow-header p:not(.cp-kicker) { max-width: 780px; color: var(--cp-text-muted); font-size: .76rem; }
+.cp-flow-toolbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.cp-flow-toolbar .cp-button-icon { width: 40px; padding: 0; font-weight: 700; }
+.cp-flow-viewport {
+    width: 100%; height: clamp(620px, 75vh, 900px); overflow: auto;
+    background-color: var(--cp-bg-elevated);
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--cp-border) 45%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--cp-border) 45%, transparent) 1px, transparent 1px);
+    background-size: 24px 24px; scrollbar-color: var(--cp-border-strong) transparent;
+}
+.cp-flow-diagram { min-width: 980px; min-height: 100%; padding: 20px; }
+.cp-flow-diagram svg { display: block; }
+.cp-flow-loading { min-height: 500px; display: grid; place-items: center; color: var(--cp-text-muted); }
+.cp-flow-loading[hidden] { display: none; }
+.cp-flow:has(.cp-flow-diagram svg) .cp-flow-loading { display: none; }
+.cp-flow-error { padding: 12px 16px !important; border-left: 3px solid var(--cp-danger); color: var(--cp-danger); background: color-mix(in srgb, var(--cp-danger) 8%, transparent); }
 
 @media (min-width: 1600px) {
     .compass-shell { padding-left: 32px; padding-right: 32px; }
@@ -303,6 +332,11 @@ html[data-theme="dark"] {
     .cp-transfer { padding: 14px; }
     .cp-trace-state { white-space: normal; }
     .cp-trace-scroll { max-height: 360px; }
+    .cp-flow { margin-top: 16px; }
+    .cp-flow-header { align-items: start; flex-direction: column; padding: 18px 16px 14px; }
+    .cp-flow-toolbar { width: 100%; }
+    .cp-flow-viewport { height: 620px; }
+    .cp-flow-diagram { min-width: 840px; padding: 12px; }
 }
 @media (prefers-reduced-motion: no-preference) {
     .cp-button, .cp-preset { transition: border-color .15s ease, background-color .15s ease; }

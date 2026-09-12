@@ -33,6 +33,24 @@ Validation at `362c784` (`docs(flows): preserve upstream and refresh AI-credit d
 - No vulnerable direct or transitive NuGet packages were reported from the configured package source.
 - The reviewed worktree was clean before this required ledger update.
 
+### Rendered Decision-Flow Integration Review
+
+Status: Implemented and reviewed 2026-09-12; no open findings.
+
+- Embedded the maintained Mermaid diagram directly in the primary Cost Compass page as a full-width "How the result is decided" section with in-page navigation, scroll, zoom, fit-to-width, and responsive desktop/mobile presentation. The former `/flow` route redirects to this section.
+- The checked-in `.mmd` asset is extracted from [`decision-flow.md`](decision-flow.md), and tests reject source drift. Mermaid `11.17.2` is pinned through npm, loaded only when the embedded section approaches the viewport or is explicitly opened, shipped with its MIT notice, and protected by a generated SHA-256/version manifest verified by tests.
+- Browser review caught and repaired a Blazor/Mermaid DOM-ownership exception caused by replacing framework-managed loading markup. A second mobile review repaired restored loading state and off-screen initial positioning after component rerenders.
+- Independent post-fix review required visibility-deferred loading with disposal cleanup, retry after a failed runtime load, theme-responsive rerendering through the guarded render path, license distribution, equivalent screen-reader flow content, true fit-to-width behavior, generated-bundle integrity coverage, control interop tests, and focus restoration for the former route. Later review repaired the former route for non-root GitHub Pages base paths, made initialization and render failure/retry transitions clear loading and alert state deterministically, and prevented theme rerenders from stealing focus from the theme button. A final review added semantic group/region roles and prevented empty or completed loading/error placeholders from entering the accessibility tree. All were implemented before final validation.
+- Final browser checks confirmed the Cost Compass in-page link renders and focuses the embedded section, the former `/flow` URL redirects there, all 54 nodes render inside `.compass-shell` with no console/page errors, theme switching regenerates the SVG, named control-group and scroll-region semantics remain exposed, mobile starts at readable zoom and can fit to width, and no body overflow or overlapping content is introduced.
+
+Validation:
+
+- Release tests passed: 472 total.
+- Release build succeeded with zero warnings and errors.
+- Focused Web tests passed: 119 total.
+- `npm audit` reported zero vulnerabilities.
+- `git diff --check` passed.
+
 ## Resolved Decision-Flow Findings
 
 Reviewed source: [external `docs/decision-flow.md`](https://github.com/sujithq/ghccp/blob/main/docs/decision-flow.md), retrieved 2026-09-12. Its own research date remains 2026-08-25. Line numbers below refer to that retrieved 92-line Markdown source, not a file in this checkout. The attached single-line SVG has matching nodes and edges but abbreviated labels; SHA-256: `221DB10A4A4B8285F30FD0302A9270B700F80C5672534791CC1296DB6EF804D3`.

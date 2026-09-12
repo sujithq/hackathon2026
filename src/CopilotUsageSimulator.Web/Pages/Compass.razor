@@ -37,6 +37,7 @@
     <span><CompassIcon Name="shield" Size="14" /> Offline, immutable previews</span>
     <span>Evidence verified: @Model.ReferenceVerifiedLabel</span>
     <nav aria-label="Compass navigation">
+        <a href="#cc-decision-flow" @onclick="ShowDecisionFlow" @onclick:preventDefault="true">Decision flow</a>
         <a href="#cc-evidence">Sources &amp; scope</a>
         <a href="advanced">Advanced simulator</a>
         <a href="guide">User guide</a>
@@ -165,6 +166,8 @@
     </section>
 </main>
 
+<CompassDecisionFlow />
+
 <footer class="cp-footer">
     <span>Deterministic .NET engine. Runs entirely in Blazor WebAssembly.</span>
     <span>Incremental usage estimate, not a GitHub invoice. USD; seat fees and taxes excluded.</span>
@@ -219,6 +222,17 @@
 
     private void ImportText() => Model.Import(_bundleText);
     private Task ImportFileAsync(InputFileChangeEventArgs args) => Model.ImportFileAsync(args.File);
+    private async Task ShowDecisionFlow()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("decisionFlow.reveal", "cc-decision-flow");
+        }
+        catch (JSException exception)
+        {
+            Model.ReportError($"Decision flow could not be opened: {exception.Message}");
+        }
+    }
     // Dispatching this callback re-renders the page after child-owned form edits.
     private void Refresh() { }
 }
