@@ -6,13 +6,14 @@ using System.Text.Json.Serialization;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Simulation;
 
-namespace CopilotUsageSimulator.Web.Services;
+namespace CopilotUsageSimulator.Bundles;
 
 public sealed class CompassBundleCodec(ScenarioJson scenarioJson)
 {
     public const string Schema = "github-copilot-cost-compass";
     public const int SchemaVersion = 1;
     public const string EngineContract = "copilot-usage-simulator/compass-v1";
+    public const int MaximumFileBytes = 2 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions Options = new()
     {

@@ -59,10 +59,28 @@ Sources have a verification date separate from the simulation date. Calendar-dat
 |---|---|
 | `src/CopilotUsageSimulator.Common` | Shared guardrail metadata, stable identifiers, cost classification, and GitHub documentation links |
 | `src/CopilotUsageSimulator.Engine` | Pure simulation domain and JSON configuration loader |
+| `src/CopilotUsageSimulator.Bundles` | Shared Compass v1 transport, catalog fingerprint and legacy scenario serialization |
+| `src/CopilotUsageSimulator.BundleTool` | Installable `compass-bundle` tool for read-only enterprise snapshots and offline bundle creation |
 | `src/CopilotUsageSimulator.Web` | Cost Compass at `/`, preserved full simulator at `/advanced`, and static GitHub Pages hosting |
 | `tests/CopilotUsageSimulator.Common.Tests` | Shared metadata contract and documentation-link tests |
 | `tests/CopilotUsageSimulator.Engine.Tests` | Contract and calculation tests |
+| `tests/CopilotUsageSimulator.BundleTool.Tests` | CLI, snapshot reconciliation, HTTP fixtures and output-safety regressions |
 | `tests/CopilotUsageSimulator.Web.Tests` | bUnit component, guided-workflow, and serialization tests |
+
+## Create a Bundle With the .NET Tool
+
+The independent `compass-bundle` tool supports `collect`, `create`, and `validate`. It shares the app's existing v1 bundle codec and deterministic Engine without depending on Web.
+
+Try the checked-in offline example with the pinned SDK:
+
+```powershell
+.\.dotnet\dotnet.exe run --project src/CopilotUsageSimulator.BundleTool --configuration Release -- create --snapshot examples/enterprise-import/snapshot.json --workload examples/enterprise-import/workload.json --overrides examples/enterprise-import/overrides.json --output artifacts/bundle-tool/example.compass.json
+.\.dotnet\dotnet.exe run --project src/CopilotUsageSimulator.BundleTool --configuration Release --no-build -- validate artifacts/bundle-tool/example.compass.json
+```
+
+Import the generated bundle in the primary Compass page, then simulate. The synthetic example is valid but blocked by `cc-spend`; validity does not mean approval, and no balances advance.
+
+See the [enterprise import guide](docs/ENTERPRISE-IMPORT.md) for pack/install instructions, environment-token authentication, live read-only collection, source coverage and explicit confirmations. A bundle represents one selected user/workload, must fit the 2 MiB file limit, and remains inside the existing September 2026 profile. Missing financial data is not silently treated as zero. Live collection does not configure GitHub or automatically produce a complete financial snapshot.
 
 ## Use the engine
 

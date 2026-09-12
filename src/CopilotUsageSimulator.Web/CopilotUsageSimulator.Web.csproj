@@ -14,6 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="CopilotUsageSimulator.Bundles" />
+    <ProjectReference Include="..\CopilotUsageSimulator.Bundles\CopilotUsageSimulator.Bundles.csproj" />
     <ProjectReference Include="..\CopilotUsageSimulator.Common\CopilotUsageSimulator.Common.csproj" />
     <ProjectReference Include="..\CopilotUsageSimulator.Engine\CopilotUsageSimulator.Engine.csproj" />
   </ItemGroup>

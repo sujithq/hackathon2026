@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Simulation;
 
-namespace CopilotUsageSimulator.Web.Services;
+namespace CopilotUsageSimulator.Bundles;
 
 public sealed class ScenarioJson
 {

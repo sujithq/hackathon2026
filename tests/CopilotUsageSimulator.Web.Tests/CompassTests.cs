@@ -1,12 +1,14 @@
 using System.Text.Json.Nodes;
 using AngleSharp.Dom;
 using Bunit;
+using CopilotUsageSimulator.BundleTool;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Guardrails;
 using CopilotUsageSimulator.Engine.Simulation;
 using CopilotUsageSimulator.Web.Pages;
 using CopilotUsageSimulator.Web.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CopilotUsageSimulator.Web.Tests;
@@ -58,6 +60,45 @@ public sealed class CompassTests : BunitContext
         Assert.Equal(before, json.Serialize(model.Scenario));
         Assert.Equal(5_740m, model.Scenario.EconomicGuardrails!.EnterprisePoolConsumedCredits);
         Assert.Equal("100", cut.Find("[data-testid=required-credits]").TextContent);
+    }
+
+    [Fact]
+    public async Task ToolOutputImportsThroughPrimaryFileWorkflowWithoutAdvancingBalances()
+    {
+        var directory = Path.Combine(AppContext.BaseDirectory, "EnterpriseImport");
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exitCode = await new BundleToolApplication().RunAsync([
+            "create", "--snapshot", Path.Combine(directory, "snapshot.json"),
+            "--workload", Path.Combine(directory, "workload.json"),
+            "--overrides", Path.Combine(directory, "overrides.json"), "--output", "-"
+        ], output, error);
+        Assert.True(exitCode == 0, error.ToString());
+        var bundle = output.ToString();
+        var expected = BundleInspector.Validate(bundle);
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        Assert.True(model.Import(bundle));
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText(bundle, "enterprise-compass.json"));
+        Assert.Null(model.Error);
+        Assert.Null(model.EvidenceWarning);
+        Assert.Equal(expected.CatalogSha256, model.CatalogFingerprint);
+        Assert.Equal("alice", model.Scenario.Attribution!.UserId);
+        Assert.Equal(2, model.Scenario.BillingContext!.SeatAssignments.Count);
+        Assert.Contains(model.Scenario.BillingContext.SeatAssignments, seat => seat.CostCenterId == "cc-research");
+        var before = Services.GetRequiredService<ScenarioJson>().Serialize(model.Scenario);
+
+        cut.Find("#cc-simulate").Click();
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal(before, Services.GetRequiredService<ScenarioJson>().Serialize(model.Scenario));
+        Assert.Equal(expected.PreviewDecision, model.Preview!.Result!.Decision.ToString());
+        Assert.Equal("cc-spend", model.Preview.Result.FirstFailingGate);
+        Assert.Equal(200m, Assert.Single(model.Scenario.EconomicGuardrails!.UserLevelBudgets).ConsumedCredits);
+        Assert.Equal(5740m, model.Scenario.EconomicGuardrails.EnterprisePoolConsumedCredits);
+        Assert.Equal(.8m, model.Scenario.EconomicGuardrails.SpendingBudgets.Single(budget => budget.Id == "cc-spend").ConsumedUsd);
+        Assert.Equal("100", cut.Find("[data-testid=required-credits]").TextContent);
+        Assert.Equal("0", cut.Find("[data-testid=accepted-credits]").TextContent);
     }
 
     [Fact]

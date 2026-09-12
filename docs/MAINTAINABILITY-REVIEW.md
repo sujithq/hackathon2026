@@ -2,9 +2,9 @@
 
 Reviewed: 2026-09-12
 
-Scope: Alignment of the current Engine, Web clients, tests, and supported profile with the maintained local [`docs/decision-flow.md`](decision-flow.md). The earlier external-flow accuracy review and 2026-09-02 whole-solution findings are preserved below; this is not a fresh whole-solution security audit.
+Scope: Bundle-tool implementation across shared contracts, Engine boundaries, both Web clients, offline reconciliation, HTTP collection, command/file safety, tests, configuration and documentation; the maintained local [`docs/decision-flow.md`](decision-flow.md) remains the financial reference. Earlier flow and whole-solution findings are preserved below.
 
-Status: No implementation-alignment findings. F-01 through F-25 remain resolved.
+Status: No open findings. F-26 through F-30 are resolved; final Release, local package/install and whitespace validation passed. Earlier F-01 through F-25 remain resolved.
 
 ## Review Principles
 
@@ -12,6 +12,94 @@ Status: No implementation-alignment findings. F-01 through F-25 remain resolved.
 - Keep Web limited to rendering, browser persistence, UI state, and client orchestration.
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
+
+## Bundle Tool Phase Reviews
+
+Reviewed 2026-09-12 against the staged, unstaged and untracked working tree. No implementation changes were made outside the approved tool, shared serialization extraction and directly related integration/configuration/documentation.
+
+### F-27: Collection pagination and body failures could lose evidence
+
+- Severity: High
+- Effort: Small
+- Status: Resolved during HTTP-boundary review.
+- Evidence: [`GitHubReadClient.cs:50`](../src/CopilotUsageSimulator.BundleTool/GitHubReadClient.cs#L50) previously checked next-link host/path but did not preserve filters or require consecutive pages. Header-read completion alone did not bound body reads; the current [page deadline](../src/CopilotUsageSimulator.BundleTool/GitHubReadClient.cs#L121) covers that path.
+- Impact: A dropped user filter, skipped/repeated page or stalled response could undermine source completeness or leave collection unfinished.
+- Resolution: Pagination validates host, resource, filter, page-size and sequence invariants, rejects repeated contents/changing totals, and applies byte/page/request limits. A bounded page deadline includes response-body reads; transport failures are sanitized. Redirects remain disabled and only GET is constructed.
+- Dependencies: The collector separately verifies unique seats against `total_seats` and budget totals; source failure never becomes an empty configuration.
+- Verification: 15 focused HTTP tests passed, including duplicate-grant pages, resource pagination, external hosts, dropped filters, skipped/repeated pages, 401/403/404/429/503, redirects, cancellation and byte limits.
+
+### F-28: Effective per-user budget evidence was not reconciled
+
+- Severity: High
+- Effort: Small
+- Status: Resolved during collector/mapping review.
+- Evidence: [`SnapshotFinancialMapper.cs:122`](../src/CopilotUsageSimulator.BundleTool/SnapshotFinancialMapper.cs#L122) initially consumed group-state rows without checking the separately returned effective budget or per-user target; replayed usage periods also lacked reconciliation in [`SnapshotIdentityResolver.cs:185`](../src/CopilotUsageSimulator.BundleTool/SnapshotIdentityResolver.cs#L185).
+- Impact: Conflicting observations could produce the wrong ULB headroom or attach evidence from a different period to a current snapshot.
+- Resolution: Cross-check returned effective identity with the Engine resolver, reconcile targets/consumption or require explicit numeric confirmation, and validate replayed report period/user/cutoff. Preserve date-only expiry boundaries and separate Actions accounting.
+- Dependencies: Existing Engine attribution, applicability and balance calculators remain authoritative; no simulation algorithm or supported date window changed.
+- Verification: Focused tests cover effective-ID mismatch, target mismatch, group versus per-user consumption, missing values, expiry fallback, wrong-month replay and independent Actions-budget blocking.
+
+### F-29: File/report error paths needed explicit preservation
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved during command/file review.
+- Evidence: [`ImportFiles.cs:52`](../src/CopilotUsageSimulator.BundleTool/ImportFiles.cs#L52) and [`BundleToolApplication.cs:171`](../src/CopilotUsageSimulator.BundleTool/BundleToolApplication.cs#L171) required filesystem-alias collision handling and report failure/cancellation classification alongside atomic bundle writes.
+- Impact: An alias could name an input as output, or a report failure could leave a misleading successful command result.
+- Resolution: Resolve filesystem aliases before target checks, refuse linked-file overwrite and input/report/output collisions, write each file through sibling temporary storage, and classify report failures/cancellation explicitly. Report and bundle are documented as separate commits, not a multi-file transaction.
+- Dependencies: Validation and preview finish before publishing a bundle; output replacement remains opt-in.
+- Verification: Command tests pass for invalid-input preservation, overwrite refusal, path collision, cancellation, UTF-8 byte limits, stdout JSON, partial collection evidence and unwritable report preservation.
+
+### F-26: Creation reports dropped Engine assumptions
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved during offline CLI review.
+- Evidence: [`SnapshotAssembler.cs:84`](../src/CopilotUsageSimulator.BundleTool/SnapshotAssembler.cs#L84) initially replaced the inspector's diagnostic list with import diagnostics.
+- Impact: A valid file could omit the Engine's profile/evidence caveats in its creation report.
+- Resolution: Preserve both diagnostic lists; include typed confirmations, unapplied-confirmation warnings and incomplete optional-source diagnostics.
+- Dependencies: Shared v1 envelope/hash serialization remains unchanged; additional report fields are tool-only contracts.
+- Verification: The command test compares every validation diagnostic with the creation report.
+
+### F-30: Incompatible bundles used the syntax-error exit code
+
+- Severity: Low
+- Effort: Small
+- Status: Resolved during final review.
+- Evidence: [`SnapshotAssembler.cs:123`](../src/CopilotUsageSimulator.BundleTool/SnapshotAssembler.cs#L123) previously allowed codec compatibility errors to reach the CLI's generic JSON-syntax handler.
+- Impact: Automation could not reliably distinguish malformed input (`2`) from an incompatible schema/fingerprint (`4`) as documented.
+- Resolution: Parse JSON syntax first, then translate codec contract failures into `bundle-incompatible` with exit `4`; syntax failures remain `2`.
+- Dependencies: The shared codec's existing exception behavior and Web import semantics are unchanged.
+- Verification: All 14 command tests passed after repair, including malformed syntax and corrupted fingerprint with input preservation; final solution validation also passed.
+
+### Ranked Low-Hanging Fruit
+
+| Rank | Finding | Severity | Effort | Resolution |
+|---|---|---|---|---|
+| 1 | F-27 | High | Small | Resolved; bounded, filter-preserving collection |
+| 2 | F-28 | High | Small | Resolved; selected-user/period evidence reconciled |
+| 3 | F-29 | Medium | Small | Resolved; atomic output and report failures tested |
+| 4 | F-26 | Medium | Small | Resolved; complete diagnostics retained |
+| 5 | F-30 | Low | Small | Resolved; documented validation exit codes |
+
+Phase baseline:
+
+- Shared codec extraction: all 17 existing bundle tests and all 119 then-existing Web tests passed.
+- Latest tool suite: 65 Release tests passed with no build warnings/errors.
+- CLI-to-primary-Compass file import: the new focused bUnit test passed, preserving both cost-center seat assignments, selected-user ULB/spending values, catalog fingerprint, first blocker and immutable repeated previews.
+- Bundles depends on Engine; BundleTool depends on Bundles, not Web. Web's only implementation changes are the shared-library reference and existing file-size constant reuse. Web.Tests references the executable solely for integration tests.
+- No private enterprise was queried. Authenticated endpoint compatibility remains a credential-dependent residual risk.
+
+Final validation, 2026-09-12:
+
+- Release solution tests: 538 passed, zero failures or skips, including 65 tool tests and 120 Web tests.
+- Release solution build with `--no-restore`: succeeded with zero warnings/errors.
+- Direct and transitive NuGet vulnerability audit: none reported from the configured package source.
+- Original versus relocated serializer sources: exact match after namespace and shared size-constant normalization, preserving the v1 wire format/hash algorithm and legacy import.
+- Local pack/install and installed help/create/validate outside the repository passed; validation left bundle bytes unchanged. The archive includes Common, Engine, Bundles, System.CommandLine and its guide, with no Web/browser dependency.
+- Added the equivalent Linux pack/install/create/validate CI step without changing deployment permissions or Pages configuration. That remote CI run and live authenticated enterprise collection were not executed locally.
+- Refreshed package reinstalled successfully after releasing a local archive-inspection handle. Its installed DLL hash matches the final Release build; installed success and incompatible-input exit paths passed outside the repository.
+- `git diff --check` passed, and separate no-index whitespace checks covered all 28 untracked files without staging them. No implementation findings remain open.
 
 ## Current Implementation Alignment Review
 

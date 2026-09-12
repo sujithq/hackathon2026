@@ -8,7 +8,6 @@ public sealed class BrowserScenarioPersistence(IJSRuntime js)
 {
     private const string StateStorageKey = "copilot-usage-simulator.state.v1";
     private const int StateVersion = 1;
-    private const long MaximumImportSize = 2 * 1024 * 1024;
 
     public async Task SaveAsync(
         string scenarioJson,
@@ -81,7 +80,7 @@ public sealed class BrowserScenarioPersistence(IJSRuntime js)
 
     public static async Task<string> ReadImportAsync(IBrowserFile file)
     {
-        await using var stream = file.OpenReadStream(MaximumImportSize);
+        await using var stream = file.OpenReadStream(CompassBundleCodec.MaximumFileBytes);
         using var reader = new StreamReader(stream);
         return await reader.ReadToEndAsync();
     }

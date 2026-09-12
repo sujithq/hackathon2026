@@ -22,6 +22,19 @@ jobs:
           dotnet-version: 11.0.100-preview.7.26381.103
       - name: Test
         run: dotnet test CopilotUsageSimulator.slnx --configuration Release
+      - name: Smoke test local bundle tool package
+        shell: bash
+        run: |
+          dotnet pack src/CopilotUsageSimulator.BundleTool --configuration Release --no-build --output "$RUNNER_TEMP/compass-packages"
+          dotnet tool install CopilotUsageSimulator.BundleTool --version 0.1.0 --tool-path "$RUNNER_TEMP/compass-tool" --add-source "$RUNNER_TEMP/compass-packages"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/compass-tool/compass-bundle" --help
+          "$RUNNER_TEMP/compass-tool/compass-bundle" create \
+            --snapshot "$GITHUB_WORKSPACE/examples/enterprise-import/snapshot.json" \
+            --workload "$GITHUB_WORKSPACE/examples/enterprise-import/workload.json" \
+            --overrides "$GITHUB_WORKSPACE/examples/enterprise-import/overrides.json" \
+            --output "$RUNNER_TEMP/compass-smoke.json"
+          "$RUNNER_TEMP/compass-tool/compass-bundle" validate "$RUNNER_TEMP/compass-smoke.json"
       - name: Configure repository base path
         id: pages-config
         shell: bash

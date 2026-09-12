@@ -18,9 +18,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CopilotUsageSimulator.Web\CopilotUsageSimulator.Web.csproj" />
+    <ProjectReference Include="..\..\src\CopilotUsageSimulator.BundleTool\CopilotUsageSimulator.BundleTool.csproj" />
+    <Content Include="..\..\examples\enterprise-import\*.json" Link="EnterpriseImport\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="CopilotUsageSimulator.Bundles" />
     <Using Include="Xunit" />
   </ItemGroup>
 
