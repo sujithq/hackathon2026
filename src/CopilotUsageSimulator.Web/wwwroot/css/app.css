@@ -77,6 +77,7 @@ main { max-width: 1600px; margin: auto; padding: 2.5rem clamp(1rem, 3vw, 3rem) 4
 .button:hover, .template-strip button:hover { border-color: #53648c; transform: translateY(-1px); }
 .button.primary { background: linear-gradient(135deg, #6d4aff, #5940ca); border-color: #8b72ff; font-weight: 700; }
 .button.ghost { background: transparent; }
+a[role="link"][aria-disabled="true"], a[role="link"][aria-disabled="true"]:hover { cursor: not-allowed; opacity: .5; text-decoration: none; transform: none; }
 .file-button { position: relative; overflow: hidden; cursor: pointer; }
 .file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .template-strip {

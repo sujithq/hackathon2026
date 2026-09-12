@@ -2,9 +2,9 @@
 
 Reviewed: 2026-09-12
 
-Scope: Bundle-tool implementation across shared contracts, Engine boundaries, both Web clients, offline reconciliation, HTTP collection, command/file safety, tests, configuration and documentation; the maintained local [`docs/decision-flow.md`](decision-flow.md) remains the financial reference. Earlier flow and whole-solution findings are preserved below.
+Scope: Current legacy-layout navigation changes across both Web clients, shared styles, tests and documentation, including their impact on routes, shared contracts and Engine behavior. Earlier bundle-tool, flow and whole-solution findings are preserved below; the maintained local [`docs/decision-flow.md`](decision-flow.md) remains the financial reference.
 
-Status: No open findings. F-26 through F-30 are resolved; final Release, local package/install and whitespace validation passed. Earlier F-01 through F-25 remain resolved.
+Status: Legacy navigation changes are implemented and reviewed with no open findings. F-01 through F-30 remain resolved; their earlier validation baselines are preserved below.
 
 ## Review Principles
 
@@ -12,6 +12,24 @@ Status: No open findings. F-26 through F-30 are resolved; final Release, local p
 - Keep Web limited to rendering, browser persistence, UI state, and client orchestration.
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
+
+## Legacy Navigation Review
+
+Reviewed: 2026-09-12 against the latest staged, unstaged and untracked working tree. Scope includes both Web layouts, page navigation, configuration help, shared CSS, regressions and directly related documentation. Common, Engine, Bundles, BundleTool, persistence contracts and deployment configuration are unchanged by this navigation fix.
+
+Result: No concrete correctness, accessibility, maintainability or regression findings remain. Implementation effort: Small. Resolution status: Complete. Ranked low-hanging fruit: None outstanding; no new finding IDs were needed.
+
+- Disabled all six links to pages using the legacy layout: [`Compass.razor:42`](../src/CopilotUsageSimulator.Web/Pages/Compass.razor#L42), [`CompassConfiguration.razor:237`](../src/CopilotUsageSimulator.Web/Shared/Compass/CompassConfiguration.razor#L237), [`MainLayout.razor:14`](../src/CopilotUsageSimulator.Web/Layout/MainLayout.razor#L14), and [`Guide.razor:13`](../src/CopilotUsageSimulator.Web/Pages/Guide.razor#L13).
+- Link labels remain visible with `role="link"`, `aria-disabled="true"`, and a tooltip. Removing `href` and leaving no click handler or tab stop prevents navigation independently of CSS. The narrowly scoped [disabled-link style](../src/CopilotUsageSimulator.Web/wwwroot/css/app.css#L80) supplies subdued appearance and a non-action cursor without changing active links.
+- Dependencies preserved: route declarations and the default layout are unchanged; direct `/advanced` and `/guide` URLs remain available. Cost Compass return links, Decision flow, Sources & scope and external documentation links remain active. This is navigation disabling, not an access-control boundary or removal of the legacy pages.
+- Regression coverage in [`CompassTests.cs:119`](../tests/CopilotUsageSimulator.Web.Tests/CompassTests.cs#L119) and [`SharedComponentTests.cs:11`](../tests/CopilotUsageSimulator.Web.Tests/SharedComponentTests.cs#L11) covers the primary page, nested configuration help, legacy navigation and guide action, plus retained destinations.
+
+Validation baseline:
+
+- Both focused navigation tests passed, followed by all 540 Release solution tests (including 122 Web tests), with zero failures or skips.
+- Release solution build succeeded with zero warnings/errors; editor diagnostics are clear. Commands used `--artifacts-path artifacts/legacy-navigation-validation` to avoid an existing locked temporary WebAssembly output from another build; no user processes were stopped.
+- Local browser checks at 1440x900 and 390x844 confirmed disabled appearance, accessible disabled roles, no navigation/focus on disabled links and no horizontal overflow. Direct `/guide` rendered with working return links and external references.
+- `git diff --check` passed. Screenshots are in ignored validation artifacts. No commit or deployment was performed, and this change does not establish a fix for the earlier hosted-app loading report.
 
 ## Bundle Tool Phase Reviews
 

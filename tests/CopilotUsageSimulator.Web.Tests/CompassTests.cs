@@ -116,6 +116,27 @@ public sealed class CompassTests : BunitContext
     }
 
     [Fact]
+    public void LegacyPageLinksAreDisabledWhileCompassNavigationRemainsAvailable()
+    {
+        var cut = Render<Compass>();
+
+        Assert.Empty(cut.FindAll("a[href='advanced'], a[href='guide']"));
+        var disabledLinks = cut.FindAll("a[role='link'][aria-disabled='true']");
+        Assert.Equal(3, disabledLinks.Count);
+        Assert.All(disabledLinks, link =>
+        {
+            Assert.False(link.HasAttribute("href"));
+            Assert.False(link.HasAttribute("tabindex"));
+            Assert.False(link.HasAttribute("onclick"));
+            Assert.NotEmpty(link.GetAttribute("title")!);
+        });
+        Assert.Equal(["Advanced simulator", "User guide"], cut.FindAll("nav[aria-label='Compass navigation'] [aria-disabled='true']")
+            .Select(link => link.TextContent).ToArray());
+        Assert.NotNull(cut.Find("a[href='#cc-decision-flow']"));
+        Assert.NotNull(cut.Find("a[href='#cc-evidence']"));
+    }
+
+    [Fact]
     public void EditingChildConfigurationInvalidatesParentVerdictAndComparisons()
     {
         var cut = Render<Compass>();

@@ -1,10 +1,36 @@
 using Bunit;
+using CopilotUsageSimulator.Web.Layout;
+using CopilotUsageSimulator.Web.Pages;
 using CopilotUsageSimulator.Web.Shared;
 
 namespace CopilotUsageSimulator.Web.Tests;
 
 public sealed class SharedComponentTests : BunitContext
 {
+    [Fact]
+    public void LegacyLayoutAndGuideDisableLegacyDestinationsButKeepCompassLinks()
+    {
+        var cut = Render<MainLayout>(parameters => parameters.Add(layout => layout.Body, builder =>
+        {
+            builder.OpenComponent<Guide>(0);
+            builder.CloseComponent();
+        }));
+
+        Assert.Empty(cut.FindAll("a[href='advanced'], a[href='guide']"));
+        var disabledLinks = cut.FindAll("a[role='link'][aria-disabled='true']");
+        Assert.Equal(3, disabledLinks.Count);
+        Assert.All(disabledLinks, link =>
+        {
+            Assert.False(link.HasAttribute("href"));
+            Assert.False(link.HasAttribute("tabindex"));
+            Assert.False(link.HasAttribute("onclick"));
+            Assert.NotEmpty(link.GetAttribute("title")!);
+        });
+        Assert.Equal("", cut.Find(".topnav a[href]").GetAttribute("href"));
+        Assert.Equal("", cut.Find(".guide-page a[href]").GetAttribute("href"));
+        Assert.NotEmpty(cut.FindAll("a[target='_blank']"));
+    }
+
     [Fact]
     public void DocsLinkProvidesAccessibleSafeExternalNavigation()
     {

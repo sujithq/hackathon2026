@@ -22,6 +22,8 @@ The result evidence identifies the simulation date, catalog, verification date, 
 
 Open `/advanced` for the preserved full simulator. **Only this workflow advances balances on successful runs.** The instructions below describe Advanced, not the preview-only Compass.
 
+In-app links to `/advanced` and `/guide` are disabled while they use the legacy layout. Their direct URLs remain available; the Cost Compass, Decision flow, Sources & scope, and external documentation links remain active.
+
 1. Choose **Cloud agent**, **Code review**, or **Chat** as a starting template. Alternatively, select one of the six green cost-blocked scenarios to load and inspect a user-level budget, included-use overflow, paid-usage applicability, paid-usage state, AI spending budget, or Actions spending budget failure. The selected starter remains highlighted, and the scenario source changes from **Template defaults** to **Customized** after you edit a field.
 2. Describe the task the agent is expected to perform.
 3. Select the operation first. The guided form shows only settings that operation can use.

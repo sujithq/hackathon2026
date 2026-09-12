@@ -16,7 +16,7 @@ Install the SDK pinned in `global.json`, **11.0.100-preview.7.26381.103**, into 
 .\.dotnet\dotnet.exe run --project src\CopilotUsageSimulator.Web --configuration Release --no-launch-profile --urls http://localhost:5086
 ```
 
-Open `http://localhost:5086/` (also available at `/compass`). `/advanced` retains the original full simulator, including its explicit repeat-and-advance workflow. Append `?scoutTheme=light` or `?scoutTheme=dark` to choose a theme; otherwise the app follows the OS preference.
+Open `http://localhost:5086/` (also available at `/compass`). `/advanced` retains the original full simulator, including its explicit repeat-and-advance workflow. Navigation links to `/advanced` and `/guide` are disabled because these pages use the legacy layout; direct URLs remain available. Append `?scoutTheme=light` or `?scoutTheme=dark` to choose a theme; otherwise the app follows the OS preference.
 
 ## Supported preview scope
 
@@ -226,7 +226,7 @@ var result = engine.Simulate(scenario);
 
 The standalone web client runs the engine entirely in the browser. It provides guided task, workload, cost-center, ULB, budget, and Actions overrides, plus complete JSON editors for every scenario and catalog setting. Every evaluated check is visible by default and can be filtered by outcome or category.
 
-See the [end-user guide](docs/USER-GUIDE.md), which is also available from the **User guide** link inside the app.
+See the [end-user guide](docs/USER-GUIDE.md). The in-app **User guide** link is disabled along with the other legacy-layout navigation; `/guide` remains available by direct URL.
 
 ```powershell
 .\.dotnet\dotnet.exe run --project src\CopilotUsageSimulator.Web --configuration Release
