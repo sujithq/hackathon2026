@@ -4,7 +4,7 @@ Reviewed: 2026-09-12
 
 Scope: Accuracy of the user-supplied AI-credit decision-flow SVG and `sujithq/ghccp`'s `docs/decision-flow.md`, compared with current official billing documentation and this solution's Engine contracts, applicability, preview client, tests, and supported-scope documentation. The earlier 2026-09-02 whole-solution findings are preserved below; this is not a fresh whole-solution security audit.
 
-Status: Five open documentation findings in the supplied external flow. F-20 is resolved for this repository's canonical flow; the external source remains unchanged.
+Status: Six open documentation findings in the supplied external flow. F-20 is mitigated in this repository's canonical flow, but the external source remains unchanged.
 
 ## Review Principles
 
@@ -23,13 +23,13 @@ The core budget sequence remains useful: effective ULB precedence, cost-center i
 
 - Severity: High
 - Effort: Small
-- Status: Resolved locally 2026-09-12; external flow not modified.
+- Status: Open upstream; repository guidance clarified 2026-09-12.
 - Evidence: External `docs/decision-flow.md:21-24,36-46,56-61` compares X with an "allowance"/ULB, asks whether a cost-center cap is already reached, and permits a hard budget that "has room." Current Engine checks the requested credits against remaining ULB/control capacity in `src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrailEvaluator.cs:77-123,162-199`, and metered USD against remaining budget headroom at `338-344`.
 - Impact: A request can fit the total monthly limit, or find some positive headroom, yet exceed the remaining amount. A partially remaining cost-center cap must still constrain the included portion of a crossing request.
 - Required correction: Define X as the incremental requested credits; subtract existing consumption at every capacity check. Ask whether this request would exceed the remaining cap. Compute a provisional included/metered split using both pool and applicable control headroom. A hard budget must cover the proposed metered charge, not merely be nonzero.
 - Example: A USD 0.40 proposed charge does not fit a USD 0.20 remaining hard budget. For the Compass demo, 100 required credits with 60 remaining requires 40 metered credits, not 100.
 - Dependencies: Preserve effective ULB selection and the first-failing-stage contract. Do not present simulator request sizing as a documented guarantee of GitHub's internal billing granularity.
-- Resolution: The canonical repository flow now defines each check in terms of the incremental request and remaining capacity, calculates the provisional included allocation from both pool and applicable control headroom, derives the metered remainder, and includes the 100/60-credit and USD 0.40/USD 0.20 examples. The Engine already implemented these rules, so no runtime change was required. This closes the repository documentation gap only; the reviewed external Markdown and SVG still require the same correction upstream.
+- Local mitigation: The canonical repository flow now defines each check in terms of the incremental request and remaining capacity, calculates the provisional included allocation from both pool and applicable control headroom, derives the metered remainder, and includes the 100/60-credit and USD 0.40/USD 0.20 examples. The Engine already implemented these rules, so no runtime change was required. The reviewed external Markdown and SVG still require the same correction upstream before F-20 can be resolved.
 - Verification: The formulas and examples in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) match the request-sized comparisons and split in [`EconomicGuardrailEvaluator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrailEvaluator.cs) and the existing Compass preview regressions.
 
 ### F-21: The diagram consumes partial included credits before later rejection
@@ -278,15 +278,16 @@ The core budget sequence remains useful: effective ULB precedence, cost-center i
 
 | Rank | Finding | Severity | Effort | Next action | Dependency |
 |---|---|---|---|---|---|
-| 1 | F-21 | High | Small | Rename pre-approval consumption as a projection; retain balances on rejection. | F-20; immutable preview contract |
-| 2 | F-22 | Medium | Small | Separate hard stops, alert-only budgets, and account/payment caps. | F-20; source qualification for zero budgets |
-| 3 | F-23 | Medium | Small | Replace "direct" with resolved cost-center attribution. | F-01; existing resolver |
-| 4 | F-24 | Medium | Small | Add financial-subflow and supported-feature boundaries. | Engine trace/preview; separate Actions meter |
-| 5 | F-25 | Low | Small | Date the allowances, qualify flex/reset semantics, and source migration/Mobile rules. | Official dated evidence |
+| 1 | F-20 | High | Small | Correct the external flow to use remaining-capacity/request-sized checks and show the partial included split. | Effective ULB and included-control applicability |
+| 2 | F-21 | High | Small | Rename pre-approval consumption as a projection; retain balances on rejection. | F-20; immutable preview contract |
+| 3 | F-22 | Medium | Small | Separate hard stops, alert-only budgets, and account/payment caps. | F-20; source qualification for zero budgets |
+| 4 | F-23 | Medium | Small | Replace "direct" with resolved cost-center attribution. | F-01; existing resolver |
+| 5 | F-24 | Medium | Small | Add financial-subflow and supported-feature boundaries. | Engine trace/preview; separate Actions meter |
+| 6 | F-25 | Low | Small | Date the allowances, qualify flex/reset semantics, and source migration/Mobile rules. | Official dated evidence |
 
 ## Planning Dependencies
 
-- F-21 through F-25 concern the external supplied flow. F-20 is resolved in the repository's canonical flow, but neither the remote Markdown nor attached SVG was changed. No repository implementation defect is asserted by these documentation findings.
+- F-20 through F-25 concern the supplied external flow. F-20 has matching guidance in the repository's canonical flow, but neither the remote Markdown nor attached SVG was changed. No repository implementation defect is asserted by these documentation findings.
 - Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
@@ -317,3 +318,9 @@ Historical 2026-09-02 implementation baseline:
 - Compared the financial sequence with current Engine allocation, applicability, terminal outcomes, profile, and immutable preview code, plus Web preview wiring and existing regression coverage.
 - The prior session's completed Release baseline was 465 passing tests (Common 6, Engine 347, Web 112), with zero build warnings/errors. Tests/build were not rerun for this documentation-only review; this is not a fresh runtime or dependency-security certification.
 - Only this ledger was edited; the analysis snapshots, implementation, attached SVG, and remote source were preserved.
+
+Post-fix review at `4af0d7c` (`docs(flows): clarify request-sized capacity checks`):
+
+- The new canonical-flow formulas and examples match the existing Engine behavior and introduce no implementation issue.
+- F-20 remains open because its reviewed source is the unchanged external Markdown/SVG; the local clarification is recorded as mitigation rather than resolution.
+- `git diff --check` passed and VS Code reported no Markdown errors. Tests/build were not rerun for this documentation-only review.
