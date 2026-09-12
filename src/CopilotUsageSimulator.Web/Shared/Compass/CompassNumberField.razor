@@ -2,20 +2,25 @@
 @using System.Numerics
 @typeparam TValue where TValue : struct, INumber<TValue>
 
-<div class="cp-field">
+<div class="@(IsBlocking ? "cp-field cp-field-blocking" : "cp-field")">
     <label for="@Id">@Label</label>
     <input id="@Id" type="number" min="0" step="@Step" value="@_text"
            aria-invalid="@(_error is not null ? "true" : "false")"
-           aria-describedby="@($"{Id}-help")" @oninput="OnInput" />
+           aria-describedby="@(IsBlocking ? $"{Id}-help {Id}-blocker" : $"{Id}-help")" @oninput="OnInput" />
     <small id="@($"{Id}-help")" class="@(_error is null ? "" : "cp-field-error")">
         @(_error ?? Hint)
     </small>
+    @if (IsBlocking)
+    {
+        <span id="@($"{Id}-blocker")" class="cp-setting-blocker"><CompassIcon Name="info" Size="14" /> First blocker</span>
+    }
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Id { get; set; } = "";
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter] public string? Hint { get; set; }
+    [Parameter] public bool IsBlocking { get; set; }
     [Parameter] public string Step { get; set; } = "1";
     [Parameter] public TValue Value { get; set; }
     [Parameter] public EventCallback<TValue> ValueChanged { get; set; }

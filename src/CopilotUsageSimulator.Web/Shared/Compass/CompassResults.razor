@@ -71,7 +71,14 @@
             <div class="cp-blocker" data-testid="compass-blocker">
                 <div class="cp-blocker-head"><strong>First modeled blocker</strong><span class="cp-badge">Stopped here</span></div>
                 <code>@gate</code>
-                <p>@evaluated.Trace.FirstOrDefault(entry => entry.Id == gate)?.Message</p>
+                <p>@(Model.BlockingGuardrail?.Message ?? evaluated.Trace.FirstOrDefault(entry => entry.Id == gate)?.Message)</p>
+                @if (Model.BlockingSetting is { } setting)
+                {
+                    <button id="cc-review-blocker" class="cp-button cp-button-small" title="@($"Review {setting.Label}")"
+                            aria-controls="@(setting.SectionId ?? setting.Id)" @onclick="ReviewBlocker">
+                        <CompassIcon Name="arrow" Size="16" /> Review blocking setting
+                    </button>
+                }
                 <p class="cp-help">Later checks cannot be assumed to pass. Rejected usage leaves consumption unchanged.</p>
             </div>
         }
@@ -253,6 +260,7 @@
 @code {
     [Parameter, EditorRequired] public CompassPageModel Model { get; set; } = null!;
     [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback ReviewBlocker { get; set; }
 
     private async Task Compare()
     {

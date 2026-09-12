@@ -45,6 +45,8 @@ The default Chat fixture is pinned to 11 September 2026: **100 AI credits requir
 
 Input changes invalidate the previous verdict. Invalid numeric edits and failed imports cannot leave a successful verdict looking current. All six engine outcomes remain distinct; an unsupported or unpriced request is a non-estimate, not zero cost.
 
+The current first blocker's setting is highlighted and its section expanded. **Review blocking setting** scrolls to and focuses it. Snapshot-only controls show the exact blocking record with a bundle-editor action instead of highlighting an unrelated field; edits clear stale highlights. These actions do not change settings or advance balances.
+
 ### Save and reproduce the evidence
 
 **Save scenario** stores one Compass bundle in browser storage, separately from the Advanced simulator's save slot. Save and export capture current valid form edits even before simulation. A versioned bundle contains the complete scenario, matching catalog and reference metadata, engine contract identity, and a SHA-256 catalog fingerprint. The fingerprint detects mismatches; it is not a digital signature or proof that custom prices are official.

@@ -63,6 +63,175 @@ public sealed class CompassTests : BunitContext
     }
 
     [Fact]
+    public void FirstBlockerHighlightsPaidSettingAndClearsWhenEdited()
+    {
+        var cut = Render<Compass>();
+
+        Assert.Equal("cc-paid", cut.Find(".cp-field-blocking select").Id);
+        Assert.Equal("cc-paid-blocker", cut.Find("#cc-paid").GetAttribute("aria-describedby"));
+        Assert.Contains("First blocker", cut.Find("#cc-paid-blocker").TextContent);
+
+        cut.Find("#cc-paid").Change("Enabled");
+
+        Assert.Empty(cut.FindAll(".cp-field-blocking, .cp-setting-blocker"));
+        cut.Find("#cc-simulate").Click();
+        Assert.Contains("Allowed", cut.Find("[data-testid=compass-verdict]").TextContent);
+        Assert.Empty(cut.FindAll(".cp-field-blocking, .cp-setting-blocker"));
+    }
+
+    [Theory]
+    [InlineData("UserBudget", "cc-ulb-limit", "cc-financial-settings")]
+    [InlineData("AiBudget", "cc-budget-limit", "cc-financial-settings")]
+    [InlineData("ActionsBudget", "cc-actions-budget", "cc-actions-settings")]
+    public void BudgetBlockerHighlightsItsLimitAndExpandsItsSection(string problem, string fieldId, string sectionId)
+    {
+        var cut = Render<Compass>();
+
+        cut.Find("#cc-problem").Change(problem);
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal(fieldId, cut.Find(".cp-field-blocking input").Id);
+        Assert.Contains($"{fieldId}-blocker", cut.Find($"#{fieldId}").GetAttribute("aria-describedby"));
+        Assert.True(cut.Find($"#{sectionId}").HasAttribute("open"));
+        Assert.Single(cut.FindAll(".cp-setting-blocker"));
+    }
+
+    [Fact]
+    public void AccessBlockerExpandsAndHighlightsTheFailingGate()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        var gate = model.Configuration.Gates.First(candidate => candidate.ApplicableOperationIds.Count == 0 ||
+            candidate.ApplicableOperationIds.Contains("chat"));
+
+        cut.Find($"[id='cc-gate-{gate.Id}']").Change(false);
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal(gate.Id, model.Preview!.Result!.FirstFailingGate);
+        Assert.Equal($"cc-gate-{gate.Id}", model.BlockingSettingId);
+        Assert.True(cut.Find("#cc-access-settings").HasAttribute("open"));
+        Assert.Equal($"cc-gate-{gate.Id}", cut.Find(".cp-field-blocking input").Id);
+    }
+
+    [Fact]
+    public void ReusedRecordIdHighlightsFailedBudgetInsteadOfEarlierPassedUserLimit()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        var scenario = CompassPresetFactory.Create(model.Configuration, "chat", CompassProblem.AiBudget);
+        var budgetId = scenario.EconomicGuardrails!.SpendingBudgets.Single(budget => budget.Scope == SpendingBudgetScope.CostCenter).Id;
+        ImportLegacy(cut, scenario with
+        {
+            EconomicGuardrails = scenario.EconomicGuardrails with
+            {
+                UserLevelBudgets = scenario.EconomicGuardrails.UserLevelBudgets.Select(budget =>
+                    budget.Kind == UserLevelBudgetKind.Individual && budget.TargetId == "user-1" ? budget with { Id = budgetId } : budget).ToArray()
+            }
+        });
+
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal(2, model.Preview!.Result!.AppliedGuardrails.Count(guardrail => guardrail.Id == budgetId));
+        Assert.Equal(GuardrailOutcome.Blocked, model.BlockingGuardrail!.Outcome);
+        Assert.Equal("cc-budget-limit", cut.Find(".cp-field-blocking input").Id);
+        Assert.Contains(model.BlockingGuardrail.Message, cut.Find("[data-testid=compass-blocker]").TextContent);
+    }
+
+    [Fact]
+    public void ReviewBlockerRequestsFocusWithoutChangingTheScenario()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        var serializer = Services.GetRequiredService<ScenarioJson>();
+        var before = serializer.Serialize(model.Scenario);
+        Assert.DoesNotContain(JSInterop.Invocations, invocation => invocation.Identifier == "costCompass.revealSetting");
+
+        cut.Find("#cc-review-blocker").Click();
+
+        var invocation = Assert.Single(JSInterop.Invocations, invocation => invocation.Identifier == "costCompass.revealSetting");
+        Assert.Equal("cc-paid", Assert.Single(invocation.Arguments));
+        Assert.Equal(before, serializer.Serialize(model.Scenario));
+        Assert.Equal("paid-usage", model.Preview!.Result!.FirstFailingGate);
+    }
+
+    [Fact]
+    public void SnapshotOnlyBlockerShowsItsExactRecordAndCanOpenTheBundleEditor()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        var scenario = CompassPresetFactory.Create(model.Configuration, "chat", CompassProblem.AiBudget);
+        ImportLegacy(cut, scenario with
+        {
+            EconomicGuardrails = scenario.EconomicGuardrails! with
+            {
+                SpendingBudgets = [new SpendingBudget { Id = "imported-finance-stop", Scope = SpendingBudgetScope.Enterprise, LimitUsd = .1m, ConsumedUsd = 0m, Enforcement = GuardrailEnforcement.HardStop }]
+            }
+        });
+        cut.Find("#cc-simulate").Click();
+        var before = model.CreateBundle();
+
+        var highlighted = cut.Find(".cp-field-blocking");
+        Assert.Equal("cc-blocking-setting", highlighted.Id);
+        Assert.Contains("Enterprise budget", highlighted.TextContent);
+        Assert.Contains("imported-finance-stop", highlighted.TextContent);
+        Assert.Contains("0.1 USD", highlighted.TextContent);
+        Assert.Empty(cut.FindAll(".cp-field-blocking input, .cp-field-blocking select"));
+
+        cut.Find("#cc-review-blocker").Click();
+        cut.Find("#cc-inspect-blocker").Click();
+
+        Assert.Contains(JSInterop.Invocations, invocation => invocation.Identifier == "costCompass.revealSetting" &&
+            Equals(invocation.Arguments.Single(), "cc-blocking-setting"));
+        Assert.Contains(JSInterop.Invocations, invocation => invocation.Identifier == "costCompass.revealSetting" &&
+            Equals(invocation.Arguments.Single(), "cc-bundle-text"));
+        Assert.Contains("imported-finance-stop", cut.Find("#cc-bundle-text").GetAttribute("value"));
+        Assert.Equal(before, model.CreateBundle());
+    }
+
+    [Fact]
+    public void LaterActionsBlockerDoesNotHighlightTheFirstEditableBudget()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        var scenario = CompassPresetFactory.Create(model.Configuration, "cloud-agent");
+        ImportLegacy(cut, scenario with
+        {
+            ActionsGuardrails = scenario.ActionsGuardrails! with
+            {
+                Budgets = [new ActionsSpendingBudget { Id = "first-budget", LimitUsd = 100m }, new ActionsSpendingBudget { Id = "actual-actions-stop", LimitUsd = 0m, Enforcement = GuardrailEnforcement.HardStop }]
+            }
+        });
+
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal("actual-actions-stop", model.Preview!.Result!.FirstFailingGate);
+        Assert.Equal("cc-blocking-setting", model.BlockingSettingId);
+        Assert.Contains("actual-actions-stop", cut.Find(".cp-field-blocking").TextContent);
+        Assert.Empty(cut.FindAll(".cp-field-blocking #cc-actions-budget"));
+    }
+
+    [Fact]
+    public void PaidProductRestrictionDoesNotMisidentifyTheEnabledPolicyDropdown()
+    {
+        var cut = Render<Compass>();
+        var model = Services.GetRequiredService<CompassPageModel>();
+        ImportLegacy(cut, model.Scenario with
+        {
+            EconomicGuardrails = model.Scenario.EconomicGuardrails! with
+            {
+                PaidUsage = new PaidUsageAuthorization { State = GuardrailValue.Enabled, ProductIds = new HashSet<string> { "another-product" } }
+            }
+        });
+
+        cut.Find("#cc-simulate").Click();
+
+        Assert.Equal("paid-usage.not-applicable", model.Preview!.Result!.FirstFailingGate);
+        Assert.Equal("cc-blocking-setting", model.BlockingSettingId);
+        Assert.Empty(cut.FindAll(".cp-field-blocking #cc-paid"));
+        Assert.Contains("product and SKU", cut.Find(".cp-field-blocking").TextContent);
+    }
+
+    [Fact]
     public async Task ToolOutputImportsThroughPrimaryFileWorkflowWithoutAdvancingBalances()
     {
         var directory = Path.Combine(AppContext.BaseDirectory, "EnterpriseImport");
@@ -195,11 +364,13 @@ public sealed class CompassTests : BunitContext
         cut.Find("#cc-budget-used").Input("0");
         cut.Find("#cc-simulate").Click();
         Assert.Contains("paid-usage", cut.Find("[data-testid=compass-blocker]").TextContent);
+        Assert.Equal("cc-paid", cut.Find(".cp-field-blocking select").Id);
 
         cut.Find("#cc-paid").Change("Enabled");
         cut.Find("#cc-simulate").Click();
 
         Assert.Contains("budget-cost-center", cut.Find("[data-testid=compass-blocker]").TextContent);
+        Assert.Equal("cc-budget-limit", cut.Find(".cp-field-blocking input").Id);
         Assert.Equal("0", cut.Find("[data-testid=accepted-credits]").TextContent);
         Assert.Equal("$0.4000", cut.Find("[data-testid=potential-usd]").TextContent);
     }

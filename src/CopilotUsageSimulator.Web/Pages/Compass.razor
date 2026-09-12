@@ -61,7 +61,7 @@
     <div class="cp-message" role="status"><CompassIcon Name="info" /><span>@Model.Notice</span></div>
 }
 
-<details class="cp-transfer">
+<details id="cc-transfer" class="cp-transfer">
     <summary>Scenario files &amp; portable evidence</summary>
     <div class="cp-transfer-content">
         <p class="cp-help">A Compass v1 bundle includes the current form values, complete scenario, matching catalog, source metadata, and a SHA-256 catalog fingerprint. It does not include a live account or credentials.</p>
@@ -75,7 +75,7 @@
             <InputFile id="cc-import-file" OnChange="ImportFileAsync" accept=".json,application/json" />
             <small>Legacy scenario-only files use the active catalog with an explicit warning. Invalid files preserve the working scenario.</small>
         </div>
-        <details>
+        <details id="cc-bundle-editor">
             <summary>Complete bundle editor / paste JSON</summary>
             <div class="cp-field">
                 <label for="cc-bundle-text">Scenario and reference JSON</label>
@@ -154,7 +154,7 @@
             <span class="cp-step">2</span>
             <div><h2 id="cc-configuration-title">Configure environment</h2><small>Explicit inputs. No hidden estimates.</small></div>
         </div>
-        <CompassConfiguration Model="Model" Changed="Refresh" />
+        <CompassConfiguration Model="Model" Changed="Refresh" InspectBlocker="InspectBlockingBundle" />
     </section>
 
     <section class="cp-panel cp-results-panel" aria-labelledby="cc-results-title">
@@ -162,7 +162,7 @@
             <span class="cp-step">3</span>
             <div><h2 id="cc-results-title">Simulation result</h2><small>Explain the decision. Compare a change.</small></div>
         </div>
-        <CompassResults Model="Model" Changed="Refresh" />
+        <CompassResults Model="Model" Changed="Refresh" ReviewBlocker="ReviewBlockingSetting" />
     </section>
 </main>
 
@@ -176,6 +176,7 @@
 @code {
     private string _theme = "light";
     private string _bundleText = "";
+    private string? _pendingSettingId;
 
     protected override void OnInitialized() => Model.Initialize();
 
@@ -191,6 +192,19 @@
             catch (JSException exception)
             {
                 Model.ReportError($"Theme preference could not be read: {exception.Message}");
+                StateHasChanged();
+            }
+        }
+        if (_pendingSettingId is { } settingId)
+        {
+            _pendingSettingId = null;
+            try
+            {
+                await JS.InvokeVoidAsync("costCompass.revealSetting", settingId);
+            }
+            catch (JSException exception)
+            {
+                Model.ReportError($"The blocking setting could not be opened: {exception.Message}");
                 StateHasChanged();
             }
         }
@@ -218,6 +232,16 @@
     {
         var bundle = Model.CreateBundle();
         if (bundle is not null) _bundleText = bundle;
+    }
+
+    private void ReviewBlockingSetting() => _pendingSettingId = Model.BlockingSettingId;
+
+    private void InspectBlockingBundle()
+    {
+        var bundle = Model.CreateBundle();
+        if (bundle is null) return;
+        _bundleText = bundle;
+        _pendingSettingId = "cc-bundle-text";
     }
 
     private void ImportText() => Model.Import(_bundleText);

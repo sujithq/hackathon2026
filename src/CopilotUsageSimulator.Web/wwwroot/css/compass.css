@@ -166,6 +166,13 @@ html[data-theme="dark"] {
 .cp-field-error { color: var(--cp-danger) !important; }
 .compass-shell input[aria-invalid=true] { border-color: var(--cp-danger); }
 .cp-help { margin: 10px 0 0 !important; font-size: .72rem; color: var(--cp-text-muted); }
+.cp-field-blocking { outline: 2px solid var(--cp-danger); outline-offset: 6px; border-radius: 4px; background: var(--cp-highlight); scroll-margin-block: 24px; }
+.cp-setting-blocker { display: inline-flex; align-items: center; gap: 5px; color: var(--cp-danger); font-size: .72rem; font-weight: 600; }
+.cp-blocking-snapshot .cp-section-heading { flex-wrap: wrap; }
+.cp-blocking-snapshot .cp-button { margin-top: 10px; }
+.cp-blocking-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 12px 0; font-size: .76rem; }
+.cp-blocking-values dt { color: var(--cp-text-muted); }
+.cp-blocking-values dd { margin: 3px 0 0; font-weight: 600; overflow-wrap: anywhere; }
 .cp-inline-evidence { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .68rem; color: var(--cp-text-muted); margin-top: 10px; }
 .cp-toggle {
     display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px;

@@ -2,9 +2,9 @@
 
 Reviewed: 2026-09-12
 
-Scope: Current legacy-layout navigation changes across both Web clients, shared styles, tests and documentation, including their impact on routes, shared contracts and Engine behavior. Earlier bundle-tool, flow and whole-solution findings are preserved below; the maintained local [`docs/decision-flow.md`](decision-flow.md) remains the financial reference.
+Scope: First-blocker setting guidance in the primary Compass client, including exact Engine identity/metadata mapping, editor boundaries, render/focus lifecycle, shared field styling, tests and documentation. Shared contracts, the other clients and deployment configuration were checked for affected behavior and remain unchanged. Earlier navigation, bundle-tool, flow and whole-solution findings are preserved below.
 
-Status: Legacy navigation changes are implemented and reviewed with no open findings. F-01 through F-30 remain resolved; their earlier validation baselines are preserved below.
+Status: Blocker guidance is implemented and reviewed with no open findings. F-31 and F-32 are resolved; all 550 Release tests, the Release build, and desktop/mobile browser checks passed. F-01 through F-30 remain resolved.
 
 ## Review Principles
 
@@ -12,6 +12,49 @@ Status: Legacy navigation changes are implemented and reviewed with no open find
 - Keep Web limited to rendering, browser persistence, UI state, and client orchestration.
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
+
+## Blocker Setting Review
+
+Reviewed: 2026-09-12 against current staged, unstaged and untracked changes. Scope includes the primary page, page model, configuration/results/number-field components, browser reveal helper, shared styles and tests. The existing Engine result determines the blocker; no client-side cost, applicability, entitlement or simulation algorithm was added. The Advanced client, shared bundle format, tool and deployment workflow are unchanged.
+
+### F-31: A reused ID could highlight an earlier passed control
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved during post-fix review.
+- Evidence: [`CompassPageModel.cs:34`](../src/CopilotUsageSimulator.Web/Services/CompassPageModel.cs#L34) initially selected the first applied guardrail matching `FirstFailingGate`, without requiring a terminal failure outcome. IDs can be reused across different guardrail collections.
+- Impact: A passed ULB and later failed spending budget with the same ID could highlight the wrong setting and display the wrong message.
+- Resolution: Require a matching ID and an actual Blocked, Indeterminate, SoftStopped or Waiting outcome. Resolve the setting using stable Common metadata plus the exact record ID retained by the existing editor adapter.
+- Dependencies: Preserve the Engine's first-failing-gate result and keep UI field mapping client-specific.
+- Verification: A regression reuses an ID across a passing ULB and blocked AI budget, asserting the budget input and its failure message are selected.
+
+### F-32: Snapshot-only blockers must not target a different guided control
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved during mapping review.
+- Evidence: The guided client edits one selected cost-center budget and the first Actions budget; paid-usage enablement does not edit its product/SKU authorization lists. The [setting resolver](../src/CopilotUsageSimulator.Web/Services/CompassPageModel.cs#L38) now checks the represented record/property and supplies an [exact-record view](../src/CopilotUsageSimulator.Web/Shared/Compass/CompassConfiguration.razor#L7) otherwise.
+- Impact: Mapping only by category could highlight a passing first budget or an enabled paid-usage dropdown while the actual blocker is another record or a product restriction.
+- Resolution: Highlight guided controls only when their exact ID and represented property match. Otherwise show the actual blocking record with its available limit/consumption/request values and a non-mutating bundle inspection action.
+- Dependencies: Reuse the existing editor-selected IDs and Common labels/units. The fallback is a read-only view of Engine output, not an invented editor or guessed policy.
+- Verification: Regressions cover an imported enterprise budget, a later Actions budget, and paid-product authorization mismatch; bundle inspection preserves scenario bytes and balances.
+
+### Ranked Low-Hanging Fruit
+
+| Rank | Finding | Severity | Effort | Resolution |
+|---|---|---|---|---|
+| 1 | F-31 | Medium | Small | Resolved; failed record identity required |
+| 2 | F-32 | Medium | Small | Resolved; exact-field mapping or snapshot view |
+
+Behavior and validation:
+
+- Only the current first blocker is marked, using an outline plus visible and screen-reader-associated text. Editing, import/reset and successful results clear stale highlights. Unsupported-evidence outcomes without a first failing check do not guess a target.
+- Result evaluation expands the containing Actions/access sections. The [explicit review action](../src/CopilotUsageSimulator.Web/Shared/Compass/CompassResults.razor#L77) reopens all collapsed ancestors and focuses/scrolls to the setting through the [browser reveal helper](../src/CopilotUsageSimulator.Web/wwwroot/js/app.js#L15); automatic highlighting does not steal focus. Browser reveal respects reduced-motion preferences and does not alter simulation state.
+- All 41 Compass tests passed without warnings after saving pending editor buffers. Initial terminal runs against older saved files were not counted as verification of the new regressions; the temporary VS Code task synchronized the current sources before validation.
+- Desktop (1440x900) and mobile (390x844) browser checks verified paid-usage/Actions highlighting, first-control identity, automatic expansion, reopening after manual collapse, focus, no horizontal overflow, and nested bundle-editor reveal. Scenario inspection left balances unchanged and no app errors were logged.
+- Two test fixtures initially defaulted to alert-only enforcement; they were corrected to explicit hard stops and the same tests rerun. No production enforcement behavior changed.
+- Final Release solution suite: 550 passed, zero failures or skips, including all 132 Web tests. Release solution build with `--no-restore` succeeded with zero warnings/errors. Both use isolated `artifacts/blocker-settings-validation` outputs to avoid contention with other editor builds. Editor diagnostics are clear.
+- `git diff --check` passed after synchronizing the final documentation. The temporary validation task was removed; screenshots remain in ignored artifacts. No deployment or commit was performed, and no fix for the earlier hosted startup report is implied.
 
 ## Legacy Navigation Review
 

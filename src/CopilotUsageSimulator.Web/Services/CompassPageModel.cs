@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using CopilotUsageSimulator.Common.Guardrails;
 using CopilotUsageSimulator.Engine;
 using CopilotUsageSimulator.Engine.Configuration;
 using CopilotUsageSimulator.Engine.Guardrails;
@@ -30,6 +31,40 @@ public sealed class CompassPageModel(
         CompassPresetFactory.Create(defaultConfiguration, "chat", CompassProblem.PaidUsageDisabled);
     public ScenarioEditorState Form { get; private set; } = new();
     public SimulationPreview? Preview { get; private set; }
+    public AppliedGuardrail? BlockingGuardrail => Preview is { ErrorCode: null, Result: { FirstFailingGate: { } gate } result }
+        ? result.AppliedGuardrails.FirstOrDefault(guardrail => string.Equals(guardrail.Id, gate, StringComparison.OrdinalIgnoreCase) &&
+            guardrail.Outcome is GuardrailOutcome.Blocked or GuardrailOutcome.Indeterminate or GuardrailOutcome.SoftStopped or GuardrailOutcome.Waiting)
+        : null;
+    public CompassBlockingSetting? BlockingSetting
+    {
+        get
+        {
+            if (Preview is not { ErrorCode: null, Result: { FirstFailingGate: { } gate } }) return null;
+            var blocker = BlockingGuardrail;
+            if (blocker is null && Configuration.Gates.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Id, gate, StringComparison.OrdinalIgnoreCase)) is { } accessGate)
+                return new($"cc-gate-{accessGate.Id}", accessGate.Id, "cc-access-settings");
+
+            var metadata = GuardrailMetadataCatalog.Resolve(blocker?.MetadataKey, gate, blocker?.Category);
+            return metadata.Key switch
+            {
+                GuardrailMetadataKeys.PaidUsage when gate is "paid-usage" or "paid-usage.unknown" =>
+                    new("cc-paid", "Paid AI usage"),
+                GuardrailMetadataKeys.IncludedPool when gate == "included-pool" =>
+                    new("cc-pool-used", "Pooled credits already used"),
+                GuardrailMetadataKeys.UlbIndividual when Matches(Form.Economic.IndividualUlbId) && Form.Economic.UseIndividualUlb =>
+                    new("cc-ulb-limit", "Individual user limit", "cc-financial-settings"),
+                GuardrailMetadataKeys.MeteredBudgetCostCenter when Matches(Form.Economic.CostCenterBudgetId) && Form.Economic.UseCostCenterBudget =>
+                    new("cc-budget-limit", "Cost-center AI budget", "cc-financial-settings"),
+                GuardrailMetadataKeys.ActionsBudget when Matches(Form.Actions.BudgetId) && Form.Actions.UseBudget && UsesActions =>
+                    new("cc-actions-budget", "Actions budget", "cc-actions-settings"),
+                _ => new("cc-blocking-setting", metadata.Label, RequiresBundleEditor: true, Unit: metadata.Unit)
+            };
+
+            bool Matches(string? recordId) => string.Equals(recordId, gate, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+    public string? BlockingSettingId => BlockingSetting?.Id;
     public IReadOnlyList<SimulationComparison> Comparisons { get; private set; } = [];
     public string? Error { get; private set; }
     public string? Notice { get; private set; }
@@ -458,3 +493,5 @@ public sealed class CompassPageModel(
 
     private ModelEligibilityEvaluator Eligibility => _eligibility ??= new ModelEligibilityEvaluator(Configuration);
 }
+
+public sealed record CompassBlockingSetting(string Id, string Label, string? SectionId = null, bool RequiresBundleEditor = false, string Unit = "");

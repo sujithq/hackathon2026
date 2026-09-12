@@ -12,6 +12,16 @@ window.simulator = {
 
 window.costCompass = {
     getTheme: () => document.documentElement.getAttribute("data-theme") || "light",
+    revealSetting: (settingId) => {
+        const target = document.getElementById(settingId);
+        if (!target) throw new Error("The setting is no longer available. Run a fresh simulation.");
+        for (let ancestor = target.parentElement; ancestor; ancestor = ancestor.parentElement) {
+            if (ancestor.tagName === "DETAILS") ancestor.open = true;
+        }
+        const highlighted = target.closest(".cp-field-blocking") || target;
+        highlighted.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+        target.focus({ preventScroll: true });
+    },
     toggleTheme: async () => {
         const theme = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
         document.documentElement.setAttribute("data-theme", theme);

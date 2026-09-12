@@ -1,4 +1,39 @@
+@using System.Globalization
+
 <div class="cp-panel-body" @key="Model.FormRevision">
+    @if (Model.BlockingSetting is { RequiresBundleEditor: true } setting)
+    {
+        var blocker = Model.BlockingGuardrail;
+        <section id="cc-blocking-setting" class="cp-section cp-field-blocking cp-blocking-snapshot" tabindex="-1" aria-labelledby="cc-blocking-setting-title">
+            <div class="cp-section-heading">
+                <h3 id="cc-blocking-setting-title">@setting.Label</h3>
+                <span class="cp-setting-blocker"><CompassIcon Name="info" Size="14" /> First blocker</span>
+            </div>
+            <code>@Model.Preview!.Result!.FirstFailingGate</code>
+            <p class="cp-help">@(blocker?.Message ?? Model.Preview.Result.Trace.FirstOrDefault(entry => entry.Id == Model.Preview.Result.FirstFailingGate)?.Message)</p>
+            @if (blocker is not null && (blocker.Limit is not null || blocker.ConsumedBefore is not null || blocker.Requested is not null))
+            {
+                <dl class="cp-blocking-values">
+                    @if (blocker.Limit is { } limit)
+                    {
+                        <div><dt>Configured limit</dt><dd>@limit.ToString("G29", CultureInfo.InvariantCulture) @setting.Unit</dd></div>
+                    }
+                    @if (blocker.ConsumedBefore is { } consumed)
+                    {
+                        <div><dt>Already used</dt><dd>@consumed.ToString("G29", CultureInfo.InvariantCulture) @setting.Unit</dd></div>
+                    }
+                    @if (blocker.Requested is { } requested)
+                    {
+                        <div><dt>This request</dt><dd>@requested.ToString("G29", CultureInfo.InvariantCulture) @setting.Unit</dd></div>
+                    }
+                </dl>
+            }
+            <p class="cp-help">This exact setting is in the supplied snapshot, outside the guided fields below.</p>
+            <button id="cc-inspect-blocker" class="cp-button cp-button-small" @onclick="InspectBlocker">
+                <CompassIcon Name="review" Size="16" /> Inspect in bundle editor
+            </button>
+        </section>
+    }
     <section class="cp-section">
         <div class="cp-section-heading">
             <h3><CompassIcon Name="shield" Size="17" /> Billing environment</h3>
@@ -114,20 +149,26 @@
         </div>
         <div class="cp-fields">
             <CompassNumberField TValue="decimal" Id="cc-pool-used" Label="Pooled credits already used" Step="any" Value="Model.Form.Economic.PoolConsumed"
+                                IsBlocking="@(Model.BlockingSettingId == "cc-pool-used")"
                                 ValueChanged="@(value => Model.Form.Economic.PoolConsumed = value)"
                                 ErrorChanged="@(error => FieldError("cc-pool-used", error))"
                                 Hint="Shared entitlement comes from every effective seat." />
-            <div class="cp-field">
+            <div class="@(Model.BlockingSettingId == "cc-paid" ? "cp-field cp-field-blocking" : "cp-field")">
                 <label for="cc-paid">Paid AI usage</label>
-                <select id="cc-paid" @bind="Model.Form.Economic.PaidUsage" @bind:after="Edited">
+                <select id="cc-paid" aria-describedby="@(Model.BlockingSettingId == "cc-paid" ? "cc-paid-blocker" : null)"
+                        @bind="Model.Form.Economic.PaidUsage" @bind:after="Edited">
                     <option value="@GuardrailValue.Disabled">Disabled</option>
                     <option value="@GuardrailValue.Enabled">Enabled</option>
                     <option value="@GuardrailValue.Unknown">Unknown</option>
                 </select>
                 <small>Only needed when included credits cannot cover the request.</small>
+                @if (Model.BlockingSettingId == "cc-paid")
+                {
+                    <span id="cc-paid-blocker" class="cp-setting-blocker"><CompassIcon Name="info" Size="14" /> First blocker</span>
+                }
             </div>
         </div>
-        <details class="cp-advanced-controls" open>
+        <details id="cc-financial-settings" class="cp-advanced-controls" open>
             <summary>User limit &amp; additional-spend budget</summary>
             <label class="cp-toggle" for="cc-use-ulb">
                 <input id="cc-use-ulb" type="checkbox" @bind="Model.Form.Economic.UseIndividualUlb" @bind:after="Edited" />
@@ -137,6 +178,7 @@
             {
                 <div class="cp-fields">
                     <CompassNumberField TValue="decimal" Id="cc-ulb-limit" Label="User limit (credits)" Step="any" Value="Model.Form.Economic.UlbLimit"
+                                        IsBlocking="@(Model.BlockingSettingId == "cc-ulb-limit")"
                                         ValueChanged="@(value => Model.Form.Economic.UlbLimit = value)"
                                         ErrorChanged="@(error => FieldError("cc-ulb-limit", error))" />
                     <CompassNumberField TValue="decimal" Id="cc-ulb-used" Label="User credits already used" Step="any" Value="Model.Form.Economic.UlbConsumed"
@@ -152,6 +194,7 @@
             {
                 <div class="cp-fields">
                     <CompassNumberField TValue="decimal" Id="cc-budget-limit" Label="AI budget limit (USD)" Step="any" Value="Model.Form.Economic.CostCenterBudgetLimit"
+                                        IsBlocking="@(Model.BlockingSettingId == "cc-budget-limit")"
                                         ValueChanged="@(value => Model.Form.Economic.CostCenterBudgetLimit = value)"
                                         ErrorChanged="@(error => FieldError("cc-budget-limit", error))" />
                     <CompassNumberField TValue="decimal" Id="cc-budget-used" Label="AI budget already spent (USD)" Step="any" Value="Model.Form.Economic.CostCenterBudgetConsumed"
@@ -183,13 +226,14 @@
                                     ValueChanged="Model.SetActionsAllowance"
                                     ErrorChanged="@(error => FieldError("cc-actions-allowance", error))" />
             </div>
-            <details class="cp-advanced-controls">
+            <details id="cc-actions-settings" class="cp-advanced-controls" open="@(Model.BlockingSetting?.SectionId == "cc-actions-settings")">
                 <summary>Actions usage &amp; stop budget</summary>
                 <div class="cp-fields">
                     <CompassNumberField TValue="decimal" Id="cc-actions-used" Label="Account minutes already used" Step="1" Value="Model.ActionsConsumed"
                                         ValueChanged="Model.SetActionsConsumed"
                                         ErrorChanged="@(error => FieldError("cc-actions-used", error))" />
                     <CompassNumberField TValue="decimal" Id="cc-actions-budget" Label="Actions budget limit (USD)" Step="any" Value="Model.Form.Actions.BudgetLimit"
+                                        IsBlocking="@(Model.BlockingSettingId == "cc-actions-budget")"
                                         ValueChanged="@(value => Model.Form.Actions.BudgetLimit = value)"
                                         ErrorChanged="@(error => FieldError("cc-actions-budget", error))" />
                     <CompassNumberField TValue="decimal" Id="cc-actions-spend" Label="Actions already spent (USD)" Step="any" Value="Model.Form.Actions.BudgetConsumed"
@@ -209,7 +253,7 @@
     }
 
     <section class="cp-section">
-        <details>
+        <details id="cc-access-settings" open="@(Model.BlockingSetting?.SectionId == "cc-access-settings")">
             <summary>Date, scope &amp; access assumptions</summary>
             <div class="cp-field cp-advanced-controls">
                 <label for="cc-date">Simulation date (edits use 12:00 UTC)</label>
@@ -226,11 +270,18 @@
                 <p class="cp-help">Each checked gate is a supplied permission assumption, not an observed GitHub setting.</p>
                 @foreach (var gate in Model.Configuration.Gates.OrderBy(gate => gate.Sequence))
                 {
-                    <label class="cp-toggle" for="@($"cc-gate-{gate.Id}")">
+                    <label class="@(Model.BlockingSettingId == $"cc-gate-{gate.Id}" ? "cp-toggle cp-field-blocking" : "cp-toggle")" for="@($"cc-gate-{gate.Id}")">
                         <input id="@($"cc-gate-{gate.Id}")" type="checkbox"
+                               aria-describedby="@(Model.BlockingSettingId == $"cc-gate-{gate.Id}" ? $"cc-gate-{gate.Id}-blocker" : null)"
                                checked="@(Model.Scenario.AccessGates.TryGetValue(gate.Id, out var state) ? state.Passed : gate.PassWhenUnspecified)"
                                @onchange="@(e => Update(() => Model.SetGate(gate.Id, e.Value is true)))" />
-                        <span><strong>@gate.Id</strong><small>Assume this catalog access gate passes when applicable.</small></span>
+                        <span>
+                            <strong>@gate.Id</strong><small>Assume this catalog access gate passes when applicable.</small>
+                            @if (Model.BlockingSettingId == $"cc-gate-{gate.Id}")
+                            {
+                                <span id="@($"cc-gate-{gate.Id}-blocker")" class="cp-setting-blocker"><CompassIcon Name="info" Size="14" /> First blocker</span>
+                            }
+                        </span>
                     </label>
                 }
             }
@@ -248,6 +299,7 @@
 @code {
     [Parameter, EditorRequired] public CompassPageModel Model { get; set; } = null!;
     [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback InspectBlocker { get; set; }
 
     private Task Edited() => Update(Model.MarkEdited);
     private Task FieldError(string id, string? error) => Update(() => Model.SetFieldError(id, error));
