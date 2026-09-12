@@ -248,7 +248,7 @@ flowchart TD
     H --> L
 ```
 
-A `$0` ULB blocks immediately. Raising a cost-center or enterprise spending limit cannot override an exhausted ULB.
+A `$0` ULB blocks immediately. Every ULB decision compares the incremental request with `limit - consumed`; fitting within the configured monthly limit is insufficient when the remaining headroom cannot cover the request. Raising a cost-center or enterprise spending limit cannot override an exhausted ULB.
 
 ### 5.3 Shared pool and cost-center included-usage control
 
@@ -269,6 +269,8 @@ flowchart TD
 ```
 
 The cost-center included cap is `Business seats x 1,900 + Enterprise seats x 3,900` under the standard 1 September 2026 allowance. It must be effective-dated. License additions/upgrades increase it immediately; removals/downgrades and moves between controlled cost centers decrease/reallocate it next cycle. Enabling the control is not retroactive.
+
+For a request of `R` credits, calculate `poolRemaining = poolLimit - poolConsumed` and, when an included-usage control applies, `controlRemaining = controlLimit - controlConsumed`. The provisional included allocation is `min(R, poolRemaining, controlRemaining)`; the provisional metered remainder is `R - included`. Thus, a 100-credit request with 60 usable included credits projects 60 included and 40 metered credits, rather than treating all 100 credits as metered.
 
 Whether a single request can split between the final pool credits and metered credits is not documented. Preserve configurable `split` and `meter-entire-request` modes and mark the selected mode as an assumption.
 
@@ -298,6 +300,8 @@ flowchart TD
     Q --> R[Emit 75%, 90%, and 100% alerts crossed]
     R --> S[ALLOW: paid usage]
 ```
+
+For each applicable spending budget, compare the complete proposed metered charge with `limitUsd - consumedUsd`. Positive headroom is not enough: a `$0.40` proposed charge exceeds `$0.20` of remaining hard-budget headroom and must be blocked.
 
 An exhausted spending limit with `Stop usage when budget limit is reached = off` is an alert-only threshold and charges continue. The default is off. A `$0` applicable budget blocks only when it is a hard-stop control; ULBs are always hard stops.
 

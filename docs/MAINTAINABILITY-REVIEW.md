@@ -1,8 +1,10 @@
 # Maintainability Review Findings
 
-Reviewed: 2026-09-02  
-Scope: Entire solution, including Common, Engine, Web, tests, configuration, workflows, and documentation  
-Status: No findings open
+Reviewed: 2026-09-12
+
+Scope: Accuracy of the user-supplied AI-credit decision-flow SVG and `sujithq/ghccp`'s `docs/decision-flow.md`, compared with current official billing documentation and this solution's Engine contracts, applicability, preview client, tests, and supported-scope documentation. The earlier 2026-09-02 whole-solution findings are preserved below; this is not a fresh whole-solution security audit.
+
+Status: Five open documentation findings in the supplied external flow. F-20 is resolved for this repository's canonical flow; the external source remains unchanged.
 
 ## Review Principles
 
@@ -11,7 +13,76 @@ Status: No findings open
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
 
-## Findings
+## Current Decision-Flow Findings
+
+Reviewed source: [external `docs/decision-flow.md`](https://github.com/sujithq/ghccp/blob/main/docs/decision-flow.md), retrieved 2026-09-12. Its own research date remains 2026-08-25. Line numbers below refer to that retrieved 92-line Markdown source, not a file in this checkout. The attached single-line SVG has matching nodes and edges but abbreviated labels; SHA-256: `221DB10A4A4B8285F30FD0302A9270B700F80C5672534791CC1296DB6EF804D3`.
+
+The core budget sequence remains useful: effective ULB precedence, cost-center included controls, shared pool, paid authorization only for overflow, scoped spending budgets, and enterprise exclusions. The following changes are necessary before presenting the diagram as a precise request evaluator or current Compass execution flow.
+
+### F-20: Capacity checks do not consistently use remaining, request-sized headroom
+
+- Severity: High
+- Effort: Small
+- Status: Resolved locally 2026-09-12; external flow not modified.
+- Evidence: External `docs/decision-flow.md:21-24,36-46,56-61` compares X with an "allowance"/ULB, asks whether a cost-center cap is already reached, and permits a hard budget that "has room." Current Engine checks the requested credits against remaining ULB/control capacity in `src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrailEvaluator.cs:77-123,162-199`, and metered USD against remaining budget headroom at `338-344`.
+- Impact: A request can fit the total monthly limit, or find some positive headroom, yet exceed the remaining amount. A partially remaining cost-center cap must still constrain the included portion of a crossing request.
+- Required correction: Define X as the incremental requested credits; subtract existing consumption at every capacity check. Ask whether this request would exceed the remaining cap. Compute a provisional included/metered split using both pool and applicable control headroom. A hard budget must cover the proposed metered charge, not merely be nonzero.
+- Example: A USD 0.40 proposed charge does not fit a USD 0.20 remaining hard budget. For the Compass demo, 100 required credits with 60 remaining requires 40 metered credits, not 100.
+- Dependencies: Preserve effective ULB selection and the first-failing-stage contract. Do not present simulator request sizing as a documented guarantee of GitHub's internal billing granularity.
+- Resolution: The canonical repository flow now defines each check in terms of the incremental request and remaining capacity, calculates the provisional included allocation from both pool and applicable control headroom, derives the metered remainder, and includes the 100/60-credit and USD 0.40/USD 0.20 examples. The Engine already implemented these rules, so no runtime change was required. This closes the repository documentation gap only; the reviewed external Markdown and SVG still require the same correction upstream.
+- Verification: The formulas and examples in [`Copilot-Token-Usage-Simulator-Flows.md`](../Copilot-Token-Usage-Simulator-Flows.md) match the request-sized comparisons and split in [`EconomicGuardrailEvaluator.cs`](../src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrailEvaluator.cs) and the existing Compass preview regressions.
+
+### F-21: The diagram consumes partial included credits before later rejection
+
+- Severity: High
+- Effort: Small
+- Status: Open; external flow not modified.
+- Evidence: External `docs/decision-flow.md:45-50` routes "Consume any remaining pool credits" into a paid-policy gate that can reject the request. Current `src/CopilotUsageSimulator.Engine/Simulation/SimulationPipelineContext.cs:24-46` returns zero accepted allocation/reservations/alerts on non-allowed results. `src/CopilotUsageSimulator.Engine/Simulation/SimulationPreviewService.cs:12-49` evaluates a copied snapshot without advancing the input.
+- Impact: Used literally as a Compass algorithm, the diagram spends remaining credits on a rejected preview and conflates required usage with accepted consumption.
+- Required correction: Rename pre-approval consumption to "Project included allocation and metered remainder." Show acceptance only after every modeled gate succeeds; a blocked Compass preview retains balances. Live work already performed and billed is a separate concern, not something this diagram establishes.
+- Dependencies: F-20 defines the split; preserve immutable preview versus explicit session advancement.
+
+### F-22: Metered-budget exits overstate both blocking and unrestricted usage
+
+- Severity: Medium
+- Effort: Small
+- Status: Open; external flow not modified.
+- Evidence: External `docs/decision-flow.md:29-33` makes a personal budget shortfall a block without representing alert-only enforcement. Lines `59-61` combine "$0 budget" with hard stops and label a missing/disabled stop "uncapped." The current official [budget setup guide](https://docs.github.com/en/billing/how-tos/set-up-budgets) distinguishes alerts from stops for personal and organizational budgets. The [individual](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing) and [organizational](https://docs.github.com/en/copilot/concepts/billing-and-usage/organizations-and-enterprises/billing) billing pages both say additional usage may be capped and may require payment before continuing.
+- Impact: Disabling one budget's stop can appear to override another applicable hard budget or guarantee unlimited billable usage. Conversely, an alert-only personal budget can appear to deny usage.
+- Required correction: First evaluate every applicable hard limit, then distinguish alert-only/missing budgets. Use "No cap from these configured spending budgets; other account/payment/service limits still apply," not unconditional "uncapped." Keep additional-usage authorization distinct from a budget's enforcement mode.
+- Qualification: The official organizational budget page contains both broad "any $0 budget" wording and metered-only/stop-enabled descriptions. Do not resolve that ambiguity by claiming every USD 0 control blocks fully included requests. The current Engine explicitly honors enforcement mode; ULBs are always hard stops.
+- Dependencies: F-20; account/cohort-specific payment limits remain outside the Compass profile.
+
+### F-23: "Direct cost center" omits valid resolved attribution routes
+
+- Severity: Medium
+- Effort: Small
+- Status: Open; external flow not modified.
+- Evidence: External `docs/decision-flow.md:52-54` restricts the cost-center branch label to direct assignment. The official [budget guidance](https://docs.github.com/en/copilot/concepts/billing-and-usage/organizations-and-enterprises/budgets) allows assignment directly, through an enterprise team, or through an organization. `src/CopilotUsageSimulator.Engine/Guardrails/EconomicGuardrailApplicabilityResolver.cs:64-107` consumes the resolved cost center and selects its applicable budgets before the organization fallback and non-excluded enterprise restriction.
+- Impact: Team- or organization-assigned members can be routed to the wrong budget. The billing family must also follow the billed identity/licensing source rather than an unrelated personal subscription.
+- Required correction: Use "Resolved cost center / applicable cost-center budget" and make prior billing attribution an explicit prerequisite. Preserve documented enterprise-budget exclusions and the existing organization fallback.
+- Dependencies: Preserve F-01 selected-seat identity and the existing attribution resolver; no new parallel client-side resolution logic.
+
+### F-24: Financial approval is presented without explicit execution and product boundaries
+
+- Severity: Medium
+- Effort: Small for labels; larger only if unsupported cases are implemented.
+- Status: Open; external flow not modified.
+- Evidence: External `docs/decision-flow.md:7-17,25,32,48,61,80-87` covers multiple billing families and ends at "served" or "metered." `src/CopilotUsageSimulator.Engine/Simulation/CompassPreviewProfile.cs:11-74` deliberately limits Compass to B/E September scenarios and supported workloads. `src/CopilotUsageSimulator.Engine/CopilotUsageSimulationEngine.cs:36-245,253-321` includes attribution/seat, runtime/access, tariff, economics, and a separate later Actions spending check. Current official [code-review documentation](https://docs.github.com/en/copilot/concepts/agents/code-review) includes organization-paid unlicensed reviews outside the ordinary user's included-pool/ULB path.
+- Impact: Readers may mistake an AI-budget overview for a complete guarantee that a task runs, that no separate Actions charge exists, or that Compass implements the personal/legacy branches.
+- Required correction: Label the diagram an AI-credit financial subflow, with access, model availability/eligibility, effective pricing, and workload costing as prerequisites; exclude Actions and special review attribution explicitly. Use "AI-credit funding permitted" rather than unconditional "served." If used to describe Compass, mark personal/legacy branches unsupported and retain indeterminate/waiting/soft-stop/partial and unpriced outcomes outside this subflow.
+- Dependencies: Keep Engine-owned trace and preview contracts authoritative; no reusable rules duplicated in Web.
+
+### F-25: Time-sensitive allowance and migration claims lack a current evidence boundary
+
+- Severity: Low
+- Effort: Small
+- Status: Open; source refresh required before claiming complete current accuracy.
+- Evidence: External `docs/decision-flow.md:3,16-17,20-29` is dated 2026-08-25, gives personal totals without base/flex qualification, and asserts an exclusion for current/former Mobile subscribers plus mandatory annual-term downgrade. The current official [individual billing page](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing) confirms 1,500/7,000/20,000 totals but identifies flex as variable. Its reset is 00:00 UTC on the first calendar day, not the subscription invoice date.
+- Required correction: Keep the currently correct totals, label them dated base-plus-variable-flex values, and spell out the reset boundary. Preserve historic migration branches only with an applicable dated official source and cohort. The current/former Mobile exclusion and mandatory legacy annual downgrade were not reconfirmed on the current individual billing, plan, or plan-management pages checked in this review; absence is not proof that those rules were repealed.
+- Dependencies: Use the existing dated source manifest for Compass. Do not overwrite the preserved pre-implementation analysis or invent personal-plan support to match the diagram.
+
+## Resolved Whole-Solution Findings
 
 ### F-01: Plan entitlement depends on the client
 
@@ -205,10 +276,17 @@ Status: No findings open
 
 ## Low-Hanging Fruit
 
-No open findings currently qualify as low-hanging fruit.
+| Rank | Finding | Severity | Effort | Next action | Dependency |
+|---|---|---|---|---|---|
+| 1 | F-21 | High | Small | Rename pre-approval consumption as a projection; retain balances on rejection. | F-20; immutable preview contract |
+| 2 | F-22 | Medium | Small | Separate hard stops, alert-only budgets, and account/payment caps. | F-20; source qualification for zero budgets |
+| 3 | F-23 | Medium | Small | Replace "direct" with resolved cost-center attribution. | F-01; existing resolver |
+| 4 | F-24 | Medium | Small | Add financial-subflow and supported-feature boundaries. | Engine trace/preview; separate Actions meter |
+| 5 | F-25 | Low | Small | Date the allowances, qualify flex/reset semantics, and source migration/Mobile rules. | Official dated evidence |
 
 ## Planning Dependencies
 
+- F-21 through F-25 concern the external supplied flow. F-20 is resolved in the repository's canonical flow, but neither the remote Markdown nor attached SVG was changed. No repository implementation defect is asserted by these documentation findings.
 - Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
@@ -224,10 +302,18 @@ Initial review baseline:
 - Release build succeeded with zero warnings and errors.
 - No vulnerable direct or transitive NuGet packages were reported.
 
-Current implementation baseline:
+Historical 2026-09-02 implementation baseline:
 
 - Worktree was clean before the F-17 implementation.
 - Release tests passed: 218 total.
 - Release build succeeded with zero warnings and errors.
 - No vulnerable or deprecated direct or transitive NuGet packages were reported.
 - `git diff --check` passed.
+
+2026-09-12 decision-flow review baseline:
+
+- Current checkout was clean at `a117c25` (`fix(engine): enforce declared pricing and eligibility constraints`) before this required ledger update.
+- Read the attached SVG's node/edge labels and the supplied raw Mermaid source. Rechecked the official organization budgets/billing, individual billing/plans, budget setup, plan management, and code-review pages on 2026-09-12.
+- Compared the financial sequence with current Engine allocation, applicability, terminal outcomes, profile, and immutable preview code, plus Web preview wiring and existing regression coverage.
+- The prior session's completed Release baseline was 465 passing tests (Common 6, Engine 347, Web 112), with zero build warnings/errors. Tests/build were not rerun for this documentation-only review; this is not a fresh runtime or dependency-security certification.
+- Only this ledger was edited; the analysis snapshots, implementation, attached SVG, and remote source were preserved.
