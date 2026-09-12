@@ -4,6 +4,8 @@
 
 This new version is implemented in the independent `GitHub Copilot Cost Compass` clone, based on `sujithq/hackathon2026` at `413f6f5359719c32ad00301861c3fdae12da3ab8`. The original implementation analysis and repository history are preserved. The [refreshed Cost Compass analysis and build plan](docs/COST-COMPASS-ANALYSIS.md) is the dated pre-implementation snapshot, verified against 23 official sources on 11 September 2026; it records the supported-case decisions and acceptance criteria.
 
+The [updated AI-credit financial flow](docs/decision-flow.md) explains request-sized headroom, provisional allocation, budget enforcement, and Compass's supported boundaries. Its [unchanged upstream Markdown](docs/reference/decision-flow.upstream-2026-09-12.md) is preserved separately with pinned revision provenance in the updated document.
+
 The reusable engine still follows [Copilot-Token-Usage-Simulator-Flows.md](Copilot-Token-Usage-Simulator-Flows.md). It has no browser, UI, persistence, or network dependency and can also serve a CLI, API, desktop application, or test harness.
 
 ## Run Cost Compass

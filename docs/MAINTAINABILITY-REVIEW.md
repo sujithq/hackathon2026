@@ -291,6 +291,7 @@ No open findings remain from this decision-flow review.
 ## Planning Dependencies
 
 - F-20 through F-25 are resolved in the maintained remote Markdown and supporting research. The separately supplied SVG remains the original reviewed snapshot and was not regenerated; `sujithq/ghccp` does not store a generated SVG under `docs`.
+- The [maintained local financial flow](decision-flow.md) now records those upstream resolutions and the preview/Actions clarifications. Its [unchanged upstream snapshot](reference/decision-flow.upstream-2026-09-12.md) is provenance only, not a second maintained specification.
 - Preserve the F-01 selected-plan/effective-seat invariant when expanding entitlement or plan-selection behavior in other clients.
 - Preserve the F-05 shared balance contract when changing terminal-path projections.
 - Preserve the F-06 inclusive tracking-baseline semantics when changing spending-budget persistence or historical simulation.
@@ -358,3 +359,11 @@ Post-fix review of upstream F-25 resolution:
 
 - Commit [`6a294c6`](https://github.com/sujithq/ghccp/commit/6a294c631842c6005195190995a3e0fdda84c37f) dated and qualified the decision-flow claims. Commits [`8a5d747`](https://github.com/sujithq/ghccp/commit/8a5d747a758b8b0665c4a2971b74f22aacbd7ee7) and [`091c833`](https://github.com/sujithq/ghccp/commit/091c833f07d3189ae9bec9408f38008f00e410ac) aligned the supporting research and repaired a stale USD 0 budget contradiction found during review.
 - Review rechecked allowance totals/composition, reset timing, legacy cohort scope, Mobile-rule absence, request-sized headroom, transactional allocation, enforcement modes, attribution, and financial-subflow boundaries. No remaining F-25 issue or F-20 through F-24 regression was found.
+
+Local copy/update requested 2026-09-12 at `588ed8d`:
+
+- Saved the latest upstream `docs/decision-flow.md` at revision `6a294c631842c6005195190995a3e0fdda84c37f` unchanged as `docs/reference/decision-flow.upstream-2026-09-12.md`; its Git blob matches `6afce95bcbeeef22c8ba6045966e9db25128be96`.
+- Added the maintained `docs/decision-flow.md` adaptation and README link without reverting any upstream finding resolutions. Fully included allocation is now explicitly provisional; personal hard budgets are checked before alert-only outcomes; remaining Actions approval and immutable-preview semantics are explicit.
+- Reconfirmed the cohort-specific annual downgrade using the official legacy billing page, preserving F-25's resolution rather than reviving the earlier unverified claim.
+- Implementation code, saved analyses, original SVG, and the remote repository were not modified. This is documentation-only work; no runtime test/build rerun is required.
+- Snapshot bytes match the pinned upstream Git blob; the updated diagram's 54 node declarations, 68 edges, class references, reachability, and local document links passed structural checks. `git diff --check` passed.
