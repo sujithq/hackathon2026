@@ -18,6 +18,29 @@ Install the SDK pinned in `global.json`, **11.0.100-preview.7.26381.103**, into 
 
 Open `http://localhost:5086/` (also available at `/compass`). `/advanced` retains the original full simulator, including its explicit repeat-and-advance workflow. Navigation links to `/advanced` and `/guide` are disabled because these pages use the legacy layout; direct URLs remain available. Append `?scoutTheme=light` or `?scoutTheme=dark` to choose a theme; otherwise the app follows the OS preference.
 
+### Dev Container
+
+Install Docker with Linux containers and the VS Code **Dev Containers** extension (`ms-vscode-remote.remote-containers`). Open this repository and run **Dev Containers: Reopen in Container**. The [container configuration](.devcontainer/devcontainer.json) installs the exact SDK pinned in [global.json](global.json), Node.js 24 for optional Mermaid asset maintenance, and C# Dev Kit. Initial setup restores the solution; it does not run the app automatically.
+
+In the container terminal:
+
+```bash
+dotnet run --project src/CopilotUsageSimulator.Web --configuration Release --no-launch-profile
+```
+
+Open the **Cost Compass** entry on VS Code's Ports tab (container port `5086`). The app listens on `0.0.0.0` inside the container so forwarding works; if local port `5086` is occupied, use the local address shown in Ports.
+
+```bash
+dotnet test CopilotUsageSimulator.slnx --configuration Release
+dotnet build CopilotUsageSimulator.slnx --configuration Release --no-restore
+```
+
+Use `dotnet`, not the host's Windows `.dotnet/dotnet.exe`. An empty container volume masks the host-local SDK so SDK resolution uses the container installation. Container builds use `artifacts/devcontainer` for both binaries and intermediate files; host `bin`/`obj` outputs are not reused. A separate writable volume isolates `node_modules`. Host SDKs, caches and source files are not deleted.
+
+First creation requires access to Microsoft/GitHub container registries, SDK downloads and NuGet. Setup points the container user's NuGet source at `https://packagefeedproxy.microsoft.io/nuget/v3/index.json`, which works on the repository's corporate network. To use a different feed, set `COMPASS_NUGET_SOURCE` in the container configuration's `containerEnv` and rebuild. Credentials and host package-source settings are not copied into the image, and host NuGet settings are never modified.
+
+No npm install is needed to run the app; the unused pnpm installer is disabled. For optional registry-accessing npm commands, use `--registry=https://packagefeedproxy.microsoft.io/npm/` as required by this repository. After changing the SDK pin or container features, run **Dev Containers: Rebuild Container**; setup rejects an SDK mismatch rather than rolling forward silently.
+
 ## Supported preview scope
 
 | Area | Supported in Compass | Explicit boundary |
