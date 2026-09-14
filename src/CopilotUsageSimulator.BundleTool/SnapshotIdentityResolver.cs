@@ -140,6 +140,8 @@ public sealed class SnapshotIdentityResolver
         ImportChecks.Items(snapshot.Budgets, "budgets");
         ImportChecks.Items(snapshot.UserBudgetStates, "userBudgetStates");
         ImportChecks.Items(snapshot.UsageReports, "usageReports");
+        ImportChecks.Require(snapshot.UsageReports.GroupBy(report => (report.Kind.ToLowerInvariant(), report.User?.ToLowerInvariant())).All(group => group.Count() == 1),
+            "duplicate-usage-report", "Usage evidence must contain at most one report per kind and user for the capture month.");
         ImportChecks.Unique(snapshot.CostCenters.Select(center => center.Id), "costCenters.id");
         ImportChecks.Unique(snapshot.Teams.Select(team => team.Id), "teams.id");
         ImportChecks.Unique(snapshot.Budgets.Select(budget => budget.Id), "budgets.id");
@@ -186,8 +188,8 @@ public sealed class SnapshotIdentityResolver
         {
             ImportChecks.Require(report.Kind is "ai-credit" or "actions" &&
                 report.Year == snapshot.CaptureCompletedAt.UtcDateTime.Year && report.Month == snapshot.CaptureCompletedAt.UtcDateTime.Month &&
-                (report.Kind != "ai-credit" || ImportChecks.Same(report.User, snapshot.SelectedUser)),
-                "usage-period-mismatch", "Usage evidence must refer to the snapshot billing month and selected user, not another period or account.");
+                (report.Kind != "ai-credit" || report.User is null || snapshot.Seats.Any(seat => ImportChecks.Same(seat.UserLogin, report.User))),
+                "usage-period-mismatch", "Usage evidence must refer to the snapshot billing month, enterprise aggregate, or an observed seated user.");
             ImportChecks.Require((report.ObservedAt is null || (report.ObservedAt >= snapshot.CapturedAt && report.ObservedAt <= snapshot.CaptureCompletedAt)) &&
                 (report.ReportedThrough is null || report.ReportedThrough <= (report.ObservedAt ?? snapshot.CaptureCompletedAt)),
                 "usage-cutoff-invalid", "A reporting cutoff cannot be newer than its observation, which must fall inside the capture interval.");

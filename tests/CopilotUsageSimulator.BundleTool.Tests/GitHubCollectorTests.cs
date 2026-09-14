@@ -31,6 +31,23 @@ public sealed class GitHubCollectorTests
     }
 
     [Fact]
+    public async Task CollectsAggregateAndOneUsageReportPerUniqueSeatWhenRequested()
+    {
+        using var handler = new FixtureHandler();
+        using var http = new HttpClient(handler);
+
+        var result = await new GitHubSnapshotCollector(new GitHubReadClient(http, "test-token"), new FixedClock())
+            .CollectAsync("example", "alice", collectAllSeatUsage: true);
+
+        var aiUsage = result.Snapshot.UsageReports.Where(report => report.Kind == "ai-credit").ToArray();
+        Assert.Equal(3, aiUsage.Length);
+        Assert.Null(aiUsage[0].User);
+        Assert.Equal(["alice", "bob"], aiUsage.Skip(1).Select(report => report.User));
+        Assert.Contains(result.Snapshot.Sources, source => source.Dataset == "ai-credit-usage:enterprise" && source.Complete);
+        Assert.Contains(result.Snapshot.Sources, source => source.Dataset == "ai-credit-usage:user:bob" && source.Complete);
+    }
+
+    [Fact]
     public async Task MissingTeamPermissionPreservesPartialSnapshotButPreventsCreation()
     {
         using var handler = new FixtureHandler { FailedPath = "/enterprises/example/teams/ent:developers/memberships" };
@@ -106,7 +123,7 @@ public sealed class GitHubCollectorTests
                     "budget_amount":10,"consumed_amount":999,"prevent_further_usage":true,"budget_alerting":{"will_alert":false,"alert_recipients":["private-email"]}}],"has_next_page":false,"total_count":1}
                     """,
                 "/enterprises/example/settings/billing/budgets/universal/user-states" when query["user"] == "alice" => """{"user_states":[{"user":"alice","consumed_amount":9.5,"target_amount":10}],"has_next_page":false,"total_count":1}""",
-                "/enterprises/example/settings/billing/ai_credit/usage" => $$"""{"enterprise":"example","user":"alice","timePeriod":{"year":2026,"month":{{UsageMonth}}},"usageItems":[]}""",
+                "/enterprises/example/settings/billing/ai_credit/usage" => $$"""{"enterprise":"example","user":"{{query["user"]}}","timePeriod":{"year":2026,"month":{{UsageMonth}}},"usageItems":[]}""",
                 "/enterprises/example/settings/billing/usage/summary" => $$"""{"enterprise":"example","timePeriod":{"year":2026,"month":{{UsageMonth}}},"usageItems":[]}""",
                 _ => throw new InvalidOperationException($"Unexpected fixture request: {request.RequestUri}")
             };

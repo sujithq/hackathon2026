@@ -24,6 +24,7 @@ public sealed class BundleToolApplication(
         collect.Options.Add(new Option<string>("--output") { Required = true, Description = "Snapshot file path, or '-' for JSON-only stdout." });
         collect.Options.Add(new Option<string>("--token-env") { Description = "Token environment variable name; otherwise GH_TOKEN, then GITHUB_TOKEN." });
         collect.Options.Add(new Option<string>("--report") { Description = "Coverage report path; defaults to <output>.report.json." });
+        collect.Options.Add(new Option<bool>("--all-seat-usage") { Description = "Also collect enterprise aggregate and per-seat monthly AI-credit usage reports." });
         collect.Options.Add(new Option<bool>("--overwrite"));
         collect.SetAction((parse, token) => CollectAsync(parse, output, error, token));
         root.Subcommands.Add(collect);
@@ -79,7 +80,8 @@ public sealed class BundleToolApplication(
                 throw new ImportException("token-missing", "Set GH_TOKEN, GITHUB_TOKEN or the named --token-env in your shell. Do not put credentials in command arguments or JSON.", 3);
             using var http = _httpFactory();
             var collected = await new GitHubSnapshotCollector(new GitHubReadClient(http, credential), clock)
-                .CollectAsync(parse.GetValue<string>("--enterprise")!, parse.GetValue<string>("--user")!, token);
+                .CollectAsync(parse.GetValue<string>("--enterprise")!, parse.GetValue<string>("--user")!,
+                    parse.GetValue<bool>("--all-seat-usage"), token);
             return new CommandOutput(ImportJson.Write(collected.Snapshot), collected.Report,
                 collected.Snapshot.Sources.All(source => source.Complete) ? 0 : 3);
         }, target, reportPath, [], parse.GetValue<bool>("--overwrite"), output, error, token);

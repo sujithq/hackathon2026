@@ -148,9 +148,11 @@ public sealed class CommandTests : IDisposable
         var app = new BundleToolApplication(name => { names.Add(name); return "test-token"; },
             () => new HttpClient(new GitHubCollectorTests.FixtureHandler()), new GitHubCollectorTests.FixedClock());
 
-        Assert.Equal(0, await app.RunAsync(["collect", "--enterprise", "example", "--user", "alice", "--token-env", "COMPASS_READ_TOKEN", "--output", "-"], output, new StringWriter()));
+        Assert.Equal(0, await app.RunAsync(["collect", "--enterprise", "example", "--user", "alice", "--all-seat-usage", "--token-env", "COMPASS_READ_TOKEN", "--output", "-"], output, new StringWriter()));
         Assert.Equal(["COMPASS_READ_TOKEN"], names);
-        Assert.Equal("alice", ImportJson.Read<EnterpriseSnapshot>(output.ToString()).SelectedUser);
+        var snapshot = ImportJson.Read<EnterpriseSnapshot>(output.ToString());
+        Assert.Equal("alice", snapshot.SelectedUser);
+        Assert.Equal(3, snapshot.UsageReports.Count(report => report.Kind == "ai-credit"));
         Assert.DoesNotContain("test-token", output.ToString());
     }
 

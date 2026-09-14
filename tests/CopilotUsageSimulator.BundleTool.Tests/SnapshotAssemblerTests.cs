@@ -144,6 +144,28 @@ public sealed class SnapshotAssemblerTests
     }
 
     [Fact]
+    public void DuplicateUsageReportsAreRejected()
+    {
+        var usage = new UsageObservation { Kind = "ai-credit", Year = 2026, Month = 9, User = "alice", Items = [] };
+        var snapshot = ImportFixture.Snapshot() with { UsageReports = [usage, usage] };
+
+        Assert.Equal("duplicate-usage-report", Assert.Throws<ImportException>(() =>
+            _assembler.Create(snapshot, ImportFixture.Workload(), ImportFixture.Overrides(), _catalog)).Code);
+    }
+
+    [Fact]
+    public void UsageForAnUnobservedUserIsRejected()
+    {
+        var snapshot = ImportFixture.Snapshot() with
+        {
+            UsageReports = [new() { Kind = "ai-credit", Year = 2026, Month = 9, User = "mallory", Items = [] }]
+        };
+
+        Assert.Equal("usage-period-mismatch", Assert.Throws<ImportException>(() =>
+            _assembler.Create(snapshot, ImportFixture.Workload(), ImportFixture.Overrides(), _catalog)).Code);
+    }
+
+    [Fact]
     public void CloudAgentUsesSeparateConfirmedActionsAllowanceAndBudget()
     {
         var snapshot = ImportFixture.Snapshot() with

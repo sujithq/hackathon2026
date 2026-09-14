@@ -9,7 +9,12 @@ public sealed class GitHubSnapshotCollector(GitHubReadClient client, TimeProvide
 {
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
-    public async Task<SnapshotCollection> CollectAsync(string enterprise, string user, CancellationToken cancellationToken = default)
+    public Task<SnapshotCollection> CollectAsync(
+        string enterprise, string user, CancellationToken cancellationToken = default) =>
+        CollectAsync(enterprise, user, false, cancellationToken);
+
+    public async Task<SnapshotCollection> CollectAsync(
+        string enterprise, string user, bool collectAllSeatUsage, CancellationToken cancellationToken = default)
     {
         if (!Regex.IsMatch(enterprise, "^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$") || !Regex.IsMatch(user, "^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$"))
             throw new ImportException("invalid-github-identity", "Enterprise and user must be GitHub slugs, not URLs or paths.", 2);
@@ -167,6 +172,19 @@ public sealed class GitHubSnapshotCollector(GitHubReadClient client, TimeProvide
         var aiPath = billing + "/ai_credit/usage?" + period + "&user=" + Uri.EscapeDataString(user);
         await Capture("ai-credit-usage", aiPath, async () => usage.Add(GitHubProjection.Usage(
             await client.ReadObjectAsync(aiPath, cancellationToken), "ai-credit", enterprise, user, _clock.GetUtcNow())));
+        if (collectAllSeatUsage)
+        {
+            var aggregatePath = billing + "/ai_credit/usage?" + period;
+            await Capture("ai-credit-usage:enterprise", aggregatePath, async () => usage.Add(GitHubProjection.Usage(
+                await client.ReadObjectAsync(aggregatePath, cancellationToken), "ai-credit", enterprise, null, _clock.GetUtcNow())));
+            foreach (var seatUser in seats.Select(seat => seat.UserLogin).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(login => !ImportChecks.Same(login, user)).Order(StringComparer.Ordinal))
+            {
+                var path = billing + "/ai_credit/usage?" + period + "&user=" + Uri.EscapeDataString(seatUser);
+                await Capture($"ai-credit-usage:user:{seatUser}", path, async () => usage.Add(GitHubProjection.Usage(
+                    await client.ReadObjectAsync(path, cancellationToken), "ai-credit", enterprise, seatUser, _clock.GetUtcNow())));
+            }
+        }
         var actionsPath = billing + "/usage/summary?" + period + "&product=actions";
         await Capture("actions-usage", actionsPath, async () => usage.Add(GitHubProjection.Usage(
             await client.ReadObjectAsync(actionsPath, cancellationToken), "actions", enterprise, null, _clock.GetUtcNow())));
@@ -183,7 +201,9 @@ public sealed class GitHubSnapshotCollector(GitHubReadClient client, TimeProvide
             CostCenters = centers.OrderBy(center => center.Id, StringComparer.Ordinal).ToArray(),
             Teams = teams.OrderBy(team => team.Id, StringComparer.Ordinal).ToArray(),
             Budgets = budgets.OrderBy(budget => budget.Id, StringComparer.Ordinal).ToArray(),
-            UserBudgetStates = states, EffectiveUserBudget = effective, UsageReports = usage
+            UserBudgetStates = states, EffectiveUserBudget = effective,
+            UsageReports = usage.OrderBy(report => report.Kind, StringComparer.Ordinal)
+                .ThenBy(report => report.User is null ? 0 : 1).ThenBy(report => report.User, StringComparer.Ordinal).ToArray()
         };
         if (Encoding.UTF8.GetByteCount(ImportJson.Write(snapshot)) > ImportFiles.MaximumSnapshotBytes)
             throw new ImportException("snapshot-too-large", "The complete snapshot exceeds 64 MiB; no inventory was pruned.", 3);

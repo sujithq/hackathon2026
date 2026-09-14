@@ -1,10 +1,10 @@
 # Maintainability Review Findings
 
-Reviewed: 2026-09-12
+Reviewed: 2026-09-14
 
-Scope: First-blocker setting guidance in the primary Compass client, including exact Engine identity/metadata mapping, editor boundaries, render/focus lifecycle, shared field styling, tests and documentation. Shared contracts, the other clients and deployment configuration were checked for affected behavior and remain unchanged. Earlier navigation, bundle-tool, flow and whole-solution findings are preserved below.
+Scope: Opt-in enterprise aggregate and per-seat monthly AI-credit usage collection in BundleTool, including CLI behavior, deterministic request/output ordering, snapshot replay validation, privacy boundaries, request amplification, tests and documentation. Earlier blocker-guidance, navigation, bundle-tool, flow and whole-solution findings are preserved below.
 
-Status: Blocker guidance is implemented and reviewed with no open findings. F-31 and F-32 are resolved; all 550 Release tests, the Release build, and desktop/mobile browser checks passed. F-01 through F-30 remain resolved.
+Status: Aggregate/per-seat usage collection is implemented and reviewed with no open findings. F-33 is resolved; all 553 Release tests and the Release build passed. F-01 through F-32 remain resolved.
 
 ## Review Principles
 
@@ -12,6 +12,36 @@ Status: Blocker guidance is implemented and reviewed with no open findings. F-31
 - Keep Web limited to rendering, browser persistence, UI state, and client orchestration.
 - Preserve deterministic behavior, stable identifiers, ordered explanations, first-failing-gate semantics, and projected balances.
 - Resolve applicability, entitlement, and state transitions from the same selected entity identity.
+
+## Aggregate And Per-Seat Usage Review
+
+Reviewed: 2026-09-14 against current staged, unstaged and untracked changes. Scope includes the BundleTool collection option, GitHub request construction, source coverage, snapshot validation, package version, tests and enterprise-import documentation. Engine simulation behavior, the bundle wire format and Web rendering are unchanged.
+
+### F-33: Replayed usage evidence allowed duplicate identity reports
+
+- Severity: Medium
+- Effort: Small
+- Status: Resolved during post-change review.
+- Evidence: The initial multi-user replay validation accepted more than one report with the same usage kind and user for the capture month.
+- Impact: A hand-edited or externally produced snapshot could present ambiguous duplicate aggregate or per-user evidence even though the collector emits one deterministic report per identity.
+- Resolution: Require at most one report per case-insensitive `(kind, user)` identity and require per-user AI reports to identify an observed seat. Enterprise aggregate AI evidence remains represented by `user: null`.
+- Dependencies: Preserve one selected scenario user, immutable previews and the distinction between monthly reported usage and authoritative live pool balances.
+- Verification: Regressions reject duplicate reports and unobserved users; collector coverage verifies aggregate plus one report per unique seat despite duplicate grants.
+
+### Ranked Low-Hanging Fruit
+
+| Rank | Finding | Severity | Effort | Resolution |
+|---|---|---|---|---|
+| 1 | F-33 | Medium | Small | Resolved; unique observed report identities required |
+
+Behavior and validation:
+
+- `collect --all-seat-usage` makes one unfiltered enterprise AI-usage request plus one request for each unique seated login. The existing selected-user request is reused and duplicate grants do not add requests.
+- Reports are sorted deterministically by kind and user. Failed aggregate or per-seat requests remain explicit incomplete sources and cause collection exit `3`; absence is never converted to zero.
+- The original selected-user collector overload remains source-compatible; the expanded collection path uses a separate explicit Boolean overload.
+- The selected `--user` remains the only identity used to create a scenario. Aggregate and other-seat reports are evidence only and do not alter attribution, balances or guardrail evaluation.
+- The guide documents the `N + 1` request cost, additional identity/financial sensitivity, reporting lag and inability to infer an authoritative live pool balance.
+- BundleTool Release tests: 68 passed, zero failures or skips. Full Release solution tests: 553 passed, zero failures or skips. Release solution build succeeded without errors; editor diagnostics are clear.
 
 ## Blocker Setting Review
 

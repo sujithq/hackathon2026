@@ -10,7 +10,7 @@ From the repository root on Windows:
 
 ```powershell
 .\.dotnet\dotnet.exe pack src/CopilotUsageSimulator.BundleTool --configuration Release --output artifacts/bundle-tool/packages
-.\.dotnet\dotnet.exe tool install CopilotUsageSimulator.BundleTool --version 0.1.0 --tool-path artifacts/bundle-tool/bin --add-source artifacts/bundle-tool/packages
+.\.dotnet\dotnet.exe tool install CopilotUsageSimulator.BundleTool --version 0.2.0 --tool-path artifacts/bundle-tool/bin --add-source artifacts/bundle-tool/packages
 $env:DOTNET_ROOT = (Resolve-Path .dotnet).Path
 .\artifacts\bundle-tool\bin\compass-bundle.exe --help
 ```
@@ -44,6 +44,10 @@ For full coverage, use an enterprise-authorized classic PAT with `read:enterpris
 .\artifacts\bundle-tool\bin\compass-bundle.exe collect --enterprise YOUR-ENTERPRISE --user YOUR-LOGIN --output artifacts/enterprise-import/snapshot.json
 ```
 
+Add `--all-seat-usage` to collect an unfiltered enterprise AI-credit usage report and one monthly report for every unique observed Copilot seat login. The selected `--user` remains the single identity used when creating a bundle. For `N` unique seats, this option makes `N + 1` AI-usage requests: one enterprise aggregate and one per user. Duplicate grants for the same GitHub user do not cause duplicate usage requests.
+
+Aggregate reports have `kind: "ai-credit"` and `user: null`; per-seat reports identify the login in `user`. These are monthly reported usage observations, not an authoritative live pool ledger. GitHub does not return a reliable reporting cutoff, so `reportedThrough` remains null and recent activity may not yet appear. A failed per-seat or aggregate request is retained as incomplete source coverage rather than being interpreted as zero usage.
+
 Collection saves an adjacent `snapshot.json.report.json` coverage report. A failed source is recorded with its dataset, endpoint, response-page count, status when available, and sanitized problem. Exit `3` means collection is incomplete even when a useful partial snapshot was saved. Fix authorization/data availability and recollect; do not mark incomplete inventories as empty or manually flip coverage flags.
 
 All HTTP requests are GETs. Pagination stays on the approved HTTPS API host and resource, preserves filters and page sequence, rejects repeated pages, and never follows redirects with credentials. Requests have bounded retries, page deadlines, page counts and response sizes. Ordinary authorization errors are not retried. A long `Retry-After` asks the operator to retry later instead of waiting indefinitely.
@@ -57,7 +61,7 @@ All HTTP requests are GETs. Pagination stays on the approved HTTPS API host and 
 | Enterprise teams | `/teams`, then `/{encoded-slug}/memberships` | Resolve cost-center team references, creation dates and actual membership. Retain membership only for referenced teams; assigning-team metadata is not a substitute. |
 | Budget definitions | `/settings/billing/budgets` | All visible scopes/pages, stable IDs, product/type, amounts, enforcement, alert preference and expiry. |
 | Selected-user budget | `/settings/billing/budgets?user=...`, then `/{id}/user-states?user=...` for multi-user budgets | Separate per-user consumption and returned effective-budget identity from aggregate group consumption. |
-| AI usage | `/settings/billing/ai_credit/usage?year=...&month=...&user=...` | Reported selected-user quantities/amounts with units; not a live pool balance. |
+| AI usage | `/settings/billing/ai_credit/usage?year=...&month=...[&user=...]` | Reported selected-user quantities/amounts by default; `--all-seat-usage` also captures enterprise aggregate and every unique observed seat. Not a live pool balance. |
 | Actions usage | `/settings/billing/usage/summary?year=...&month=...&product=actions` | Separate enterprise Actions reporting across cost centers, not the older endpoint's default no-cost-center subset. |
 
 API response fields outside the typed snapshot are discarded, including emails, avatars, alert-recipient lists and unrelated profile data. Collection records its start/end, API version, source coverage and report periods. The APIs do not establish a current reporting cutoff, so `reportedThrough` remains null. Current configuration is not a historical effective-dated export, and collection is not atomic across endpoints.
@@ -129,7 +133,7 @@ The report includes the typed confirmations, unapplied-confirmation warnings, re
 
 ## Boundaries and Privacy
 
-- One selected user and one workload per bundle. Shared seat inventory across cost centers is retained, but ULB consumption and applicable controls are selected-user data. Export again before changing the selected user; the app's user selector does not fetch fresh consumption.
+- One selected user and one workload per bundle. Shared seat inventory across cost centers is retained, and `--all-seat-usage` may retain monthly usage observations for every seat, but ULB consumption and applicable controls remain selected-user data. Export again before changing the selected user; the app's user selector does not fetch fresh consumption.
 - Current Compass evidence supports Business/Enterprise scenarios from **September 1 through September 27, 2026**, with narrower model-price evidence windows. Collection can run later; creation then reports an unsupported date. Never backdate a live snapshot or extend prices to obtain a successful estimate.
 - The output bundle must fit the browser's **2,097,152-byte** file-import limit. The collector/replay input limit is **64 MiB**, and each HTTP page is bounded to **4 MiB**. Oversized enterprises fail explicitly; seats are never dropped to fit the bundle.
 - Required seat, cost-center, team and budget inventory coverage must be complete. Optional usage/state failures remain visible; missing nonnullable balances still require confirmations. Capture may not cross a UTC billing-month boundary.

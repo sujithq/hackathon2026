@@ -147,7 +147,7 @@ public sealed class GitHubReadClient
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             request.Headers.Add("X-GitHub-Api-Version", ApiVersion);
-            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("compass-bundle", "0.1.0"));
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("compass-bundle", "0.2.0"));
             HttpResponseMessage response;
             try
             {
